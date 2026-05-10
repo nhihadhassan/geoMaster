@@ -1,0 +1,124 @@
+{
+  "type": "Topology",
+  "objects": {
+    "countries": {
+      "type": "GeometryCollection",
+      "geometries": [
+        {
+          "type": "Polygon",
+          "id": "BRA",
+          "properties": { "iso_a3": "BRA", "name": "Brazil" },
+          "arcs": [[0]]
+        },
+        {
+          "type": "Polygon",
+          "id": "USA",
+          "properties": { "iso_a3": "USA", "name": "United States" },
+          "arcs": [[1]]
+        },
+        {
+          "type": "Polygon",
+          "id": "SGP",
+          "properties": { "iso_a3": "SGP", "name": "Singapore" },
+          "arcs": [[2]]
+        },
+        {
+          "type": "Polygon",
+          "id": "FRA",
+          "properties": { "iso_a3": "FRA", "name": "France" },
+          "arcs": [[3]]
+        },
+        {
+          "type": "Polygon",
+          "id": "JPN",
+          "properties": { "iso_a3": "JPN", "name": "Japan" },
+          "arcs": [[4]]
+        },
+        {
+          "type": "Polygon",
+          "id": "AUS",
+          "properties": { "iso_a3": "AUS", "name": "Australia" },
+          "arcs": [[5]]
+        },
+        {
+          "type": "Polygon",
+          "id": "ZAF",
+          "properties": { "iso_a3": "ZAF", "name": "South Africa" },
+          "arcs": [[6]]
+        },
+        {
+          "type": "Polygon",
+          "id": "EGY",
+          "properties": { "iso_a3": "EGY", "name": "Egypt" },
+          "arcs": [[7]]
+        },
+        {
+          "type": "Polygon",
+          "id": "IND",
+          "properties": { "iso_a3": "IND", "name": "India" },
+          "arcs": [[8]]
+        },
+        {
+          "type": "Polygon",
+          "id": "CAN",
+          "properties": { "iso_a3": "CAN", "name": "Canada" },
+          "arcs": [[9]]
+        },
+        {
+          "type": "Polygon",
+          "id": "MEX",
+          "properties": { "iso_a3": "MEX", "name": "Mexico" },
+          "arcs": [[10]]
+        },
+        {
+          "type": "Polygon",
+          "id": "GBR",
+          "properties": { "iso_a3": "GBR", "name": "United Kingdom" },
+          "arcs": [[11]]
+        },
+        {
+          "type": "Polygon",
+          "id": "CHN",
+          "properties": { "iso_a3": "CHN", "name": "China" },
+          "arcs": [[12]]
+        },
+        {
+          "type": "Polygon",
+          "id": "RUS",
+          "properties": { "iso_a3": "RUS", "name": "Russia" },
+          "arcs": [[13]]
+        },
+        {
+          "type": "Polygon",
+          "id": "NGA",
+          "properties": { "iso_a3": "NGA", "name": "Nigeria" },
+          "arcs": [[14]]
+        },
+        {
+          "type": "Polygon",
+          "id": "ARG",
+          "properties": { "iso_a3": "ARG", "name": "Argentina" },
+          "arcs": [[15]]
+        }
+      ]
+    }
+  },
+  "arcs": [
+    [[-74, -34], [-34, -34], [-34, 5], [-74, 5], [-74, -34]],
+    [[-125, 24], [-67, 24], [-67, 49], [-125, 49], [-125, 24]],
+    [[103.6, 1.16], [104.1, 1.16], [104.1, 1.47], [103.6, 1.47], [103.6, 1.16]],
+    [[-5, 42], [8, 42], [8, 51], [-5, 51], [-5, 42]],
+    [[129, 30], [146, 30], [146, 46], [129, 46], [129, 30]],
+    [[113, -44], [154, -44], [154, -10], [113, -10], [113, -44]],
+    [[16, -35], [33, -35], [33, -22], [16, -22], [16, -35]],
+    [[24, 22], [37, 22], [37, 32], [24, 32], [24, 22]],
+    [[68, 8], [97, 8], [97, 37], [68, 37], [68, 8]],
+    [[-141, 42], [-52, 42], [-52, 83], [-141, 83], [-141, 42]],
+    [[-118, 14], [-86, 14], [-86, 33], [-118, 33], [-118, 14]],
+    [[-8, 49], [2, 49], [2, 59], [-8, 59], [-8, 49]],
+    [[73, 18], [135, 18], [135, 54], [73, 54], [73, 18]],
+    [[30, 41], [180, 41], [180, 82], [30, 82], [30, 41]],
+    [[3, 4], [15, 4], [15, 14], [3, 14], [3, 4]],
+    [[-73, -56], [-53, -56], [-53, -22], [-73, -22], [-73, -56]]
+  ]
+}
