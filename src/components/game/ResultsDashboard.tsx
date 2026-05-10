@@ -30,6 +30,8 @@ export function ResultsDashboard() {
         ? "You gave up"
         : "Time expired";
   const modeBResults = Object.values(countryResults);
+  const isTargetQueueMode =
+    selectedMode === "identify-shaded" || selectedMode === "click-country";
   const perfectCount = modeBResults.filter(
     (result) => result.status === "correct",
   ).length;
@@ -39,8 +41,7 @@ export function ResultsDashboard() {
   const resolvedModeBIds = new Set(Object.keys(countryResults));
   const missedCount =
     modeBResults.filter((result) => result.status === "missed").length +
-    (selectedMode === "identify-shaded" &&
-    (gameStatus === "failed" || gameStatus === "gave-up")
+    (isTargetQueueMode && (gameStatus === "failed" || gameStatus === "gave-up")
       ? quizCountries.filter((country) => !resolvedModeBIds.has(country.iso_a3))
           .length
       : 0);
@@ -59,7 +60,7 @@ export function ResultsDashboard() {
       <p className="mt-2 text-sm text-white/64">
         You found {score} of {total} countries.
       </p>
-      {selectedMode === "identify-shaded" ? (
+      {isTargetQueueMode ? (
         <p className="mt-2 text-xs font-medium text-white/50">
           Perfect {perfectCount} · With hints {assistedCount} · Missed{" "}
           {missedCount}

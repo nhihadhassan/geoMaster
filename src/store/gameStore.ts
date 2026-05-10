@@ -12,7 +12,7 @@ export type GameStatus =
   | "completed"
   | "failed"
   | "gave-up";
-export type GameMode = "type-to-fill" | "identify-shaded";
+export type GameMode = "type-to-fill" | "identify-shaded" | "click-country";
 export type CountryResultStatus = "correct" | "assisted" | "missed";
 
 export type CountryResult = {
@@ -23,6 +23,7 @@ export type CountryResult = {
 export type IdentifyGuessResult = {
   outcome: "correct" | "assisted" | "wrong" | "missed" | "ignored";
   country?: Country;
+  clickedCountry?: Country | null;
 };
 
 type FeatureStateDebug = {
@@ -60,6 +61,9 @@ type DebugState = {
   lastMatchAccepted: boolean | null;
   lastPopupIso: string | null;
   lastShadedIso: string | null;
+  lastClickedIso: string | null;
+  lastClickedName: string | null;
+  lastClickSource: "main" | "inset" | null;
   insetMissedCount: number;
 };
 
@@ -93,6 +97,10 @@ type GameState = {
   setCapitalHintEnabled: (enabled: boolean) => void;
   submitTypeGuess: (country: Country) => boolean;
   submitIdentifyGuess: (country: Country | null) => IdentifyGuessResult;
+  submitMapClickGuess: (
+    clickedIso: string | null,
+    source: "main" | "inset",
+  ) => IdentifyGuessResult;
   tick: () => void;
   restoreMapFeatureState: () => void;
   setMapDebug: (debug: Partial<DebugState>) => void;
@@ -106,6 +114,27 @@ const shuffleIds = (countries: Country[]) =>
 
 const getCountryById = (countries: Country[], id: string | undefined) =>
   countries.find((country) => country.iso_a3 === id) ?? null;
+
+const isTargetQueueMode = (mode: GameMode) =>
+  mode === "identify-shaded" || mode === "click-country";
+
+const getSecondIdentifyHint = (country: Country, capitalHintEnabled: boolean) =>
+  capitalHintEnabled
+    ? `Starts with ${country.name.charAt(0).toUpperCase()}, ends with ${country.name.charAt(country.name.length - 1).toUpperCase()}`
+    : `Capital: ${country.capital}`;
+
+const getClickHint = (country: Country, attempt: 1 | 2) => {
+  if (attempt === 1) {
+    return (
+      country.clickHint1 ??
+      (country.isSmall
+        ? "It is an island or small country."
+        : "It is on the mainland.")
+    );
+  }
+
+  return country.clickHint2 ?? `Capital: ${country.capital}`;
+};
 
 const createResetState = (
   selectedRegion: QuizRegion,
@@ -164,6 +193,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     lastMatchAccepted: null,
     lastPopupIso: null,
     lastShadedIso: null,
+    lastClickedIso: null,
+    lastClickedName: null,
+    lastClickSource: null,
     insetMissedCount: 0,
   },
   selectRegion: (selectedRegion) => {
@@ -183,7 +215,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    if (state.selectedMode === "identify-shaded") {
+    if (isTargetQueueMode(state.selectedMode)) {
       const [firstTargetId, ...targetQueue] = shuffleIds(state.quizCountries);
 
       set({
@@ -336,9 +368,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           ? [`Starts with ${target.name.charAt(0).toUpperCase()}`]
           : [
               `Starts with ${target.name.charAt(0).toUpperCase()}`,
-              state.capitalHintEnabled
-                ? `Starts with ${target.name.charAt(0).toUpperCase()}, ends with ${target.name.charAt(target.name.length - 1).toUpperCase()}`
-                : `Capital: ${target.capital}`,
+              getSecondIdentifyHint(target, state.capitalHintEnabled),
             ];
 
       set({
@@ -375,6 +405,121 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
 
     return { outcome: resultStatus, country: target };
+  },
+  submitMapClickGuess: (clickedIso, source) => {
+    const state = get();
+    const target = state.currentTargetCountry;
+    const clickedCountry = clickedIso
+      ? getCountryById(state.quizCountries, clickedIso)
+      : null;
+
+    set({
+      debug: {
+        ...state.debug,
+        lastClickedIso: clickedCountry?.iso_a3 ?? clickedIso,
+        lastClickedName: clickedCountry?.name ?? null,
+        lastClickSource: source,
+      },
+    });
+
+    if (
+      state.gameStatus !== "running" ||
+      state.selectedMode !== "click-country" ||
+      !target
+    ) {
+      return { outcome: "ignored", clickedCountry };
+    }
+
+    if (!clickedCountry) {
+      return { outcome: "ignored", country: target, clickedCountry };
+    }
+
+    const advanceTarget = (
+      countryResults: Record<string, CountryResult>,
+    ) => {
+      const [nextTargetId, ...targetQueue] = state.targetQueue;
+      const nextTarget = getCountryById(state.quizCountries, nextTargetId);
+      const isComplete = !nextTarget;
+      const score = Object.values(countryResults).filter(
+        (result) => result.status === "correct" || result.status === "assisted",
+      ).length;
+
+      return {
+        currentTargetCountry: nextTarget,
+        targetQueue,
+        score,
+        gameStatus: isComplete ? ("completed" as GameStatus) : state.gameStatus,
+      };
+    };
+
+    if (clickedCountry.iso_a3 !== target.iso_a3) {
+      const attempts = (state.incorrectAttempts[target.iso_a3] ?? 0) + 1;
+      const incorrectAttempts = {
+        ...state.incorrectAttempts,
+        [target.iso_a3]: attempts,
+      };
+
+      if (attempts >= 3) {
+        const countryResults = {
+          ...state.countryResults,
+          [target.iso_a3]: {
+            status: "missed" as CountryResultStatus,
+            attemptsUsed: 3,
+          },
+        };
+        const nextState = advanceTarget(countryResults);
+
+        set({
+          ...nextState,
+          countryResults,
+          incorrectAttempts,
+          currentInput: "",
+          currentTargetHints: [],
+          smartHint: null,
+        });
+
+        return { outcome: "missed", country: target, clickedCountry };
+      }
+
+      const currentTargetHints =
+        attempts === 1
+          ? [getClickHint(target, 1)]
+          : [getClickHint(target, 1), getClickHint(target, 2)];
+
+      set({
+        incorrectAttempts,
+        currentTargetHints,
+        smartHint: currentTargetHints.at(-1) ?? null,
+      });
+
+      return { outcome: "wrong", country: target, clickedCountry };
+    }
+
+    const attemptsUsed = state.incorrectAttempts[target.iso_a3] ?? 0;
+    const resultStatus: CountryResultStatus =
+      attemptsUsed === 0 ? "correct" : "assisted";
+    const guessedCountryIds = [...state.guessedCountryIds, target.iso_a3];
+    const countryResults = {
+      ...state.countryResults,
+      [target.iso_a3]: {
+        status: resultStatus,
+        attemptsUsed: attemptsUsed + 1,
+      },
+    };
+    const nextState = advanceTarget(countryResults);
+
+    set({
+      ...nextState,
+      guessedCountryIds,
+      countryResults,
+      currentInput: "",
+      lastMatchedCountry: target,
+      lastMatchSequence: state.lastMatchSequence + 1,
+      currentTargetHints: [],
+      smartHint: null,
+    });
+
+    return { outcome: resultStatus, country: target, clickedCountry };
   },
   tick: () => {
     const state = get();

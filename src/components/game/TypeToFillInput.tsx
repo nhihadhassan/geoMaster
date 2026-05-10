@@ -39,6 +39,29 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
   const [localHint, setLocalHint] = useState<string | null>(null);
   const inputDisabled = gameStatus !== "running";
 
+  if (selectedMode === "click-country") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 28, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 280, damping: 30 }}
+        className="pointer-events-none absolute inset-x-4 bottom-6 z-20 mx-auto max-w-2xl rounded-[2rem] border border-white/16 bg-black/38 p-2 shadow-2xl shadow-black/40 backdrop-blur-2xl"
+      >
+        <div className="grid h-16 place-items-center rounded-[1.55rem] border border-white/10 bg-white/10 px-6 text-center text-sm font-semibold text-white/70 sm:text-base">
+          {gameStatus === "running"
+            ? "Click the country shown in the prompt"
+            : gameStatus === "completed"
+              ? "Quiz complete"
+              : gameStatus === "failed"
+                ? "Time expired"
+                : gameStatus === "gave-up"
+                  ? "Quiz ended"
+                  : "Choose a region, then start the quiz"}
+        </div>
+      </motion.div>
+    );
+  }
+
   const vibrate = (pattern: number | number[]) => {
     navigator.vibrate?.(pattern);
   };

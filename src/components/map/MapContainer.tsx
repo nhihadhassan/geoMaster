@@ -397,6 +397,12 @@ function MapDebugPanel({
         <dd>{debug.lastPopupIso ?? "none"}</dd>
         <dt>Shaded ISO</dt>
         <dd>{debug.lastShadedIso ?? "none"}</dd>
+        <dt>Clicked ISO</dt>
+        <dd>{debug.lastClickedIso ?? "none"}</dd>
+        <dt>Clicked name</dt>
+        <dd>{debug.lastClickedName ?? "none"}</dd>
+        <dt>Click source</dt>
+        <dd>{debug.lastClickSource ?? "none"}</dd>
         <dt>Target</dt>
         <dd>
           {currentTargetCountry
@@ -563,6 +569,7 @@ export function MapContainer() {
     (state) => state.currentTargetCountry,
   );
   const currentTargetHints = useGameStore((state) => state.currentTargetHints);
+  const incorrectAttempts = useGameStore((state) => state.incorrectAttempts);
   const smartHint = useGameStore((state) => state.smartHint);
   const capitalHintEnabled = useGameStore(
     (state) => state.capitalHintEnabled,
@@ -571,6 +578,9 @@ export function MapContainer() {
   const remainingSeconds = useGameStore((state) => state.remainingSeconds);
   const setCapitalHintEnabled = useGameStore(
     (state) => state.setCapitalHintEnabled,
+  );
+  const submitMapClickGuess = useGameStore(
+    (state) => state.submitMapClickGuess,
   );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
   const quizCountryIdList = useMemo(
@@ -608,23 +618,24 @@ export function MapContainer() {
         .map(([iso]) => iso),
     [resultEntries],
   );
+  const isTargetQueueMode =
+    selectedMode === "identify-shaded" || selectedMode === "click-country";
   const remainingCountryIds = useMemo(
     () => {
-      const completedIds =
-        selectedMode === "identify-shaded"
-          ? resolvedCountryIds
-          : guessedCountryIds;
+      const completedIds = isTargetQueueMode
+        ? resolvedCountryIds
+        : guessedCountryIds;
 
       return quizCountries
         .map((country) => country.iso_a3)
         .filter((iso) => !completedIds.includes(iso));
     },
-    [guessedCountryIds, quizCountries, resolvedCountryIds, selectedMode],
+    [guessedCountryIds, isTargetQueueMode, quizCountries, resolvedCountryIds],
   );
   const remainingCount = remainingCountryIds.length;
   const missedCountryIds = useMemo(
     () => {
-      if (selectedMode === "identify-shaded") {
+      if (isTargetQueueMode) {
         return [
           ...new Set([
             ...modeBMissedCountryIds,
@@ -643,7 +654,7 @@ export function MapContainer() {
       gameStatus,
       modeBMissedCountryIds,
       remainingCountryIds,
-      selectedMode,
+      isTargetQueueMode,
     ],
   );
   const visibleLabelIds = useMemo(
@@ -652,7 +663,7 @@ export function MapContainer() {
         return quizCountryIdList;
       }
 
-      if (selectedMode === "identify-shaded") {
+      if (isTargetQueueMode) {
         return resolvedCountryIds;
       }
 
@@ -661,15 +672,17 @@ export function MapContainer() {
     [
       gameStatus,
       guessedCountryIds,
+      isTargetQueueMode,
       quizCountryIdList,
       resolvedCountryIds,
-      selectedMode,
     ],
   );
   const caribbeanInsetMounted =
     Boolean(topologyData) &&
     selectedRegion === "north-america" &&
-    (selectedMode === "type-to-fill" || selectedMode === "identify-shaded") &&
+    (selectedMode === "type-to-fill" ||
+      selectedMode === "identify-shaded" ||
+      selectedMode === "click-country") &&
     gameStatus !== "idle";
   const labelCollections = useMemo(
     () =>
@@ -701,6 +714,9 @@ export function MapContainer() {
     selectedMode === "identify-shaded" &&
     gameStatus === "running" &&
     Boolean(currentTargetCountry);
+  const currentTargetAttemptCount = currentTargetCountry
+    ? incorrectAttempts[currentTargetCountry.iso_a3] ?? 0
+    : 0;
   const insetTargetHighlightActive =
     caribbeanInsetMounted &&
     targetHighlightActive &&
@@ -1348,7 +1364,8 @@ export function MapContainer() {
     const region = getRegionConfig(selectedRegion);
     const shouldFrameQuizRegion =
       (selectedMode === "type-to-fill" ||
-        selectedMode === "identify-shaded") &&
+        selectedMode === "identify-shaded" ||
+        selectedMode === "click-country") &&
       gameStatus !== "idle";
     const regionPadding =
       typeof window !== "undefined" && window.innerWidth < 768
@@ -1450,7 +1467,7 @@ export function MapContainer() {
     syncPaintExpressions,
   ]);
 
-  const handleCountryMatched = (
+  const handleCountryMatched = useCallback((
     country: Country,
     outcome?: "correct" | "assisted",
   ) => {
@@ -1478,7 +1495,94 @@ export function MapContainer() {
       lastPopupIso: country.iso_a3,
       lastShadedIso: country.iso_a3,
     });
-  };
+  }, [
+    applyCountryFeatureState,
+    assistedCountryIds,
+    guessedCountryIds,
+    setMapDebug,
+    syncPaintExpressions,
+  ]);
+
+  const handleInsetCountryClick = useCallback(
+    (iso: string | null) => {
+      const result = submitMapClickGuess(iso, "inset");
+
+      if (
+        (result.outcome === "correct" || result.outcome === "assisted") &&
+        result.country
+      ) {
+        handleCountryMatched(result.country, result.outcome);
+      } else if (result.outcome === "wrong" || result.outcome === "ignored") {
+        navigator.vibrate?.([18, 24, 18]);
+      } else if (result.outcome === "missed") {
+        navigator.vibrate?.([28, 36, 28]);
+      }
+    },
+    [handleCountryMatched, submitMapClickGuess],
+  );
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!mapLoaded || !map) {
+      return;
+    }
+
+    const canvas = map.getCanvas();
+    canvas.style.cursor =
+      selectedMode === "click-country" && gameStatus === "running"
+        ? "pointer"
+        : "";
+
+    if (selectedMode !== "click-country" || gameStatus !== "running") {
+      return () => {
+        canvas.style.cursor = "";
+      };
+    }
+
+    const handleClick = (event: mapboxgl.MapMouseEvent) => {
+      if (!map.getLayer(FILL_LAYER_ID)) {
+        return;
+      }
+
+      const [feature] = map.queryRenderedFeatures(event.point, {
+        layers: [FILL_LAYER_ID],
+      });
+      const iso =
+        typeof feature?.properties?.iso_a3 === "string"
+          ? feature.properties.iso_a3
+          : null;
+      const clickedIso = iso && quizCountryIdList.includes(iso) ? iso : null;
+      const result = submitMapClickGuess(clickedIso, "main");
+
+      if (
+        (result.outcome === "correct" || result.outcome === "assisted") &&
+        result.country
+      ) {
+        handleCountryMatched(result.country, result.outcome);
+      } else if (result.outcome === "wrong" || result.outcome === "ignored") {
+        navigator.vibrate?.([18, 24, 18]);
+      } else if (result.outcome === "missed") {
+        navigator.vibrate?.([28, 36, 28]);
+        syncPaintExpressions(map);
+      }
+    };
+
+    map.on("click", handleClick);
+
+    return () => {
+      map.off("click", handleClick);
+      canvas.style.cursor = "";
+    };
+  }, [
+    gameStatus,
+    handleCountryMatched,
+    mapLoaded,
+    quizCountryIdList,
+    selectedMode,
+    submitMapClickGuess,
+    syncPaintExpressions,
+  ]);
 
   const handleTestBrazilShade = () => {
     const map = mapRef.current;
@@ -1581,15 +1685,23 @@ export function MapContainer() {
             targetCountryId={
               targetHighlightActive ? currentTargetCountry?.iso_a3 ?? null : null
             }
+            clickEnabled={
+              selectedMode === "click-country" && gameStatus === "running"
+            }
+            onCountryClick={handleInsetCountryClick}
             onLabelSourceLoaded={handleInsetLabelLayerLoaded}
           />
         ) : null}
       </AnimatePresence>
-      {selectedMode === "identify-shaded" && gameStatus === "running" ? (
+      {(selectedMode === "identify-shaded" ||
+        selectedMode === "click-country") &&
+      gameStatus === "running" ? (
         <TargetHintCard
+          mode={selectedMode}
           targetCountry={currentTargetCountry}
           smartHint={smartHint}
           currentTargetHints={currentTargetHints}
+          attemptCount={currentTargetAttemptCount}
           capitalHintEnabled={capitalHintEnabled}
           onCapitalHintChange={setCapitalHintEnabled}
         />

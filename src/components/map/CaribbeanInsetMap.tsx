@@ -60,6 +60,8 @@ type CaribbeanInsetMapProps = {
   remainingCountryIds: string[];
   pulseActive: boolean;
   targetCountryId: string | null;
+  clickEnabled?: boolean;
+  onCountryClick?: (iso: string | null) => void;
   onLabelSourceLoaded?: (loaded: boolean) => void;
 };
 
@@ -145,6 +147,8 @@ export function CaribbeanInsetMap({
   remainingCountryIds,
   pulseActive,
   targetCountryId,
+  clickEnabled = false,
+  onCountryClick,
   onLabelSourceLoaded,
 }: CaribbeanInsetMapProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
@@ -195,12 +199,18 @@ export function CaribbeanInsetMap({
       fitBoundsOptions: {
         padding: 18,
       },
-      interactive: false,
+      interactive: true,
       attributionControl: false,
       projection: "mercator",
     });
 
     mapRef.current = map;
+    map.dragPan.disable();
+    map.scrollZoom.disable();
+    map.boxZoom.disable();
+    map.doubleClickZoom.disable();
+    map.touchZoomRotate.disable();
+    map.keyboard.disable();
 
     map.once("load", () => {
       hideLabels(map);
@@ -225,6 +235,47 @@ export function CaribbeanInsetMap({
       setMapLoaded(false);
     };
   }, [mapboxToken, onLabelSourceLoaded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!mapLoaded || !map) {
+      return;
+    }
+
+    const canvas = map.getCanvas();
+    canvas.style.cursor = clickEnabled ? "pointer" : "";
+
+    if (!clickEnabled) {
+      return () => {
+        canvas.style.cursor = "";
+      };
+    }
+
+    const handleClick = (event: mapboxgl.MapMouseEvent) => {
+      if (!map.getLayer(INSET_FILL_LAYER_ID)) {
+        onCountryClick?.(null);
+        return;
+      }
+
+      const [feature] = map.queryRenderedFeatures(event.point, {
+        layers: [INSET_FILL_LAYER_ID],
+      });
+      const iso =
+        typeof feature?.properties?.iso_a3 === "string"
+          ? feature.properties.iso_a3
+          : null;
+
+      onCountryClick?.(iso && caribbeanCountryIds.has(iso) ? iso : null);
+    };
+
+    map.on("click", handleClick);
+
+    return () => {
+      map.off("click", handleClick);
+      canvas.style.cursor = "";
+    };
+  }, [clickEnabled, mapLoaded, onCountryClick]);
 
   const ensureLayers = useCallback(
     (map: Map) => {

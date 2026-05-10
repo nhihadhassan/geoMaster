@@ -17,6 +17,7 @@ const formatTime = (seconds: number) => {
 const modeLabels: Record<GameMode, string> = {
   "type-to-fill": "Type",
   "identify-shaded": "Identify",
+  "click-country": "Map Click",
 };
 
 export function GameHud() {
@@ -44,12 +45,14 @@ export function GameHud() {
   const missedCount = modeBResults.filter(
     (result) => result.status === "missed",
   ).length;
+  const isTargetQueueMode =
+    selectedMode === "identify-shaded" || selectedMode === "click-country";
   const identifiedCount =
-    selectedMode === "identify-shaded"
+    isTargetQueueMode
       ? perfectCount + assistedCount
       : guessedCountryIds.length;
   const progressCount =
-    selectedMode === "identify-shaded"
+    isTargetQueueMode
       ? modeBResults.length
       : guessedCountryIds.length;
   const progress = total === 0 ? 0 : progressCount / total;
@@ -78,7 +81,7 @@ export function GameHud() {
         <p className="text-sm font-medium text-white/82">
           {identifiedCount}/{total} countries
         </p>
-        {selectedMode === "identify-shaded" && modeBResults.length > 0 ? (
+        {isTargetQueueMode && modeBResults.length > 0 ? (
           <p className="mt-0.5 text-[0.68rem] font-medium text-white/48">
             Perfect {perfectCount} · Hints {assistedCount} · Missed {missedCount}
           </p>
