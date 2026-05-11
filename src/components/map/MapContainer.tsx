@@ -4,7 +4,9 @@ import mapboxgl, { type GeoJSONSource, type Map } from "mapbox-gl";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, Geometry } from "geojson";
+import { AntarcticaEducationCard } from "@/components/game/AntarcticaEducationCard";
 import { GameHud } from "@/components/game/GameHud";
+import { LearningModeCard } from "@/components/game/LearningModeCard";
 import { PremiumControls } from "@/components/game/PremiumControls";
 import { ResultsDashboard } from "@/components/game/ResultsDashboard";
 import { TargetHintCard } from "@/components/game/TargetHintCard";
@@ -22,6 +24,13 @@ import {
 } from "@/data/countries";
 import { buildLabelCollections } from "@/data/labelPlacements";
 import {
+  findLearningFeature,
+  landmarkFeatureCollection,
+  physicalFeatureCollection,
+  subdivisionFeatureCollection,
+} from "@/data/learningFeatures";
+import { buildSmallCountryGuideCollections } from "@/data/smallCountryGuides";
+import {
   useWorldTopology,
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
@@ -35,6 +44,17 @@ const REMAINING_PULSE_FILL_LAYER_ID = "geomaster-remaining-pulse-fill";
 const REMAINING_PULSE_LINE_LAYER_ID = "geomaster-remaining-pulse-line";
 const LABEL_SOURCE_ID = "geomaster-country-labels";
 const LEADER_SOURCE_ID = "geomaster-country-leaders";
+const GUIDE_CIRCLE_SOURCE_ID = "geomaster-small-country-guide-circles";
+const GUIDE_LINE_SOURCE_ID = "geomaster-small-country-guide-lines";
+const GUIDE_CIRCLE_LAYER_ID = "geomaster-small-country-guide-circle-layer";
+const GUIDE_LINE_LAYER_ID = "geomaster-small-country-guide-line-layer";
+const SUBDIVISION_SOURCE_ID = "geomaster-subdivisions";
+const SUBDIVISION_LABEL_LAYER_ID = "geomaster-subdivision-label-layer";
+const PHYSICAL_SOURCE_ID = "geomaster-physical-features";
+const PHYSICAL_LABEL_LAYER_ID = "geomaster-physical-feature-label-layer";
+const LANDMARK_SOURCE_ID = "geomaster-landmarks";
+const LANDMARK_CIRCLE_LAYER_ID = "geomaster-landmark-circle-layer";
+const LANDMARK_LABEL_LAYER_ID = "geomaster-landmark-label-layer";
 const LABEL_LAYER_PREFIX = "geomaster-country-label-layer";
 const LEADER_LAYER_ID = "geomaster-country-leader-layer";
 const DEBUG_LABEL_SOURCE_ID = "geomaster-debug-country-labels";
@@ -44,8 +64,9 @@ const DEBUG_LEADER_LAYER_ID = "geomaster-debug-country-leader-layer";
 const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const LABEL_ANCHORS = ["center", "left", "right", "top", "bottom"] as const;
-const LABEL_LAYER_IDS = LABEL_ANCHORS.map(
-  (anchor) => `${LABEL_LAYER_PREFIX}-${anchor}`,
+const LABEL_KINDS = ["fallback", "manual"] as const;
+const LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
+  LABEL_ANCHORS.map((anchor) => `${LABEL_LAYER_PREFIX}-${kind}-${anchor}`),
 );
 const GEOMASTER_LAYER_IDS = [
   FILL_LAYER_ID,
@@ -53,6 +74,12 @@ const GEOMASTER_LAYER_IDS = [
   TARGET_GLOW_LAYER_ID,
   REMAINING_PULSE_FILL_LAYER_ID,
   REMAINING_PULSE_LINE_LAYER_ID,
+  GUIDE_LINE_LAYER_ID,
+  GUIDE_CIRCLE_LAYER_ID,
+  SUBDIVISION_LABEL_LAYER_ID,
+  PHYSICAL_LABEL_LAYER_ID,
+  LANDMARK_CIRCLE_LAYER_ID,
+  LANDMARK_LABEL_LAYER_ID,
   LEADER_LAYER_ID,
   ...LABEL_LAYER_IDS,
   DEBUG_LEADER_LAYER_ID,
@@ -264,6 +291,9 @@ const formatDebugBoolean = (value: boolean) => (value ? "yes" : "no");
 const getMapDebugSnapshot = (map: Map) => ({
   sourceIds: [
     SOURCE_ID,
+    SUBDIVISION_SOURCE_ID,
+    PHYSICAL_SOURCE_ID,
+    LANDMARK_SOURCE_ID,
     LEADER_SOURCE_ID,
     LABEL_SOURCE_ID,
     DEBUG_LEADER_SOURCE_ID,
@@ -276,6 +306,23 @@ const getMapDebugSnapshot = (map: Map) => ({
   leaderLayerLoaded: Boolean(map.getLayer(LEADER_LAYER_ID)),
   projection: map.getProjection?.().name ?? "unknown",
 });
+
+const LEARNING_LAYER_IDS = [
+  SUBDIVISION_LABEL_LAYER_ID,
+  PHYSICAL_LABEL_LAYER_ID,
+  LANDMARK_CIRCLE_LAYER_ID,
+  LANDMARK_LABEL_LAYER_ID,
+];
+
+const setLearningLayerVisibility = (map: Map, visible: boolean) => {
+  LEARNING_LAYER_IDS.forEach((layerId) => {
+    if (!map.getLayer(layerId)) {
+      return;
+    }
+
+    map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+  });
+};
 
 type MapDebugPanelProps = {
   onTestBrazilShade: () => void;
@@ -557,8 +604,23 @@ export function MapContainer() {
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
+  const [debugUiEnabled] = useState(() => {
+    if (!IS_DEVELOPMENT || typeof window === "undefined") {
+      return false;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+
+    return (
+      params.has("debug") ||
+      window.localStorage.getItem("geomaster-debug") === "1"
+    );
+  });
   const { data: topologyData, error: topologyError } = useWorldTopology();
   const selectedRegion = useGameStore((state) => state.selectedRegion);
+  const selectedSpecialRegion = useGameStore(
+    (state) => state.selectedSpecialRegion,
+  );
   const selectedMode = useGameStore((state) => state.selectedMode);
   const quizCountries = useGameStore((state) => state.quizCountries);
   const guessedCountryIds = useGameStore((state) => state.guessedCountryIds);
@@ -579,10 +641,28 @@ export function MapContainer() {
   const setCapitalHintEnabled = useGameStore(
     (state) => state.setCapitalHintEnabled,
   );
+  const clearSpecialRegion = useGameStore((state) => state.clearSpecialRegion);
+  const autoHideCorrectCard = useGameStore(
+    (state) => state.autoHideCorrectCard,
+  );
+  const clearCorrectCard = useGameStore((state) => state.clearCorrectCard);
+  const selectedLearningFeature = useGameStore(
+    (state) => state.selectedLearningFeature,
+  );
+  const selectLearningCountry = useGameStore(
+    (state) => state.selectLearningCountry,
+  );
+  const selectLearningFeature = useGameStore(
+    (state) => state.selectLearningFeature,
+  );
+  const clearLearningFeature = useGameStore(
+    (state) => state.clearLearningFeature,
+  );
   const submitMapClickGuess = useGameStore(
     (state) => state.submitMapClickGuess,
   );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
+
   const quizCountryIdList = useMemo(
     () => quizCountries.map((country) => country.iso_a3),
     [quizCountries],
@@ -620,6 +700,11 @@ export function MapContainer() {
   );
   const isTargetQueueMode =
     selectedMode === "identify-shaded" || selectedMode === "click-country";
+  const learningModeActive = gameStatus === "idle" && !selectedSpecialRegion;
+  const learningLabelIds = useMemo(
+    () => countries.map((country) => country.iso_a3),
+    [],
+  );
   const remainingCountryIds = useMemo(
     () => {
       const completedIds = isTargetQueueMode
@@ -659,6 +744,10 @@ export function MapContainer() {
   );
   const visibleLabelIds = useMemo(
     () => {
+      if (learningModeActive) {
+        return learningLabelIds;
+      }
+
       if (gameStatus === "failed" || gameStatus === "gave-up") {
         return quizCountryIdList;
       }
@@ -673,6 +762,8 @@ export function MapContainer() {
       gameStatus,
       guessedCountryIds,
       isTargetQueueMode,
+      learningLabelIds,
+      learningModeActive,
       quizCountryIdList,
       resolvedCountryIds,
     ],
@@ -686,10 +777,24 @@ export function MapContainer() {
     gameStatus !== "idle";
   const labelCollections = useMemo(
     () =>
-      buildLabelCollections(quizCountries, visibleLabelIds, "main", {
+      buildLabelCollections(learningModeActive ? countries : quizCountries, visibleLabelIds, "main", {
         hideMainInsetLabels: caribbeanInsetMounted,
       }),
-    [caribbeanInsetMounted, quizCountries, visibleLabelIds],
+    [caribbeanInsetMounted, learningModeActive, quizCountries, visibleLabelIds],
+  );
+  const guideCountryIds = useMemo(() => {
+    if (gameStatus !== "running") {
+      return [];
+    }
+
+    const labeledIds = new Set(visibleLabelIds);
+
+    return quizCountryIdList.filter((countryId) => !labeledIds.has(countryId));
+  }, [gameStatus, quizCountryIdList, visibleLabelIds]);
+  const guideCollections = useMemo(
+    () =>
+      buildSmallCountryGuideCollections(quizCountries, guideCountryIds, "main"),
+    [guideCountryIds, quizCountries],
   );
   const debugLabelCollections = useMemo(
     () =>
@@ -821,6 +926,21 @@ export function MapContainer() {
       const existingLabelSource = map.getSource(LABEL_SOURCE_ID) as
         | GeoJSONSource
         | undefined;
+      const existingGuideCircleSource = map.getSource(
+        GUIDE_CIRCLE_SOURCE_ID,
+      ) as GeoJSONSource | undefined;
+      const existingGuideLineSource = map.getSource(
+        GUIDE_LINE_SOURCE_ID,
+      ) as GeoJSONSource | undefined;
+      const existingSubdivisionSource = map.getSource(
+        SUBDIVISION_SOURCE_ID,
+      ) as GeoJSONSource | undefined;
+      const existingPhysicalSource = map.getSource(
+        PHYSICAL_SOURCE_ID,
+      ) as GeoJSONSource | undefined;
+      const existingLandmarkSource = map.getSource(
+        LANDMARK_SOURCE_ID,
+      ) as GeoJSONSource | undefined;
       const existingDebugLeaderSource = map.getSource(
         DEBUG_LEADER_SOURCE_ID,
       ) as GeoJSONSource | undefined;
@@ -843,6 +963,51 @@ export function MapContainer() {
         map.addSource(LABEL_SOURCE_ID, {
           type: "geojson",
           data: labelCollections.labels,
+        });
+      }
+
+      if (existingGuideCircleSource) {
+        existingGuideCircleSource.setData(guideCollections.circles);
+      } else {
+        map.addSource(GUIDE_CIRCLE_SOURCE_ID, {
+          type: "geojson",
+          data: guideCollections.circles,
+        });
+      }
+
+      if (existingGuideLineSource) {
+        existingGuideLineSource.setData(guideCollections.leaders);
+      } else {
+        map.addSource(GUIDE_LINE_SOURCE_ID, {
+          type: "geojson",
+          data: guideCollections.leaders,
+        });
+      }
+
+      if (existingSubdivisionSource) {
+        existingSubdivisionSource.setData(subdivisionFeatureCollection);
+      } else {
+        map.addSource(SUBDIVISION_SOURCE_ID, {
+          type: "geojson",
+          data: subdivisionFeatureCollection,
+        });
+      }
+
+      if (existingPhysicalSource) {
+        existingPhysicalSource.setData(physicalFeatureCollection);
+      } else {
+        map.addSource(PHYSICAL_SOURCE_ID, {
+          type: "geojson",
+          data: physicalFeatureCollection,
+        });
+      }
+
+      if (existingLandmarkSource) {
+        existingLandmarkSource.setData(landmarkFeatureCollection);
+      } else {
+        map.addSource(LANDMARK_SOURCE_ID, {
+          type: "geojson",
+          data: landmarkFeatureCollection,
         });
       }
 
@@ -977,6 +1142,164 @@ export function MapContainer() {
         });
       }
 
+      if (!map.getLayer(GUIDE_LINE_LAYER_ID)) {
+        map.addLayer({
+          id: GUIDE_LINE_LAYER_ID,
+          type: "line",
+          source: GUIDE_LINE_SOURCE_ID,
+          paint: {
+            "line-color": "#0f172a",
+            "line-opacity": 0.28,
+            "line-width": 0.85,
+            "line-dasharray": [1.4, 1.4],
+          },
+        });
+      }
+
+      if (!map.getLayer(GUIDE_CIRCLE_LAYER_ID)) {
+        map.addLayer({
+          id: GUIDE_CIRCLE_LAYER_ID,
+          type: "circle",
+          source: GUIDE_CIRCLE_SOURCE_ID,
+          paint: {
+            "circle-radius": ["get", "radiusPx"],
+            "circle-color": "rgba(15,23,42,0)",
+            "circle-stroke-color": "#0f172a",
+            "circle-stroke-opacity": 0.42,
+            "circle-stroke-width": 1.4,
+            "circle-opacity": 0.2,
+          },
+        });
+      }
+
+      if (!map.getLayer(PHYSICAL_LABEL_LAYER_ID)) {
+        map.addLayer({
+          id: PHYSICAL_LABEL_LAYER_ID,
+          type: "symbol",
+          source: PHYSICAL_SOURCE_ID,
+          minzoom: 3.2,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Regular"],
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              3.2,
+              10,
+              5.5,
+              13,
+            ],
+            "text-anchor": "center",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            visibility: learningModeActive ? "visible" : "none",
+          },
+          paint: {
+            "text-color": "#1e3a5f",
+            "text-halo-color": "rgba(241,245,249,0.92)",
+            "text-halo-width": 1.35,
+            "text-halo-blur": 0.16,
+            "text-opacity": 0.82,
+          },
+        });
+      }
+
+      if (!map.getLayer(SUBDIVISION_LABEL_LAYER_ID)) {
+        map.addLayer({
+          id: SUBDIVISION_LABEL_LAYER_ID,
+          type: "symbol",
+          source: SUBDIVISION_SOURCE_ID,
+          minzoom: 3.8,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Regular"],
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              3.8,
+              9.5,
+              6,
+              12,
+            ],
+            "text-anchor": "center",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            visibility: learningModeActive ? "visible" : "none",
+          },
+          paint: {
+            "text-color": "#263449",
+            "text-halo-color": "rgba(248,250,252,0.92)",
+            "text-halo-width": 1.25,
+            "text-halo-blur": 0.16,
+            "text-opacity": 0.78,
+          },
+        });
+      }
+
+      if (!map.getLayer(LANDMARK_CIRCLE_LAYER_ID)) {
+        map.addLayer({
+          id: LANDMARK_CIRCLE_LAYER_ID,
+          type: "circle",
+          source: LANDMARK_SOURCE_ID,
+          minzoom: 4.8,
+          layout: {
+            visibility: learningModeActive ? "visible" : "none",
+          },
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4.8,
+              3.5,
+              7,
+              5.5,
+            ],
+            "circle-color": "#f8fafc",
+            "circle-opacity": 0.92,
+            "circle-stroke-color": "#0369a1",
+            "circle-stroke-opacity": 0.76,
+            "circle-stroke-width": 1.4,
+          },
+        });
+      }
+
+      if (!map.getLayer(LANDMARK_LABEL_LAYER_ID)) {
+        map.addLayer({
+          id: LANDMARK_LABEL_LAYER_ID,
+          type: "symbol",
+          source: LANDMARK_SOURCE_ID,
+          minzoom: 4.8,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Regular"],
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4.8,
+              10.5,
+              7,
+              13,
+            ],
+            "text-offset": [0, 1.1],
+            "text-anchor": "top",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            visibility: learningModeActive ? "visible" : "none",
+          },
+          paint: {
+            "text-color": "#172033",
+            "text-halo-color": "rgba(248,250,252,0.94)",
+            "text-halo-width": 1.55,
+            "text-halo-blur": 0.16,
+            "text-opacity": 0.9,
+          },
+        });
+      }
+
       if (!map.getLayer(LEADER_LAYER_ID)) {
         map.addLayer({
           id: LEADER_LAYER_ID,
@@ -991,42 +1314,53 @@ export function MapContainer() {
         });
       }
 
-      LABEL_ANCHORS.forEach((anchor) => {
-        const layerId = `${LABEL_LAYER_PREFIX}-${anchor}`;
+      LABEL_KINDS.forEach((kind) => {
+        LABEL_ANCHORS.forEach((anchor) => {
+          const isManual = kind === "manual";
+          const layerId = `${LABEL_LAYER_PREFIX}-${kind}-${anchor}`;
 
-        if (!map.getLayer(layerId)) {
-          map.addLayer({
-            id: layerId,
-            type: "symbol",
-            source: LABEL_SOURCE_ID,
-            filter: ["==", ["get", "textAnchor"], anchor],
-            layout: {
-              "text-field": ["get", "label"],
-              "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Regular"],
-              "text-size": [
-                "match",
-                ["get", "labelSize"],
-                "small",
-                10.5,
-                "large",
-                13,
-                11.5,
+          if (!map.getLayer(layerId)) {
+            map.addLayer({
+              id: layerId,
+              type: "symbol",
+              source: LABEL_SOURCE_ID,
+              filter: [
+                "all",
+                ["==", ["get", "textAnchor"], anchor],
+                ["==", ["get", "placementKind"], kind],
               ],
-              "text-anchor": anchor,
-              "text-line-height": 0.95,
-              "text-letter-spacing": 0,
-              "text-allow-overlap": true,
-              "text-ignore-placement": true,
-            },
-            paint: {
-              "text-color": "#172033",
-              "text-halo-color": "rgba(248,250,252,0.92)",
-              "text-halo-width": 1.75,
-              "text-halo-blur": 0.18,
-              "text-opacity": 0.96,
-            },
-          });
-        }
+              layout: {
+                "text-field": ["get", "label"],
+                "text-font": [
+                  "DIN Offc Pro Medium",
+                  "Arial Unicode MS Regular",
+                ],
+                "text-size": [
+                  "match",
+                  ["get", "labelSize"],
+                  "small",
+                  isManual ? 10.5 : 9.5,
+                  "large",
+                  isManual ? 13 : 12,
+                  isManual ? 11.5 : 10.5,
+                ],
+                "text-anchor": anchor,
+                "text-line-height": 0.95,
+                "text-letter-spacing": 0,
+                "text-allow-overlap": isManual,
+                "text-ignore-placement": isManual,
+                "symbol-sort-key": isManual ? 2 : 1,
+              },
+              paint: {
+                "text-color": isManual ? "#172033" : "#243145",
+                "text-halo-color": "rgba(248,250,252,0.94)",
+                "text-halo-width": isManual ? 1.75 : 1.45,
+                "text-halo-blur": 0.18,
+                "text-opacity": isManual ? 0.96 : 0.88,
+              },
+            });
+          }
+        });
       });
 
       if (!map.getLayer(DEBUG_LEADER_LAYER_ID)) {
@@ -1067,6 +1401,10 @@ export function MapContainer() {
       }
 
       [
+        PHYSICAL_LABEL_LAYER_ID,
+        SUBDIVISION_LABEL_LAYER_ID,
+        LANDMARK_CIRCLE_LAYER_ID,
+        LANDMARK_LABEL_LAYER_ID,
         LEADER_LAYER_ID,
         ...LABEL_LAYER_IDS,
         DEBUG_LEADER_LAYER_ID,
@@ -1114,11 +1452,20 @@ export function MapContainer() {
       const debugLeaderSource = map.getSource(DEBUG_LEADER_SOURCE_ID) as
         | GeoJSONSource
         | undefined;
+      const guideCircleSource = map.getSource(GUIDE_CIRCLE_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
+      const guideLineSource = map.getSource(GUIDE_LINE_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
 
       labelSource?.setData(labelCollections.labels);
       leaderSource?.setData(labelCollections.leaders);
+      guideCircleSource?.setData(guideCollections.circles);
+      guideLineSource?.setData(guideCollections.leaders);
       debugLabelSource?.setData(debugLabelCollections.labels);
       debugLeaderSource?.setData(debugLabelCollections.leaders);
+      setLearningLayerVisibility(map, learningModeActive);
 
       setMapDebug({
         countrySourceLoaded: Boolean(map.getSource(SOURCE_ID)),
@@ -1135,7 +1482,9 @@ export function MapContainer() {
       debugLabelCollections,
       currentTargetCountry,
       gameStatus,
+      guideCollections,
       labelCollections,
+      learningModeActive,
       missedCountryIds,
       pulseActive,
       quizCountryIdList,
@@ -1283,6 +1632,16 @@ export function MapContainer() {
       return;
     }
 
+    setLearningLayerVisibility(map, learningModeActive);
+  }, [learningModeActive, mapLoaded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!mapLoaded || !map) {
+      return;
+    }
+
     syncPaintExpressions(map);
     setMapDebug({
       ...getMapDebugSnapshot(map),
@@ -1362,15 +1721,19 @@ export function MapContainer() {
     }
 
     const region = getRegionConfig(selectedRegion);
+    const isAntarctica = selectedSpecialRegion === "antarctica";
     const shouldFrameQuizRegion =
       (selectedMode === "type-to-fill" ||
         selectedMode === "identify-shaded" ||
         selectedMode === "click-country") &&
-      gameStatus !== "idle";
+      gameStatus !== "idle" &&
+      !isAntarctica;
     const regionPadding =
       typeof window !== "undefined" && window.innerWidth < 768
         ? { top: 104, right: 24, bottom: 142, left: 24 }
-        : { top: 118, right: 360, bottom: 154, left: 360 };
+        : gameStatus === "running"
+          ? { top: 112, right: 96, bottom: 148, left: 96 }
+          : { top: 118, right: 240, bottom: 154, left: 240 };
 
     try {
       map.setProjection(gameStatus === "idle" ? "globe" : "mercator");
@@ -1378,7 +1741,16 @@ export function MapContainer() {
       // Projection changes are polish, not required for the quiz loop.
     }
 
-    if (shouldFrameQuizRegion) {
+    if (isAntarctica) {
+      map.flyTo({
+        center: [0, -82],
+        zoom: 1.25,
+        pitch: 0,
+        bearing: 0,
+        duration: 1300,
+        essential: true,
+      });
+    } else if (shouldFrameQuizRegion) {
       map.fitBounds(region.bounds, {
         padding: regionPadding,
         pitch: region.pitch,
@@ -1398,7 +1770,14 @@ export function MapContainer() {
     }
 
     setMapDebug(getMapDebugSnapshot(map));
-  }, [gameStatus, mapLoaded, selectedMode, selectedRegion, setMapDebug]);
+  }, [
+    gameStatus,
+    mapLoaded,
+    selectedMode,
+    selectedRegion,
+    selectedSpecialRegion,
+    setMapDebug,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1529,12 +1908,13 @@ export function MapContainer() {
     }
 
     const canvas = map.getCanvas();
-    canvas.style.cursor =
-      selectedMode === "click-country" && gameStatus === "running"
-        ? "pointer"
-        : "";
+    const clickLearningMode = gameStatus === "idle" && !selectedSpecialRegion;
+    const clickQuizMode =
+      selectedMode === "click-country" && gameStatus === "running";
 
-    if (selectedMode !== "click-country" || gameStatus !== "running") {
+    canvas.style.cursor = clickLearningMode || clickQuizMode ? "pointer" : "";
+
+    if (!clickLearningMode && !clickQuizMode) {
       return () => {
         canvas.style.cursor = "";
       };
@@ -1552,6 +1932,47 @@ export function MapContainer() {
         typeof feature?.properties?.iso_a3 === "string"
           ? feature.properties.iso_a3
           : null;
+
+      if (clickLearningMode) {
+        const getFeatureId = (layerIds: string[]) => {
+          const existingLayerIds = layerIds.filter((layerId) =>
+            Boolean(map.getLayer(layerId)),
+          );
+
+          if (existingLayerIds.length === 0) {
+            return null;
+          }
+
+          const [learningFeature] = map.queryRenderedFeatures(event.point, {
+            layers: existingLayerIds,
+          });
+
+          return typeof learningFeature?.properties?.id === "string"
+            ? learningFeature.properties.id
+            : null;
+        };
+        const landmarkId = getFeatureId([
+          LANDMARK_LABEL_LAYER_ID,
+          LANDMARK_CIRCLE_LAYER_ID,
+        ]);
+        const physicalId = getFeatureId([PHYSICAL_LABEL_LAYER_ID]);
+        const subdivisionId = getFeatureId([SUBDIVISION_LABEL_LAYER_ID]);
+        const learningFeature =
+          findLearningFeature("landmark", landmarkId) ??
+          findLearningFeature("physical", physicalId) ??
+          findLearningFeature("subdivision", subdivisionId);
+
+        if (learningFeature) {
+          selectLearningFeature(learningFeature);
+          return;
+        }
+
+        selectLearningCountry(
+          iso && quizCountryIds.has(iso) ? iso : null,
+        );
+        return;
+      }
+
       const clickedIso = iso && quizCountryIdList.includes(iso) ? iso : null;
       const result = submitMapClickGuess(clickedIso, "main");
 
@@ -1580,6 +2001,9 @@ export function MapContainer() {
     mapLoaded,
     quizCountryIdList,
     selectedMode,
+    selectedSpecialRegion,
+    selectLearningFeature,
+    selectLearningCountry,
     submitMapClickGuess,
     syncPaintExpressions,
   ]);
@@ -1667,8 +2091,24 @@ export function MapContainer() {
         </p>
       </motion.div>
 
-      <GameHud />
+      {selectedSpecialRegion ? null : <GameHud />}
+      {learningModeActive ? (
+        <div className="pointer-events-none absolute left-5 top-28 z-20 rounded-full border border-sky-100/18 bg-black/42 px-4 py-2 text-sm font-semibold text-white/70 shadow-2xl shadow-black/35 backdrop-blur-2xl">
+          <span className="text-sky-100/82">Learning Mode</span>
+          <span className="ml-2 text-white/42">
+            Zoom in for states, features, and landmarks
+          </span>
+        </div>
+      ) : null}
       <PremiumControls />
+      <AnimatePresence>
+        {selectedSpecialRegion === "antarctica" ? (
+          <AntarcticaEducationCard
+            key="antarctica-card"
+            onBack={clearSpecialRegion}
+          />
+        ) : null}
+      </AnimatePresence>
       <AnimatePresence>
         {caribbeanInsetMounted && topologyData ? (
           <CaribbeanInsetMap
@@ -1693,7 +2133,8 @@ export function MapContainer() {
           />
         ) : null}
       </AnimatePresence>
-      {(selectedMode === "identify-shaded" ||
+      {!selectedSpecialRegion &&
+      (selectedMode === "identify-shaded" ||
         selectedMode === "click-country") &&
       gameStatus === "running" ? (
         <TargetHintCard
@@ -1706,13 +2147,32 @@ export function MapContainer() {
           onCapitalHintChange={setCapitalHintEnabled}
         />
       ) : null}
-      <CountryPopup
-        country={lastMatchedCountry}
-        feedbackSequence={lastMatchSequence}
-      />
-      <TypeToFillInput onCountryMatched={handleCountryMatched} />
-      <ResultsDashboard />
-      {IS_DEVELOPMENT ? (
+      {selectedSpecialRegion ? null : (
+        <>
+          <CountryPopup
+            country={lastMatchedCountry}
+            feedbackSequence={lastMatchSequence}
+            autoHide={autoHideCorrectCard}
+            onClose={clearCorrectCard}
+          />
+          <AnimatePresence>
+            {learningModeActive && selectedLearningFeature ? (
+              <LearningModeCard
+                key={`${selectedLearningFeature.kind}-${
+                  selectedLearningFeature.kind === "country"
+                    ? selectedLearningFeature.country.iso_a3
+                    : selectedLearningFeature.feature.id
+                }`}
+                feature={selectedLearningFeature}
+                onClose={clearLearningFeature}
+              />
+            ) : null}
+          </AnimatePresence>
+          <TypeToFillInput onCountryMatched={handleCountryMatched} />
+          <ResultsDashboard />
+        </>
+      )}
+      {IS_DEVELOPMENT && debugUiEnabled ? (
         <MapDebugPanel
           onTestBrazilShade={handleTestBrazilShade}
           onClearBrazilShade={handleClearBrazilShade}

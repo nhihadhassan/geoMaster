@@ -1,10 +1,10 @@
-import { countries } from "../src/data/countries";
-import { findCountryMatch } from "../src/utils/countryMatcher";
+import { countries } from "../src/data/countries.ts";
+import { findCountryMatch } from "../src/utils/countryMatcher.ts";
 
 const cases: Array<[string, string | null]> = [
   ["Brazil", "BRA"],
   ["Brasil", "BRA"],
-  ["Brazl", null],
+  ["Brazl", "BRA"],
   ["Brazi", null],
   ["Canada", "CAN"],
   ["Canad", null],
@@ -17,6 +17,30 @@ const cases: Array<[string, string | null]> = [
   ["America", null],
   ["St Lucia", "LCA"],
   ["Trinidad", "TTO"],
+  ["Antigua", "ATG"],
+  ["St Kitts", "KNA"],
+  ["St Vincent", "VCT"],
+  ["Vatican", "VAT"],
+  ["Czech Republic", "CZE"],
+  ["Bosnia", "BIH"],
+  ["Macedonia", "MKD"],
+  ["UK", "GBR"],
+  ["Sao Tome", "STP"],
+  ["Ivory Coast", "CIV"],
+  ["DRC", "COD"],
+  ["Congo Brazzaville", "COG"],
+  ["Cape Verde", "CPV"],
+  ["Swaziland", "SWZ"],
+  ["UAE", "ARE"],
+  ["DPRK", "PRK"],
+  ["Burma", "MMR"],
+  ["East Timor", "TLS"],
+  ["PNG", "PNG"],
+  ["NZ", "NZL"],
+  ["Liechtenstien", "LIE"],
+  ["Kyrgystan", "KGZ"],
+  ["Turkmenstan", "TKM"],
+  ["Tajikstan", "TJK"],
 ];
 
 const failures = cases

@@ -2,12 +2,15 @@
   "name": "geomaster-app",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:matcher": "tsx scripts/test-country-matcher.ts"
+    "generate:countries": "node --experimental-strip-types scripts/generate-country-data.ts",
+    "validate:countries": "node --experimental-strip-types scripts/validate-country-data.ts",
+    "test:matcher": "node --experimental-strip-types scripts/test-country-matcher.ts"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",

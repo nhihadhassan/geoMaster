@@ -61,18 +61,22 @@ const isIncompletePrefix = (input: string, candidate: string) =>
 
 const canUseFuzzyMatch = (input: string, candidate: string) => {
   if (input.length < 5 || candidate.length < 5) {
-    return false;
+    return null;
   }
 
   if (isIncompletePrefix(input, candidate) || isIncompletePrefix(candidate, input)) {
-    return false;
+    return null;
   }
 
-  if (Math.abs(input.length - candidate.length) > 0) {
-    return false;
+  const maxDistance = Math.min(input.length, candidate.length) >= 12 ? 2 : 1;
+
+  if (Math.abs(input.length - candidate.length) > maxDistance) {
+    return null;
   }
 
-  return editDistance(input, candidate) === 1;
+  const distance = editDistance(input, candidate);
+
+  return distance > 0 && distance <= maxDistance ? distance : null;
 };
 
 export const findCountryMatch = (
@@ -101,13 +105,33 @@ export const findCountryMatch = (
     }
   }
 
-  for (const country of countries) {
-    const matchedCandidate = candidateNamesFor(country)
+  const fuzzyMatches = countries.flatMap((country) =>
+    candidateNamesFor(country)
       .map(normalizeCountryText)
-      .find((candidate) => canUseFuzzyMatch(normalizedQuery, candidate));
+      .map((candidate) => ({
+        country,
+        distance: canUseFuzzyMatch(normalizedQuery, candidate),
+      }))
+      .filter(
+        (match): match is { country: Country; distance: number } =>
+          match.distance !== null,
+      ),
+  );
 
-    if (matchedCandidate) {
-      return { country, matchedBy: "fuzzy", score: 1 };
+  if (fuzzyMatches.length > 0) {
+    const bestDistance = Math.min(
+      ...fuzzyMatches.map((match) => match.distance),
+    );
+    const bestCountries = new Map(
+      fuzzyMatches
+        .filter((match) => match.distance === bestDistance)
+        .map((match) => [match.country.iso_a3, match.country]),
+    );
+
+    if (bestCountries.size === 1) {
+      const [country] = bestCountries.values();
+
+      return { country, matchedBy: "fuzzy", score: bestDistance };
     }
   }
 

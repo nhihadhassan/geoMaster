@@ -1,10 +1,16 @@
 import { create } from "zustand";
 import {
+  countries as allCountries,
   getCountriesForRegion,
   getRegionConfig,
   type Country,
   type QuizRegion,
 } from "@/data/countries";
+import {
+  getClickCountryHints,
+  getIdentifyHints,
+} from "@/utils/countryHints";
+import type { LearningFeature } from "@/data/learningFeatures";
 
 export type GameStatus =
   | "idle"
@@ -69,6 +75,7 @@ type DebugState = {
 
 type GameState = {
   selectedRegion: QuizRegion;
+  selectedSpecialRegion: "antarctica" | null;
   selectedMode: GameMode;
   quizCountries: Country[];
   guessedCountryIds: string[];
@@ -86,8 +93,13 @@ type GameState = {
   currentTargetHints: string[];
   smartHint: string | null;
   capitalHintEnabled: boolean;
+  autoHideCorrectCard: boolean;
+  learningCountry: Country | null;
+  selectedLearningFeature: LearningFeature | null;
   debug: DebugState;
   selectRegion: (region: QuizRegion) => void;
+  selectSpecialRegion: (region: "antarctica") => void;
+  clearSpecialRegion: () => void;
   selectMode: (mode: GameMode) => void;
   startQuiz: () => void;
   giveUp: () => void;
@@ -95,6 +107,12 @@ type GameState = {
   backToRegionSelect: () => void;
   setCurrentInput: (value: string) => void;
   setCapitalHintEnabled: (enabled: boolean) => void;
+  setAutoHideCorrectCard: (enabled: boolean) => void;
+  clearCorrectCard: () => void;
+  selectLearningCountry: (iso: string | null) => void;
+  selectLearningFeature: (feature: LearningFeature | null) => void;
+  clearLearningCountry: () => void;
+  clearLearningFeature: () => void;
   submitTypeGuess: (country: Country) => boolean;
   submitIdentifyGuess: (country: Country | null) => IdentifyGuessResult;
   submitMapClickGuess: (
@@ -118,22 +136,22 @@ const getCountryById = (countries: Country[], id: string | undefined) =>
 const isTargetQueueMode = (mode: GameMode) =>
   mode === "identify-shaded" || mode === "click-country";
 
-const getSecondIdentifyHint = (country: Country, capitalHintEnabled: boolean) =>
-  capitalHintEnabled
-    ? `Starts with ${country.name.charAt(0).toUpperCase()}, ends with ${country.name.charAt(country.name.length - 1).toUpperCase()}`
-    : `Capital: ${country.capital}`;
+const AUTO_HIDE_CORRECT_CARD_KEY = "geomaster-auto-hide-correct-card";
 
-const getClickHint = (country: Country, attempt: 1 | 2) => {
-  if (attempt === 1) {
-    return (
-      country.clickHint1 ??
-      (country.isSmall
-        ? "It is an island or small country."
-        : "It is on the mainland.")
-    );
+const readInitialAutoHideCorrectCard = () => {
+  if (typeof window === "undefined") {
+    return true;
   }
 
-  return country.clickHint2 ?? `Capital: ${country.capital}`;
+  return window.localStorage.getItem(AUTO_HIDE_CORRECT_CARD_KEY) !== "false";
+};
+
+const persistAutoHideCorrectCard = (enabled: boolean) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(AUTO_HIDE_CORRECT_CARD_KEY, String(enabled));
 };
 
 const createResetState = (
@@ -145,6 +163,7 @@ const createResetState = (
 
   return {
     selectedRegion,
+    selectedSpecialRegion: null,
     selectedMode,
     quizCountries,
     guessedCountryIds: [],
@@ -162,11 +181,14 @@ const createResetState = (
     currentTargetHints: [],
     smartHint: null,
     capitalHintEnabled: false,
+    learningCountry: null,
+    selectedLearningFeature: null,
   };
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
   ...createResetState("south-america", "type-to-fill"),
+  autoHideCorrectCard: readInitialAutoHideCorrectCard(),
   debug: {
     mapLoaded: false,
     countrySourceLoaded: false,
@@ -203,6 +225,22 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set(createResetState(selectedRegion, selectedMode));
   },
+  selectSpecialRegion: (selectedSpecialRegion) => {
+    const { selectedRegion, selectedMode } = get();
+
+    set({
+      ...createResetState(selectedRegion, selectedMode),
+      selectedSpecialRegion,
+      lastMatchedCountry: null,
+      learningCountry: null,
+      selectedLearningFeature: null,
+    });
+  },
+  clearSpecialRegion: () => {
+    const { selectedRegion, selectedMode } = get();
+
+    set(createResetState(selectedRegion, selectedMode));
+  },
   selectMode: (selectedMode) => {
     const { selectedRegion } = get();
 
@@ -230,6 +268,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         currentTargetHints: [],
         smartHint: null,
         incorrectAttempts: {},
+        learningCountry: null,
+        selectedLearningFeature: null,
       });
 
       return;
@@ -247,6 +287,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentTargetHints: [],
       smartHint: null,
       incorrectAttempts: {},
+      learningCountry: null,
+      selectedLearningFeature: null,
     });
   },
   resetQuiz: () => {
@@ -268,6 +310,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       targetQueue: [],
       currentTargetHints: [],
       smartHint: null,
+      lastMatchedCountry: null,
+      learningCountry: null,
+      selectedLearningFeature: null,
     });
   },
   backToRegionSelect: () => {
@@ -277,6 +322,42 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   setCurrentInput: (value) => set({ currentInput: value }),
   setCapitalHintEnabled: (enabled) => set({ capitalHintEnabled: enabled }),
+  setAutoHideCorrectCard: (enabled) => {
+    persistAutoHideCorrectCard(enabled);
+    set({ autoHideCorrectCard: enabled });
+  },
+  clearCorrectCard: () => set({ lastMatchedCountry: null }),
+  selectLearningCountry: (iso) => {
+    const state = get();
+
+    if (state.gameStatus !== "idle" || state.selectedSpecialRegion) {
+      return;
+    }
+
+    const country =
+      allCountries.find((country) => country.iso_a3 === iso) ?? null;
+
+    set({
+      learningCountry: country,
+      selectedLearningFeature: country ? { kind: "country", country } : null,
+    });
+  },
+  selectLearningFeature: (feature) => {
+    const state = get();
+
+    if (state.gameStatus !== "idle" || state.selectedSpecialRegion) {
+      return;
+    }
+
+    set({
+      selectedLearningFeature: feature,
+      learningCountry: feature?.kind === "country" ? feature.country : null,
+    });
+  },
+  clearLearningCountry: () =>
+    set({ learningCountry: null, selectedLearningFeature: null }),
+  clearLearningFeature: () =>
+    set({ learningCountry: null, selectedLearningFeature: null }),
   submitTypeGuess: (country) => {
     const state = get();
 
@@ -363,13 +444,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         return { outcome: "missed", country: target };
       }
 
-      const currentTargetHints =
-        attempts === 1
-          ? [`Starts with ${target.name.charAt(0).toUpperCase()}`]
-          : [
-              `Starts with ${target.name.charAt(0).toUpperCase()}`,
-              getSecondIdentifyHint(target, state.capitalHintEnabled),
-            ];
+      const currentTargetHints = getIdentifyHints(
+        target,
+        attempts,
+        state.capitalHintEnabled,
+      );
 
       set({
         incorrectAttempts,
@@ -481,10 +560,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         return { outcome: "missed", country: target, clickedCountry };
       }
 
-      const currentTargetHints =
-        attempts === 1
-          ? [getClickHint(target, 1)]
-          : [getClickHint(target, 1), getClickHint(target, 2)];
+      const currentTargetHints = getClickCountryHints(
+        target,
+        attempts,
+        state.selectedRegion,
+      );
 
       set({
         incorrectAttempts,

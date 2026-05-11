@@ -8,6 +8,7 @@ import type { Country } from "@/data/countries";
 
 type TextAnchor = "center" | "left" | "right" | "top" | "bottom";
 type LabelSize = "small" | "normal" | "large";
+type PlacementKind = "manual" | "fallback";
 
 type LabelSurface = "main" | "inset";
 
@@ -31,6 +32,7 @@ export type LabelProperties = {
   label: string;
   textAnchor: TextAnchor;
   labelSize: LabelSize;
+  placementKind: PlacementKind;
 };
 
 export type LeaderProperties = {
@@ -313,6 +315,258 @@ export const labelPlacements: Record<string, LabelPlacement> = {
       labelSize: "large",
     },
   },
+  AND: {
+    main: {
+      labelCoord: [-2.8, 43.6],
+      leaderAnchorCoord: [1.52, 42.51],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  LIE: {
+    main: {
+      labelCoord: [5.5, 47.8],
+      leaderAnchorCoord: [9.56, 47.17],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  MCO: {
+    main: {
+      labelCoord: [10.2, 44.4],
+      leaderAnchorCoord: [7.42, 43.73],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  SMR: {
+    main: {
+      labelCoord: [15.8, 44.8],
+      leaderAnchorCoord: [12.46, 43.94],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  VAT: {
+    main: {
+      labelCoord: [16.4, 41.4],
+      leaderAnchorCoord: [12.45, 41.9],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  MLT: {
+    main: {
+      labelCoord: [17.7, 35.1],
+      leaderAnchorCoord: [14.38, 35.94],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  RUS: { main: { labelCoord: [39.0, 56.0], labelSize: "large" } },
+  BHR: {
+    main: {
+      labelCoord: [54.2, 27.4],
+      leaderAnchorCoord: [50.55, 26.07],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  BRN: {
+    main: {
+      labelCoord: [118.0, 6.1],
+      leaderAnchorCoord: [114.73, 4.54],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  ISR: {
+    main: {
+      labelCoord: [31.7, 31.5],
+      leaderAnchorCoord: [34.85, 31.05],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  KWT: {
+    main: {
+      labelCoord: [51.0, 30.6],
+      leaderAnchorCoord: [47.48, 29.31],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  LBN: {
+    main: {
+      labelCoord: [31.8, 34.5],
+      leaderAnchorCoord: [35.86, 33.85],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  MDV: {
+    main: {
+      labelCoord: [68.4, 1.0],
+      leaderAnchorCoord: [73.22, 3.2],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  PSE: {
+    main: {
+      labelCoord: [39.0, 31.8],
+      leaderAnchorCoord: [35.23, 31.95],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  QAT: {
+    main: {
+      labelCoord: [54.0, 24.6],
+      leaderAnchorCoord: [51.18, 25.35],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  SGP: {
+    main: {
+      labelCoord: [108.0, 2.4],
+      leaderAnchorCoord: [103.82, 1.35],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  CPV: {
+    main: {
+      label: "Cabo Verde",
+      labelCoord: [-19.0, 17.0],
+      leaderAnchorCoord: [-23.6, 15.1],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  COM: {
+    main: {
+      labelCoord: [47.0, -8.5],
+      leaderAnchorCoord: [43.33, -11.65],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  GMB: {
+    main: {
+      label: "Gambia",
+      labelCoord: [-19.0, 13.2],
+      leaderAnchorCoord: [-15.31, 13.44],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  LSO: {
+    main: {
+      labelCoord: [25.0, -31.8],
+      leaderAnchorCoord: [28.23, -29.61],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  MUS: {
+    main: {
+      labelCoord: [61.0, -20.0],
+      leaderAnchorCoord: [57.55, -20.35],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  STP: {
+    main: {
+      label: "Sao Tome",
+      labelCoord: [2.0, 1.5],
+      leaderAnchorCoord: [6.61, 0.19],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  SWZ: {
+    main: {
+      labelCoord: [34.0, -26.3],
+      leaderAnchorCoord: [31.47, -26.52],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  SYC: {
+    main: {
+      labelCoord: [59.0, -2.0],
+      leaderAnchorCoord: [55.45, -4.68],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  KIR: {
+    main: {
+      labelCoord: [205.0, 3.0],
+      leaderAnchorCoord: [202.8, 1.8],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  MHL: {
+    main: {
+      labelCoord: [168.0, 9.4],
+      leaderAnchorCoord: [171.18, 7.13],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  FSM: {
+    main: {
+      labelCoord: [154.0, 8.0],
+      leaderAnchorCoord: [158.22, 6.89],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  NRU: {
+    main: {
+      labelCoord: [165.0, 0.6],
+      leaderAnchorCoord: [166.93, -0.52],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  PLW: {
+    main: {
+      labelCoord: [130.0, 9.0],
+      leaderAnchorCoord: [134.58, 7.5],
+      textAnchor: "right",
+      labelSize: "small",
+    },
+  },
+  WSM: {
+    main: {
+      labelCoord: [190.0, -13.0],
+      leaderAnchorCoord: [187.9, -13.76],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  TON: {
+    main: {
+      labelCoord: [191.0, -21.0],
+      leaderAnchorCoord: [184.8, -21.18],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
+  TUV: {
+    main: {
+      labelCoord: [184.0, -6.5],
+      leaderAnchorCoord: [179.2, -8.5],
+      textAnchor: "left",
+      labelSize: "small",
+    },
+  },
 };
 
 const emptyLabelCollection = {
@@ -343,30 +597,41 @@ export const buildLabelCollections = (
         labelPlacements[country.iso_a3]?.main;
 
       if (
-        !placement ||
         (surface === "main" &&
           options.hideMainInsetLabels &&
-          placement.hideOnMainWhenInset)
+          placement?.hideOnMainWhenInset)
       ) {
         return;
       }
+
+      const fallbackLng =
+        country.continentQuizGroups.includes("oceania") && country.center.lng < 0
+          ? country.center.lng + 360
+          : country.center.lng;
+      const fallbackPlacement: Placement = {
+        labelCoord: [fallbackLng, country.center.lat],
+        labelSize: country.isSmall ? "small" : "normal",
+      };
+      const resolvedPlacement = placement ?? fallbackPlacement;
+      const placementKind: PlacementKind = placement ? "manual" : "fallback";
 
       labelFeatures.push({
         type: "Feature",
         properties: {
           iso_a3: country.iso_a3,
           name: country.name,
-          label: placement.label ?? country.name,
-          textAnchor: placement.textAnchor ?? "center",
-          labelSize: placement.labelSize ?? "normal",
+          label: resolvedPlacement.label ?? country.name,
+          textAnchor: resolvedPlacement.textAnchor ?? "center",
+          labelSize: resolvedPlacement.labelSize ?? "normal",
+          placementKind,
         },
         geometry: {
           type: "Point",
-          coordinates: placement.labelCoord,
+          coordinates: resolvedPlacement.labelCoord,
         },
       });
 
-      if (placement.leaderAnchorCoord) {
+      if (resolvedPlacement.leaderAnchorCoord) {
         leaderFeatures.push({
           type: "Feature",
           properties: {
@@ -374,7 +639,10 @@ export const buildLabelCollections = (
           },
           geometry: {
             type: "LineString",
-            coordinates: [placement.leaderAnchorCoord, placement.labelCoord],
+            coordinates: [
+              resolvedPlacement.leaderAnchorCoord,
+              resolvedPlacement.labelCoord,
+            ],
           },
         });
       }

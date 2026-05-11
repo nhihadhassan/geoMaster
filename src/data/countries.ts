@@ -1,23 +1,57 @@
-export type QuizRegion = "south-america" | "north-america";
+import { generatedCountries } from "./countries.generated.ts";
+
+export type QuizRegion =
+  | "north-america"
+  | "south-america"
+  | "europe"
+  | "asia"
+  | "africa"
+  | "oceania";
+
+export type RegionSelectorId = QuizRegion | "antarctica";
+
+export type CountryEducation = {
+  population: number | null;
+  populationYear?: number;
+  gdpUsd: number | null;
+  gdpYear?: number;
+  languages: string[];
+  nativeName?: string;
+  funFact: string;
+};
+
+export type CountryHints = {
+  subregionHint?: string;
+  locationHint?: string;
+  neighborHint?: string;
+  islandOrMainlandHint?: string;
+};
 
 export type Country = {
   iso_a3: string;
   name: string;
   acceptedNames: string[];
+  continentQuizGroups: QuizRegion[];
+  /** @deprecated Use continentQuizGroups for runtime quiz membership. */
   continentQuizGroup: QuizRegion;
   capital: string;
   flag: string;
+  flagCode?: string;
+  flagEmoji?: string;
   clickHint1?: string;
   clickHint2?: string;
+  hints?: CountryHints;
   center: {
     lat: number;
     lng: number;
   };
   zoom: number;
   isSmall: boolean;
+  allowMissingStats?: boolean;
+  education: CountryEducation;
 };
 
-type RegionConfig = {
+export type RegionConfig = {
   id: QuizRegion;
   label: string;
   timerSeconds: number;
@@ -31,480 +65,17 @@ type RegionConfig = {
   bearing: number;
 };
 
-const flag = (code: string) => `https://flagcdn.com/${code}.svg`;
+export type RegionSelectorConfig = {
+  id: RegionSelectorId;
+  label: string;
+  count: number;
+  enabled: boolean;
+  note?: string;
+};
 
-export const countries: Country[] = [
-  {
-    iso_a3: "ARG",
-    name: "Argentina",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Buenos Aires",
-    flag: flag("ar"),
-    clickHint1: "It is in southern South America.",
-    clickHint2: "It sits east of Chile and south of Bolivia and Paraguay.",
-    center: { lat: -38.4161, lng: -63.6167 },
-    zoom: 4,
-    isSmall: false,
-  },
-  {
-    iso_a3: "BOL",
-    name: "Bolivia",
-    acceptedNames: ["Plurinational State of Bolivia"],
-    continentQuizGroup: "south-america",
-    capital: "Sucre",
-    flag: flag("bo"),
-    clickHint1: "It is landlocked in central South America.",
-    clickHint2: "It borders Brazil, Peru, Chile, Argentina, and Paraguay.",
-    center: { lat: -16.2902, lng: -63.5887 },
-    zoom: 5.2,
-    isSmall: false,
-  },
-  {
-    iso_a3: "BRA",
-    name: "Brazil",
-    acceptedNames: ["Brasil"],
-    continentQuizGroup: "south-america",
-    capital: "Brasilia",
-    flag: flag("br"),
-    clickHint1: "It is in eastern South America.",
-    clickHint2: "It is the largest country on the continent.",
-    center: { lat: -14.235, lng: -51.9253 },
-    zoom: 4.1,
-    isSmall: false,
-  },
-  {
-    iso_a3: "CHL",
-    name: "Chile",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Santiago",
-    flag: flag("cl"),
-    clickHint1: "It runs along the Pacific coast of South America.",
-    clickHint2: "It is the long narrow country west of Argentina.",
-    center: { lat: -35.6751, lng: -71.543 },
-    zoom: 4.5,
-    isSmall: false,
-  },
-  {
-    iso_a3: "COL",
-    name: "Colombia",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Bogota",
-    flag: flag("co"),
-    clickHint1: "It is in northwestern South America.",
-    clickHint2: "It touches both the Caribbean Sea and the Pacific Ocean.",
-    center: { lat: 4.5709, lng: -74.2973 },
-    zoom: 5,
-    isSmall: false,
-  },
-  {
-    iso_a3: "ECU",
-    name: "Ecuador",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Quito",
-    flag: flag("ec"),
-    clickHint1: "It is on South America's Pacific coast.",
-    clickHint2: "It sits between Colombia and Peru.",
-    center: { lat: -1.8312, lng: -78.1834 },
-    zoom: 6,
-    isSmall: false,
-  },
-  {
-    iso_a3: "GUY",
-    name: "Guyana",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Georgetown",
-    flag: flag("gy"),
-    clickHint1: "It is on the northern coast of South America.",
-    clickHint2: "It sits west of Suriname and east of Venezuela.",
-    center: { lat: 4.8604, lng: -58.9302 },
-    zoom: 5.7,
-    isSmall: false,
-  },
-  {
-    iso_a3: "PRY",
-    name: "Paraguay",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Asuncion",
-    flag: flag("py"),
-    clickHint1: "It is landlocked in central South America.",
-    clickHint2: "It sits between Bolivia, Brazil, and Argentina.",
-    center: { lat: -23.4425, lng: -58.4438 },
-    zoom: 5.5,
-    isSmall: false,
-  },
-  {
-    iso_a3: "PER",
-    name: "Peru",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Lima",
-    flag: flag("pe"),
-    clickHint1: "It is on the Pacific coast of South America.",
-    clickHint2: "It lies south of Ecuador and west of Brazil.",
-    center: { lat: -9.19, lng: -75.0152 },
-    zoom: 5,
-    isSmall: false,
-  },
-  {
-    iso_a3: "SUR",
-    name: "Suriname",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Paramaribo",
-    flag: flag("sr"),
-    clickHint1: "It is on the northern coast of South America.",
-    clickHint2: "It sits between Guyana and French Guiana.",
-    center: { lat: 3.9193, lng: -56.0278 },
-    zoom: 6.1,
-    isSmall: false,
-  },
-  {
-    iso_a3: "URY",
-    name: "Uruguay",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Montevideo",
-    flag: flag("uy"),
-    clickHint1: "It is in southeastern South America.",
-    clickHint2: "It sits between Argentina and Brazil on the Atlantic coast.",
-    center: { lat: -32.5228, lng: -55.7658 },
-    zoom: 6.1,
-    isSmall: false,
-  },
-  {
-    iso_a3: "VEN",
-    name: "Venezuela",
-    acceptedNames: [],
-    continentQuizGroup: "south-america",
-    capital: "Caracas",
-    flag: flag("ve"),
-    clickHint1: "It is on the northern coast of South America.",
-    clickHint2: "It lies east of Colombia and north of Brazil.",
-    center: { lat: 6.4238, lng: -66.5897 },
-    zoom: 5,
-    isSmall: false,
-  },
-  {
-    iso_a3: "ATG",
-    name: "Antigua and Barbuda",
-    acceptedNames: ["Antigua"],
-    continentQuizGroup: "north-america",
-    capital: "Saint John's",
-    flag: flag("ag"),
-    clickHint1: "It is in the Caribbean.",
-    clickHint2: "It is in the Lesser Antilles, east of Saint Kitts and Nevis.",
-    center: { lat: 17.0608, lng: -61.7964 },
-    zoom: 8.6,
-    isSmall: true,
-  },
-  {
-    iso_a3: "BHS",
-    name: "Bahamas",
-    acceptedNames: ["The Bahamas"],
-    continentQuizGroup: "north-america",
-    capital: "Nassau",
-    flag: flag("bs"),
-    clickHint1: "It is an island country in the Caribbean.",
-    clickHint2: "It sits north of Cuba and southeast of Florida.",
-    center: { lat: 25.0343, lng: -77.3963 },
-    zoom: 6.5,
-    isSmall: true,
-  },
-  {
-    iso_a3: "BRB",
-    name: "Barbados",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Bridgetown",
-    flag: flag("bb"),
-    clickHint1: "It is in the eastern Caribbean.",
-    clickHint2: "It lies east of Saint Vincent and the Grenadines.",
-    center: { lat: 13.1939, lng: -59.5432 },
-    zoom: 9,
-    isSmall: true,
-  },
-  {
-    iso_a3: "BLZ",
-    name: "Belize",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Belmopan",
-    flag: flag("bz"),
-    clickHint1: "It is in Central America.",
-    clickHint2: "It sits on the Caribbean coast, east of Guatemala.",
-    center: { lat: 17.1899, lng: -88.4976 },
-    zoom: 7,
-    isSmall: true,
-  },
-  {
-    iso_a3: "CAN",
-    name: "Canada",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Ottawa",
-    flag: flag("ca"),
-    clickHint1: "It is in northern North America.",
-    clickHint2: "It sits directly north of the United States.",
-    center: { lat: 56.1304, lng: -106.3468 },
-    zoom: 2.8,
-    isSmall: false,
-  },
-  {
-    iso_a3: "CRI",
-    name: "Costa Rica",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "San Jose",
-    flag: flag("cr"),
-    clickHint1: "It is in Central America.",
-    clickHint2: "It sits between Nicaragua and Panama.",
-    center: { lat: 9.7489, lng: -83.7534 },
-    zoom: 7,
-    isSmall: true,
-  },
-  {
-    iso_a3: "CUB",
-    name: "Cuba",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Havana",
-    flag: flag("cu"),
-    clickHint1: "It is a large Caribbean island country.",
-    clickHint2: "It sits south of Florida and west of Hispaniola.",
-    center: { lat: 21.5218, lng: -77.7812 },
-    zoom: 6,
-    isSmall: false,
-  },
-  {
-    iso_a3: "DMA",
-    name: "Dominica",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Roseau",
-    flag: flag("dm"),
-    clickHint1: "It is in the Caribbean.",
-    clickHint2: "It lies between Guadeloupe and Martinique.",
-    center: { lat: 15.415, lng: -61.371 },
-    zoom: 9,
-    isSmall: true,
-  },
-  {
-    iso_a3: "DOM",
-    name: "Dominican Republic",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Santo Domingo",
-    flag: flag("do"),
-    clickHint1: "It is in the Caribbean.",
-    clickHint2: "It shares Hispaniola with Haiti.",
-    center: { lat: 18.7357, lng: -70.1627 },
-    zoom: 7,
-    isSmall: true,
-  },
-  {
-    iso_a3: "SLV",
-    name: "El Salvador",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "San Salvador",
-    flag: flag("sv"),
-    clickHint1: "It is in Central America.",
-    clickHint2: "It is on the Pacific coast between Guatemala and Honduras.",
-    center: { lat: 13.7942, lng: -88.8965 },
-    zoom: 7.6,
-    isSmall: true,
-  },
-  {
-    iso_a3: "GRD",
-    name: "Grenada",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Saint George's",
-    flag: flag("gd"),
-    clickHint1: "It is in the southern Caribbean.",
-    clickHint2: "It lies north of Trinidad and Tobago.",
-    center: { lat: 12.1165, lng: -61.679 },
-    zoom: 9,
-    isSmall: true,
-  },
-  {
-    iso_a3: "GTM",
-    name: "Guatemala",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Guatemala City",
-    flag: flag("gt"),
-    clickHint1: "It is in Central America.",
-    clickHint2: "It borders Mexico, Belize, Honduras, and El Salvador.",
-    center: { lat: 15.7835, lng: -90.2308 },
-    zoom: 6.7,
-    isSmall: false,
-  },
-  {
-    iso_a3: "HTI",
-    name: "Haiti",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Port-au-Prince",
-    flag: flag("ht"),
-    clickHint1: "It is in the Caribbean.",
-    clickHint2: "It shares Hispaniola with the Dominican Republic.",
-    center: { lat: 18.9712, lng: -72.2852 },
-    zoom: 7.2,
-    isSmall: true,
-  },
-  {
-    iso_a3: "HND",
-    name: "Honduras",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Tegucigalpa",
-    flag: flag("hn"),
-    clickHint1: "It is in Central America.",
-    clickHint2: "It sits east of Guatemala and north of Nicaragua.",
-    center: { lat: 15.2, lng: -86.2419 },
-    zoom: 6.6,
-    isSmall: false,
-  },
-  {
-    iso_a3: "JAM",
-    name: "Jamaica",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Kingston",
-    flag: flag("jm"),
-    clickHint1: "It is a Caribbean island country.",
-    clickHint2: "It sits south of Cuba and west of Hispaniola.",
-    center: { lat: 18.1096, lng: -77.2975 },
-    zoom: 7.5,
-    isSmall: true,
-  },
-  {
-    iso_a3: "MEX",
-    name: "Mexico",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Mexico City",
-    flag: flag("mx"),
-    clickHint1: "It is south of the United States.",
-    clickHint2: "It connects North America to Central America.",
-    center: { lat: 23.6345, lng: -102.5528 },
-    zoom: 4.5,
-    isSmall: false,
-  },
-  {
-    iso_a3: "NIC",
-    name: "Nicaragua",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Managua",
-    flag: flag("ni"),
-    clickHint1: "It is in Central America.",
-    clickHint2: "It sits between Honduras and Costa Rica.",
-    center: { lat: 12.8654, lng: -85.2072 },
-    zoom: 6.7,
-    isSmall: false,
-  },
-  {
-    iso_a3: "PAN",
-    name: "Panama",
-    acceptedNames: [],
-    continentQuizGroup: "north-america",
-    capital: "Panama City",
-    flag: flag("pa"),
-    clickHint1: "It is in southern Central America.",
-    clickHint2: "It links Central America with South America.",
-    center: { lat: 8.538, lng: -80.7821 },
-    zoom: 7,
-    isSmall: true,
-  },
-  {
-    iso_a3: "KNA",
-    name: "Saint Kitts and Nevis",
-    acceptedNames: ["St Kitts", "Saint Kitts"],
-    continentQuizGroup: "north-america",
-    capital: "Basseterre",
-    flag: flag("kn"),
-    clickHint1: "It is in the Caribbean.",
-    clickHint2: "It lies west of Antigua and Barbuda.",
-    center: { lat: 17.3578, lng: -62.783 },
-    zoom: 9,
-    isSmall: true,
-  },
-  {
-    iso_a3: "LCA",
-    name: "Saint Lucia",
-    acceptedNames: ["St Lucia"],
-    continentQuizGroup: "north-america",
-    capital: "Castries",
-    flag: flag("lc"),
-    clickHint1: "It is in the Caribbean.",
-    clickHint2: "It is in the Lesser Antilles, south of Martinique.",
-    center: { lat: 13.9094, lng: -60.9789 },
-    zoom: 9,
-    isSmall: true,
-  },
-  {
-    iso_a3: "VCT",
-    name: "Saint Vincent and the Grenadines",
-    acceptedNames: ["St Vincent", "Saint Vincent"],
-    continentQuizGroup: "north-america",
-    capital: "Kingstown",
-    flag: flag("vc"),
-    clickHint1: "It is in the Caribbean.",
-    clickHint2: "It lies south of Saint Lucia and north of Grenada.",
-    center: { lat: 12.9843, lng: -61.2872 },
-    zoom: 8.7,
-    isSmall: true,
-  },
-  {
-    iso_a3: "TTO",
-    name: "Trinidad and Tobago",
-    acceptedNames: ["Trinidad"],
-    continentQuizGroup: "north-america",
-    capital: "Port of Spain",
-    flag: flag("tt"),
-    clickHint1: "It is in the southern Caribbean.",
-    clickHint2: "It sits just off the northeastern coast of South America.",
-    center: { lat: 10.6918, lng: -61.2225 },
-    zoom: 8.2,
-    isSmall: true,
-  },
-  {
-    iso_a3: "USA",
-    name: "United States",
-    acceptedNames: ["USA", "US", "United States of America"],
-    continentQuizGroup: "north-america",
-    capital: "Washington, D.C.",
-    flag: flag("us"),
-    clickHint1: "It is directly south of Canada.",
-    clickHint2: "It lies north of Mexico and spans the continent.",
-    center: { lat: 39.8283, lng: -98.5795 },
-    zoom: 3.2,
-    isSmall: false,
-  },
-];
+export const countries: Country[] = generatedCountries;
 
 export const regionConfigs: Record<QuizRegion, RegionConfig> = {
-  "south-america": {
-    id: "south-america",
-    label: "South America",
-    timerSeconds: 240,
-    bounds: [
-      [-83, -57],
-      [-33, 14],
-    ],
-    center: { lat: -17, lng: -61 },
-    zoom: 3.25,
-    pitch: 42,
-    bearing: -10,
-  },
   "north-america": {
     id: "north-america",
     label: "North America",
@@ -518,11 +89,101 @@ export const regionConfigs: Record<QuizRegion, RegionConfig> = {
     pitch: 38,
     bearing: 8,
   },
+  "south-america": {
+    id: "south-america",
+    label: "South America",
+    timerSeconds: 240,
+    bounds: [
+      [-83, -57],
+      [-33, 14],
+    ],
+    center: { lat: -17, lng: -61 },
+    zoom: 3.25,
+    pitch: 42,
+    bearing: -10,
+  },
+  europe: {
+    id: "europe",
+    label: "Europe",
+    timerSeconds: 480,
+    bounds: [
+      [-25, 34],
+      [64, 73],
+    ],
+    center: { lat: 54, lng: 21 },
+    zoom: 3.35,
+    pitch: 36,
+    bearing: 0,
+  },
+  asia: {
+    id: "asia",
+    label: "Asia",
+    timerSeconds: 540,
+    bounds: [
+      [25, -12],
+      [180, 76],
+    ],
+    center: { lat: 31, lng: 96 },
+    zoom: 2.35,
+    pitch: 34,
+    bearing: 0,
+  },
+  africa: {
+    id: "africa",
+    label: "Africa",
+    timerSeconds: 600,
+    bounds: [
+      [-31, -37],
+      [66, 39],
+    ],
+    center: { lat: 2, lng: 22 },
+    zoom: 3.2,
+    pitch: 36,
+    bearing: 0,
+  },
+  oceania: {
+    id: "oceania",
+    label: "Oceania",
+    timerSeconds: 300,
+    bounds: [
+      [105, -51],
+      [233, 12],
+    ],
+    center: { lat: -18, lng: 168 },
+    zoom: 2.6,
+    pitch: 32,
+    bearing: 0,
+  },
 };
 
+const regionOrder: QuizRegion[] = [
+  "north-america",
+  "south-america",
+  "europe",
+  "asia",
+  "africa",
+  "oceania",
+];
+
 export const getCountriesForRegion = (region: QuizRegion) =>
-  countries.filter((country) => country.continentQuizGroup === region);
+  countries.filter((country) => country.continentQuizGroups.includes(region));
 
 export const getRegionConfig = (region: QuizRegion) => regionConfigs[region];
+
+export const regionSelectorConfigs: RegionSelectorConfig[] = [
+  ...regionOrder.map((region) => ({
+    id: region,
+    label: regionConfigs[region].label,
+    count: getCountriesForRegion(region).length,
+    enabled: true,
+  })),
+  {
+    id: "antarctica",
+    label: "Antarctica",
+    count: 0,
+    enabled: true,
+    note: "Educational region",
+  },
+];
 
 export const quizCountryIds = new Set(countries.map((country) => country.iso_a3));
