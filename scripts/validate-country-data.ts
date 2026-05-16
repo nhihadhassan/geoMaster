@@ -1,5 +1,6 @@
 import worldCountries from "../src/data/world-countries.geo.json" with { type: "json" };
-import { countries, type QuizRegion } from "../src/data/countries.ts";
+import { cities } from "../src/data/cities.ts";
+import { countries, type ContinentQuizRegion } from "../src/data/countries.ts";
 import {
   expectedRegionCounts,
   expectedRegionMembershipCount,
@@ -7,6 +8,7 @@ import {
   quizCountrySeeds,
 } from "../src/data/countryQuizLists.ts";
 import { labelPlacements } from "../src/data/labelPlacements.ts";
+import { landmarks } from "../src/data/landmarks.ts";
 import { smallCountryGuides } from "../src/data/smallCountryGuides.ts";
 import { findCountryMatch, normalizeCountryText } from "../src/utils/countryMatcher.ts";
 
@@ -84,7 +86,7 @@ if (regionMembershipTotal !== expectedRegionMembershipCount) {
 }
 
 for (const [region, expectedCount] of Object.entries(expectedRegionCounts) as [
-  QuizRegion,
+  ContinentQuizRegion,
   number,
 ][]) {
   const count = countries.filter(
@@ -106,6 +108,13 @@ for (const [region, expectedCount] of Object.entries(expectedRegionCounts) as [
   }
 }
 
+const worldCountryIds = new Set(countries.map((country) => country.iso_a3));
+if (worldCountryIds.size !== expectedUniqueCountryCount) {
+  errors.push(
+    `Whole World expected ${expectedUniqueCountryCount} unique ISO_A3 values, found ${worldCountryIds.size}.`,
+  );
+}
+
 const israel = countries.find((country) => country.iso_a3 === "ISR");
 if (israel) {
   errors.push("Israel must not appear in the active quiz country data.");
@@ -121,6 +130,19 @@ if (!palestine) {
   if (!palestine.continentQuizGroups.includes("asia")) {
     errors.push("Palestine must be included in the Asia quiz.");
   }
+}
+
+const centralAfricanRepublic = countries.find(
+  (country) => country.iso_a3 === "CAF",
+);
+if (!centralAfricanRepublic) {
+  errors.push("Central African Republic is missing from the active quiz country data.");
+} else if (
+  !centralAfricanRepublic.acceptedNames
+    .map((name) => normalizeCountryText(name))
+    .includes(normalizeCountryText("CAR"))
+) {
+  errors.push('Central African Republic must accept "CAR" as an alias.');
 }
 
 for (const iso of ["RUS", "TUR"]) {
@@ -262,6 +284,80 @@ if (missingGuides.length) {
   errors.push(`Missing small-country guide metadata for: ${missingGuides.join(", ")}.`);
 }
 
+const validateLearningPoint = (
+  collectionName: string,
+  id: string,
+  name: string,
+  center: [number, number],
+) => {
+  if (!id) {
+    errors.push(`${collectionName} item "${name}" is missing an id.`);
+  }
+
+  if (!name) {
+    errors.push(`${collectionName} item "${id}" is missing a name.`);
+  }
+
+  if (!Number.isFinite(center[0]) || !Number.isFinite(center[1])) {
+    errors.push(`${collectionName} item "${name || id}" has invalid coordinates.`);
+  }
+};
+
+const cityIds = new Set<string>();
+for (const city of cities) {
+  validateLearningPoint("City", city.id, city.name, city.center);
+
+  if (cityIds.has(city.id)) {
+    errors.push(`Duplicate city id: ${city.id}`);
+  }
+  cityIds.add(city.id);
+
+  if (!city.subdivision) {
+    errors.push(`${city.name} is missing a subdivision.`);
+  }
+
+  if (!city.education.description || !city.education.funFact) {
+    errors.push(`${city.name} is missing city education text.`);
+  }
+}
+
+const landmarkIds = new Set<string>();
+for (const landmark of landmarks) {
+  validateLearningPoint("Landmark", landmark.id, landmark.name, landmark.center);
+
+  if (landmarkIds.has(landmark.id)) {
+    errors.push(`Duplicate landmark id: ${landmark.id}`);
+  }
+  landmarkIds.add(landmark.id);
+
+  if (!landmark.type) {
+    errors.push(`${landmark.name} is missing a landmark type.`);
+  }
+
+  if (!landmark.education.description) {
+    errors.push(`${landmark.name} is missing a landmark description.`);
+  }
+
+  if (landmark.image?.src) {
+    if (!landmark.image.alt) {
+      errors.push(`${landmark.name} image is missing alt text.`);
+    }
+
+    if (
+      /^https?:\/\//.test(landmark.image.src) &&
+      (!landmark.image.credit ||
+        !landmark.image.sourceUrl ||
+        !landmark.image.license)
+    ) {
+      errors.push(
+        `${landmark.name} external image must include credit, sourceUrl, and license.`,
+      );
+    }
+  } else if (landmark.countryIsoA3 === "CAN" && landmark.subdivision === "Ontario") {
+    warnings.push(`${landmark.name} uses the learning-card image placeholder.`);
+  }
+}
+
 const aliasMap = new Map<string, string>();
 for (const country of countries) {
   for (const value of [country.name, ...country.acceptedNames]) {
@@ -293,6 +389,9 @@ const matcherSmokeTests = [
   ["DRC", "COD"],
   ["Congo Brazzaville", "COG"],
   ["Vatican", "VAT"],
+  ["Central African Republic", "CAF"],
+  ["CAR", "CAF"],
+  ["CARS", null],
   ["UK", "GBR"],
   ["Sao Tome", "STP"],
   ["UAE", "ARE"],

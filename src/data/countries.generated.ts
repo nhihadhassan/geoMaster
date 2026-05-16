@@ -1710,6 +1710,7 @@ export const generatedCountries = [
     "iso_a3": "CAF",
     "name": "Central African Republic",
     "acceptedNames": [
+      "CAR",
       "Central African Republic"
     ],
     "continentQuizGroups": [

@@ -6,7 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, Geometry } from "geojson";
 import { AntarcticaEducationCard } from "@/components/game/AntarcticaEducationCard";
 import { GameHud } from "@/components/game/GameHud";
+import { LandingPage } from "@/components/game/LandingPage";
 import { LearningModeCard } from "@/components/game/LearningModeCard";
+import { PauseOverlay } from "@/components/game/PauseOverlay";
+import { PerfectRunCelebration } from "@/components/game/PerfectRunCelebration";
 import { PremiumControls } from "@/components/game/PremiumControls";
 import { ResultsDashboard } from "@/components/game/ResultsDashboard";
 import { TargetHintCard } from "@/components/game/TargetHintCard";
@@ -24,6 +27,7 @@ import {
 } from "@/data/countries";
 import { buildLabelCollections } from "@/data/labelPlacements";
 import {
+  cityFeatureCollection,
   findLearningFeature,
   landmarkFeatureCollection,
   physicalFeatureCollection,
@@ -50,6 +54,9 @@ const GUIDE_CIRCLE_LAYER_ID = "geomaster-small-country-guide-circle-layer";
 const GUIDE_LINE_LAYER_ID = "geomaster-small-country-guide-line-layer";
 const SUBDIVISION_SOURCE_ID = "geomaster-subdivisions";
 const SUBDIVISION_LABEL_LAYER_ID = "geomaster-subdivision-label-layer";
+const CITY_SOURCE_ID = "geomaster-cities";
+const CITY_CIRCLE_LAYER_ID = "geomaster-city-circle-layer";
+const CITY_LABEL_LAYER_ID = "geomaster-city-label-layer";
 const PHYSICAL_SOURCE_ID = "geomaster-physical-features";
 const PHYSICAL_LABEL_LAYER_ID = "geomaster-physical-feature-label-layer";
 const LANDMARK_SOURCE_ID = "geomaster-landmarks";
@@ -63,6 +70,7 @@ const DEBUG_LABEL_LAYER_ID = "geomaster-debug-country-label-layer";
 const DEBUG_LEADER_LAYER_ID = "geomaster-debug-country-leader-layer";
 const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
+const LANDING_SEEN_KEY = "geomaster-landing-seen";
 const LABEL_ANCHORS = ["center", "left", "right", "top", "bottom"] as const;
 const LABEL_KINDS = ["fallback", "manual"] as const;
 const LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
@@ -77,6 +85,8 @@ const GEOMASTER_LAYER_IDS = [
   GUIDE_LINE_LAYER_ID,
   GUIDE_CIRCLE_LAYER_ID,
   SUBDIVISION_LABEL_LAYER_ID,
+  CITY_CIRCLE_LAYER_ID,
+  CITY_LABEL_LAYER_ID,
   PHYSICAL_LABEL_LAYER_ID,
   LANDMARK_CIRCLE_LAYER_ID,
   LANDMARK_LABEL_LAYER_ID,
@@ -85,43 +95,6 @@ const GEOMASTER_LAYER_IDS = [
   DEBUG_LEADER_LAYER_ID,
   DEBUG_LABEL_LAYER_ID,
 ];
-
-const playSuccessChime = () => {
-  const AudioContextClass =
-    window.AudioContext ??
-    (window as Window & { webkitAudioContext?: typeof AudioContext })
-      .webkitAudioContext;
-
-  if (!AudioContextClass) {
-    return;
-  }
-
-  const context = new AudioContextClass();
-  const gain = context.createGain();
-  const firstTone = context.createOscillator();
-  const secondTone = context.createOscillator();
-
-  firstTone.type = "sine";
-  secondTone.type = "triangle";
-  firstTone.frequency.setValueAtTime(523.25, context.currentTime);
-  firstTone.frequency.exponentialRampToValueAtTime(
-    783.99,
-    context.currentTime + 0.18,
-  );
-  secondTone.frequency.setValueAtTime(1046.5, context.currentTime + 0.08);
-
-  gain.gain.setValueAtTime(0.0001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.025);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.42);
-
-  firstTone.connect(gain);
-  secondTone.connect(gain);
-  gain.connect(context.destination);
-  firstTone.start();
-  secondTone.start(context.currentTime + 0.08);
-  firstTone.stop(context.currentTime + 0.34);
-  secondTone.stop(context.currentTime + 0.42);
-};
 
 const hideMapLabelsAndRoads = (map: Map) => {
   const style = map.getStyle();
@@ -292,6 +265,7 @@ const getMapDebugSnapshot = (map: Map) => ({
   sourceIds: [
     SOURCE_ID,
     SUBDIVISION_SOURCE_ID,
+    CITY_SOURCE_ID,
     PHYSICAL_SOURCE_ID,
     LANDMARK_SOURCE_ID,
     LEADER_SOURCE_ID,
@@ -309,6 +283,8 @@ const getMapDebugSnapshot = (map: Map) => ({
 
 const LEARNING_LAYER_IDS = [
   SUBDIVISION_LABEL_LAYER_ID,
+  CITY_CIRCLE_LAYER_ID,
+  CITY_LABEL_LAYER_ID,
   PHYSICAL_LABEL_LAYER_ID,
   LANDMARK_CIRCLE_LAYER_ID,
   LANDMARK_LABEL_LAYER_ID,
@@ -604,6 +580,7 @@ export function MapContainer() {
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
+  const [landingOpen, setLandingOpen] = useState(false);
   const [debugUiEnabled] = useState(() => {
     if (!IS_DEVELOPMENT || typeof window === "undefined") {
       return false;
@@ -645,6 +622,10 @@ export function MapContainer() {
   const autoHideCorrectCard = useGameStore(
     (state) => state.autoHideCorrectCard,
   );
+  const isPerfectRun = useGameStore((state) => state.isPerfectRun);
+  const perfectRunSequence = useGameStore(
+    (state) => state.perfectRunSequence,
+  );
   const clearCorrectCard = useGameStore((state) => state.clearCorrectCard);
   const selectedLearningFeature = useGameStore(
     (state) => state.selectedLearningFeature,
@@ -662,6 +643,14 @@ export function MapContainer() {
     (state) => state.submitMapClickGuess,
   );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setLandingOpen(window.localStorage.getItem(LANDING_SEEN_KEY) !== "1");
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   const quizCountryIdList = useMemo(
     () => quizCountries.map((country) => country.iso_a3),
@@ -699,7 +688,9 @@ export function MapContainer() {
     [resultEntries],
   );
   const isTargetQueueMode =
-    selectedMode === "identify-shaded" || selectedMode === "click-country";
+    selectedMode === "identify-shaded" ||
+    selectedMode === "click-country" ||
+    selectedMode === "capital-challenge";
   const learningModeActive = gameStatus === "idle" && !selectedSpecialRegion;
   const learningLabelIds = useMemo(
     () => countries.map((country) => country.iso_a3),
@@ -773,7 +764,8 @@ export function MapContainer() {
     selectedRegion === "north-america" &&
     (selectedMode === "type-to-fill" ||
       selectedMode === "identify-shaded" ||
-      selectedMode === "click-country") &&
+      selectedMode === "click-country" ||
+      selectedMode === "capital-challenge") &&
     gameStatus !== "idle";
   const labelCollections = useMemo(
     () =>
@@ -935,6 +927,9 @@ export function MapContainer() {
       const existingSubdivisionSource = map.getSource(
         SUBDIVISION_SOURCE_ID,
       ) as GeoJSONSource | undefined;
+      const existingCitySource = map.getSource(CITY_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
       const existingPhysicalSource = map.getSource(
         PHYSICAL_SOURCE_ID,
       ) as GeoJSONSource | undefined;
@@ -990,6 +985,15 @@ export function MapContainer() {
         map.addSource(SUBDIVISION_SOURCE_ID, {
           type: "geojson",
           data: subdivisionFeatureCollection,
+        });
+      }
+
+      if (existingCitySource) {
+        existingCitySource.setData(cityFeatureCollection);
+      } else {
+        map.addSource(CITY_SOURCE_ID, {
+          type: "geojson",
+          data: cityFeatureCollection,
         });
       }
 
@@ -1238,6 +1242,68 @@ export function MapContainer() {
         });
       }
 
+      if (!map.getLayer(CITY_CIRCLE_LAYER_ID)) {
+        map.addLayer({
+          id: CITY_CIRCLE_LAYER_ID,
+          type: "circle",
+          source: CITY_SOURCE_ID,
+          minzoom: 4.8,
+          layout: {
+            visibility: learningModeActive ? "visible" : "none",
+          },
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4.8,
+              2.6,
+              8,
+              4.8,
+            ],
+            "circle-color": "#0f172a",
+            "circle-opacity": 0.58,
+            "circle-stroke-color": "#f8fafc",
+            "circle-stroke-opacity": 0.82,
+            "circle-stroke-width": 1.15,
+          },
+        });
+      }
+
+      if (!map.getLayer(CITY_LABEL_LAYER_ID)) {
+        map.addLayer({
+          id: CITY_LABEL_LAYER_ID,
+          type: "symbol",
+          source: CITY_SOURCE_ID,
+          minzoom: 4.8,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": ["DIN Offc Pro Medium", "Arial Unicode MS Regular"],
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4.8,
+              10,
+              8,
+              13,
+            ],
+            "text-offset": [0, 1],
+            "text-anchor": "top",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+            visibility: learningModeActive ? "visible" : "none",
+          },
+          paint: {
+            "text-color": "#122033",
+            "text-halo-color": "rgba(248,250,252,0.94)",
+            "text-halo-width": 1.45,
+            "text-halo-blur": 0.16,
+            "text-opacity": 0.88,
+          },
+        });
+      }
+
       if (!map.getLayer(LANDMARK_CIRCLE_LAYER_ID)) {
         map.addLayer({
           id: LANDMARK_CIRCLE_LAYER_ID,
@@ -1403,6 +1469,8 @@ export function MapContainer() {
       [
         PHYSICAL_LABEL_LAYER_ID,
         SUBDIVISION_LABEL_LAYER_ID,
+        CITY_CIRCLE_LAYER_ID,
+        CITY_LABEL_LAYER_ID,
         LANDMARK_CIRCLE_LAYER_ID,
         LANDMARK_LABEL_LAYER_ID,
         LEADER_LAYER_ID,
@@ -1725,13 +1793,14 @@ export function MapContainer() {
     const shouldFrameQuizRegion =
       (selectedMode === "type-to-fill" ||
         selectedMode === "identify-shaded" ||
-        selectedMode === "click-country") &&
+        selectedMode === "click-country" ||
+        selectedMode === "capital-challenge") &&
       gameStatus !== "idle" &&
       !isAntarctica;
     const regionPadding =
       typeof window !== "undefined" && window.innerWidth < 768
         ? { top: 104, right: 24, bottom: 142, left: 24 }
-        : gameStatus === "running"
+        : gameStatus === "running" || gameStatus === "paused"
           ? { top: 112, right: 96, bottom: 148, left: 96 }
           : { top: 118, right: 240, bottom: 154, left: 240 };
 
@@ -1852,8 +1921,6 @@ export function MapContainer() {
   ) => {
     const map = mapRef.current;
 
-    playSuccessChime();
-
     if (!map) {
       return;
     }
@@ -1955,10 +2022,15 @@ export function MapContainer() {
           LANDMARK_LABEL_LAYER_ID,
           LANDMARK_CIRCLE_LAYER_ID,
         ]);
+        const cityId = getFeatureId([
+          CITY_LABEL_LAYER_ID,
+          CITY_CIRCLE_LAYER_ID,
+        ]);
         const physicalId = getFeatureId([PHYSICAL_LABEL_LAYER_ID]);
         const subdivisionId = getFeatureId([SUBDIVISION_LABEL_LAYER_ID]);
         const learningFeature =
           findLearningFeature("landmark", landmarkId) ??
+          findLearningFeature("city", cityId) ??
           findLearningFeature("physical", physicalId) ??
           findLearningFeature("subdivision", subdivisionId);
 
@@ -2049,6 +2121,15 @@ export function MapContainer() {
     setMapDebug({ insetLabelLayerLoaded: loaded });
   }, [setMapDebug]);
 
+  const closeLanding = useCallback(() => {
+    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
+    setLandingOpen(false);
+  }, []);
+
+  const reopenLanding = useCallback(() => {
+    setLandingOpen(true);
+  }, []);
+
   if (!mapboxToken) {
     return (
       <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,#15423c,transparent_34rem),#05080c] px-6 text-white">
@@ -2092,6 +2173,15 @@ export function MapContainer() {
       </motion.div>
 
       {selectedSpecialRegion ? null : <GameHud />}
+      {!landingOpen && learningModeActive ? (
+        <button
+          type="button"
+          onClick={reopenLanding}
+          className="absolute right-4 top-24 z-20 rounded-full border border-white/14 bg-black/42 px-4 py-2 text-sm font-semibold text-white/70 shadow-2xl shadow-black/35 backdrop-blur-2xl transition hover:bg-black/52 hover:text-white sm:right-5 sm:top-28"
+        >
+          GeoMaster
+        </button>
+      ) : null}
       {learningModeActive ? (
         <div className="pointer-events-none absolute left-5 top-28 z-20 rounded-full border border-sky-100/18 bg-black/42 px-4 py-2 text-sm font-semibold text-white/70 shadow-2xl shadow-black/35 backdrop-blur-2xl">
           <span className="text-sky-100/82">Learning Mode</span>
@@ -2135,7 +2225,8 @@ export function MapContainer() {
       </AnimatePresence>
       {!selectedSpecialRegion &&
       (selectedMode === "identify-shaded" ||
-        selectedMode === "click-country") &&
+        selectedMode === "click-country" ||
+        selectedMode === "capital-challenge") &&
       gameStatus === "running" ? (
         <TargetHintCard
           mode={selectedMode}
@@ -2149,6 +2240,14 @@ export function MapContainer() {
       ) : null}
       {selectedSpecialRegion ? null : (
         <>
+          <AnimatePresence>
+            {isPerfectRun && perfectRunSequence > 0 ? (
+              <PerfectRunCelebration
+                key={perfectRunSequence}
+                sequence={perfectRunSequence}
+              />
+            ) : null}
+          </AnimatePresence>
           <CountryPopup
             country={lastMatchedCountry}
             feedbackSequence={lastMatchSequence}
@@ -2172,6 +2271,18 @@ export function MapContainer() {
           <ResultsDashboard />
         </>
       )}
+      <AnimatePresence>
+        {gameStatus === "paused" ? <PauseOverlay key="pause-overlay" /> : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {landingOpen ? (
+          <LandingPage
+            key="landing"
+            onStartQuiz={closeLanding}
+            onExploreMap={closeLanding}
+          />
+        ) : null}
+      </AnimatePresence>
       {IS_DEVELOPMENT && debugUiEnabled ? (
         <MapDebugPanel
           onTestBrazilShade={handleTestBrazilShade}

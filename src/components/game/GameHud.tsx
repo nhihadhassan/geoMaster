@@ -18,6 +18,7 @@ const modeLabels: Record<GameMode, string> = {
   "type-to-fill": "Type",
   "identify-shaded": "Identify",
   "click-country": "Map Click",
+  "capital-challenge": "Capital",
 };
 
 export function GameHud() {
@@ -32,6 +33,8 @@ export function GameHud() {
   const startQuiz = useGameStore((state) => state.startQuiz);
   const resetQuiz = useGameStore((state) => state.resetQuiz);
   const giveUp = useGameStore((state) => state.giveUp);
+  const pauseQuiz = useGameStore((state) => state.pauseQuiz);
+  const resumeQuiz = useGameStore((state) => state.resumeQuiz);
   const backToRegionSelect = useGameStore((state) => state.backToRegionSelect);
   const tick = useGameStore((state) => state.tick);
   const region = getRegionConfig(selectedRegion);
@@ -46,7 +49,9 @@ export function GameHud() {
     (result) => result.status === "missed",
   ).length;
   const isTargetQueueMode =
-    selectedMode === "identify-shaded" || selectedMode === "click-country";
+    selectedMode === "identify-shaded" ||
+    selectedMode === "click-country" ||
+    selectedMode === "capital-challenge";
   const identifiedCount =
     isTargetQueueMode
       ? perfectCount + assistedCount
@@ -72,7 +77,7 @@ export function GameHud() {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute left-1/2 top-5 z-20 flex w-[min(58rem,calc(100vw-2rem))] -translate-x-1/2 items-center justify-between gap-3 rounded-full border border-white/16 bg-black/38 px-4 py-3 text-white shadow-2xl shadow-black/35 backdrop-blur-2xl"
+      className="absolute left-1/2 top-4 z-20 flex w-[min(58rem,calc(100vw-1rem))] -translate-x-1/2 flex-wrap items-center justify-between gap-2 rounded-[1.65rem] border border-white/16 bg-black/38 px-3 py-2.5 text-white shadow-2xl shadow-black/35 backdrop-blur-2xl sm:top-5 sm:w-[min(58rem,calc(100vw-2rem))] sm:gap-3 sm:rounded-full sm:px-4 sm:py-3"
     >
       <div className="min-w-0">
         <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-white/48">
@@ -99,14 +104,14 @@ export function GameHud() {
         </div>
       </div>
 
-      <div className="flex rounded-full border border-white/10 bg-white/6 p-1">
+      <div className="order-3 flex w-full overflow-x-auto rounded-full border border-white/10 bg-white/6 p-1 sm:order-none sm:w-auto">
         {(Object.keys(modeLabels) as GameMode[]).map((mode) => (
           <button
             key={mode}
             type="button"
             onClick={() => selectMode(mode)}
-            disabled={gameStatus === "running"}
-            className={`rounded-full px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 ${
+            disabled={gameStatus === "running" || gameStatus === "paused"}
+            className={`shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 ${
               selectedMode === mode
                 ? "bg-white text-slate-950"
                 : "text-white/58 hover:text-white"
@@ -117,7 +122,7 @@ export function GameHud() {
         ))}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {gameStatus === "idle" ? (
           <button
             type="button"
@@ -135,6 +140,24 @@ export function GameHud() {
           Back to Region Select
         </button>
         {gameStatus === "running" ? (
+          <button
+            type="button"
+            onClick={pauseQuiz}
+            className="rounded-full border border-sky-100/24 bg-sky-300/14 px-3 py-2 text-xs font-semibold text-sky-50 transition hover:bg-sky-300/22"
+          >
+            Pause
+          </button>
+        ) : null}
+        {gameStatus === "paused" ? (
+          <button
+            type="button"
+            onClick={resumeQuiz}
+            className="rounded-full border border-emerald-100/30 bg-emerald-300/18 px-3 py-2 text-xs font-semibold text-emerald-50 transition hover:bg-emerald-300/26"
+          >
+            Resume
+          </button>
+        ) : null}
+        {gameStatus === "running" || gameStatus === "paused" ? (
           <button
             type="button"
             onClick={giveUp}

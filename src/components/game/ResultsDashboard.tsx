@@ -51,7 +51,9 @@ export function ResultsDashboard() {
         : "Time expired";
   const modeBResults = Object.values(countryResults);
   const isTargetQueueMode =
-    selectedMode === "identify-shaded" || selectedMode === "click-country";
+    selectedMode === "identify-shaded" ||
+    selectedMode === "click-country" ||
+    selectedMode === "capital-challenge";
   const countryById = useMemo(
     () => new Map(quizCountries.map((country) => [country.iso_a3, country])),
     [quizCountries],

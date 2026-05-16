@@ -2,11 +2,12 @@ import { create } from "zustand";
 import {
   countries as allCountries,
   getCountriesForRegion,
-  getRegionConfig,
+  getTimerSeconds,
   type Country,
   type QuizRegion,
 } from "@/data/countries";
 import {
+  getCapitalChallengeHints,
   getClickCountryHints,
   getIdentifyHints,
 } from "@/utils/countryHints";
@@ -15,10 +16,15 @@ import type { LearningFeature } from "@/data/learningFeatures";
 export type GameStatus =
   | "idle"
   | "running"
+  | "paused"
   | "completed"
   | "failed"
   | "gave-up";
-export type GameMode = "type-to-fill" | "identify-shaded" | "click-country";
+export type GameMode =
+  | "type-to-fill"
+  | "identify-shaded"
+  | "click-country"
+  | "capital-challenge";
 export type CountryResultStatus = "correct" | "assisted" | "missed";
 
 export type CountryResult = {
@@ -90,6 +96,8 @@ type GameState = {
   incorrectAttempts: Record<string, number>;
   lastMatchedCountry: Country | null;
   lastMatchSequence: number;
+  isPerfectRun: boolean;
+  perfectRunSequence: number;
   currentTargetHints: string[];
   smartHint: string | null;
   capitalHintEnabled: boolean;
@@ -102,6 +110,8 @@ type GameState = {
   clearSpecialRegion: () => void;
   selectMode: (mode: GameMode) => void;
   startQuiz: () => void;
+  pauseQuiz: () => void;
+  resumeQuiz: () => void;
   giveUp: () => void;
   resetQuiz: () => void;
   backToRegionSelect: () => void;
@@ -115,6 +125,7 @@ type GameState = {
   clearLearningFeature: () => void;
   submitTypeGuess: (country: Country) => boolean;
   submitIdentifyGuess: (country: Country | null) => IdentifyGuessResult;
+  submitCapitalGuess: (country: Country | null) => IdentifyGuessResult;
   submitMapClickGuess: (
     clickedIso: string | null,
     source: "main" | "inset",
@@ -134,7 +145,16 @@ const getCountryById = (countries: Country[], id: string | undefined) =>
   countries.find((country) => country.iso_a3 === id) ?? null;
 
 const isTargetQueueMode = (mode: GameMode) =>
-  mode === "identify-shaded" || mode === "click-country";
+  mode === "identify-shaded" ||
+  mode === "click-country" ||
+  mode === "capital-challenge";
+
+const isPerfectCountryResultSet = (
+  countryResults: Record<string, CountryResult>,
+  total: number,
+) =>
+  Object.values(countryResults).length === total &&
+  Object.values(countryResults).every((result) => result.status === "correct");
 
 const AUTO_HIDE_CORRECT_CARD_KEY = "geomaster-auto-hide-correct-card";
 
@@ -159,7 +179,6 @@ const createResetState = (
   selectedMode: GameMode,
 ) => {
   const quizCountries = getCountriesForRegion(selectedRegion);
-  const regionConfig = getRegionConfig(selectedRegion);
 
   return {
     selectedRegion,
@@ -173,11 +192,13 @@ const createResetState = (
     targetQueue: [],
     score: 0,
     total: quizCountries.length,
-    remainingSeconds: regionConfig.timerSeconds,
+    remainingSeconds: getTimerSeconds(selectedRegion, selectedMode),
     gameStatus: "idle" as GameStatus,
     incorrectAttempts: {},
     lastMatchedCountry: null,
     lastMatchSequence: 0,
+    isPerfectRun: false,
+    perfectRunSequence: 0,
     currentTargetHints: [],
     smartHint: null,
     capitalHintEnabled: false,
@@ -249,7 +270,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   startQuiz: () => {
     const state = get();
 
-    if (state.gameStatus === "running") {
+    if (state.gameStatus === "running" || state.gameStatus === "paused") {
       return;
     }
 
@@ -265,6 +286,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         targetQueue,
         currentTargetCountry: getCountryById(state.quizCountries, firstTargetId),
         lastMatchedCountry: null,
+        isPerfectRun: false,
         currentTargetHints: [],
         smartHint: null,
         incorrectAttempts: {},
@@ -284,12 +306,35 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentTargetCountry: null,
       targetQueue: [],
       lastMatchedCountry: null,
+      isPerfectRun: false,
       currentTargetHints: [],
       smartHint: null,
       incorrectAttempts: {},
       learningCountry: null,
       selectedLearningFeature: null,
     });
+  },
+  pauseQuiz: () => {
+    const state = get();
+
+    if (state.gameStatus !== "running") {
+      return;
+    }
+
+    set({
+      gameStatus: "paused",
+      currentInput: "",
+      smartHint: null,
+    });
+  },
+  resumeQuiz: () => {
+    const state = get();
+
+    if (state.gameStatus !== "paused") {
+      return;
+    }
+
+    set({ gameStatus: "running" });
   },
   resetQuiz: () => {
     const { selectedRegion, selectedMode } = get();
@@ -299,7 +344,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   giveUp: () => {
     const state = get();
 
-    if (state.gameStatus !== "running") {
+    if (state.gameStatus !== "running" && state.gameStatus !== "paused") {
       return;
     }
 
@@ -311,6 +356,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentTargetHints: [],
       smartHint: null,
       lastMatchedCountry: null,
+      isPerfectRun: false,
       learningCountry: null,
       selectedLearningFeature: null,
     });
@@ -372,12 +418,17 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const guessedCountryIds = [...state.guessedCountryIds, country.iso_a3];
     const isComplete = guessedCountryIds.length === state.quizCountries.length;
+    const perfectRunSequence = isComplete
+      ? state.perfectRunSequence + 1
+      : state.perfectRunSequence;
 
     set({
       guessedCountryIds,
       currentInput: "",
       lastMatchedCountry: country,
       lastMatchSequence: state.lastMatchSequence + 1,
+      isPerfectRun: isComplete,
+      perfectRunSequence,
       score: guessedCountryIds.length,
       gameStatus: isComplete ? "completed" : "running",
       smartHint: null,
@@ -406,12 +457,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       const score = Object.values(countryResults).filter(
         (result) => result.status === "correct" || result.status === "assisted",
       ).length;
+      const isPerfectRun =
+        isComplete &&
+        isPerfectCountryResultSet(countryResults, state.quizCountries.length);
 
       return {
         currentTargetCountry: nextTarget,
         targetQueue,
         score,
         gameStatus: isComplete ? ("completed" as GameStatus) : state.gameStatus,
+        isPerfectRun,
+        perfectRunSequence: isPerfectRun
+          ? state.perfectRunSequence + 1
+          : state.perfectRunSequence,
       };
     };
 
@@ -448,6 +506,113 @@ export const useGameStore = create<GameState>((set, get) => ({
         target,
         attempts,
         state.capitalHintEnabled,
+      );
+
+      set({
+        incorrectAttempts,
+        currentTargetHints,
+        smartHint: currentTargetHints.at(-1) ?? null,
+      });
+
+      return { outcome: "wrong", country: target };
+    }
+
+    const attemptsUsed = state.incorrectAttempts[target.iso_a3] ?? 0;
+    const resultStatus: CountryResultStatus =
+      attemptsUsed === 0 ? "correct" : "assisted";
+    const guessedCountryIds = [...state.guessedCountryIds, target.iso_a3];
+    const countryResults = {
+      ...state.countryResults,
+      [target.iso_a3]: {
+        status: resultStatus,
+        attemptsUsed: attemptsUsed + 1,
+      },
+    };
+    const nextState = advanceTarget(countryResults);
+
+    set({
+      ...nextState,
+      guessedCountryIds,
+      countryResults,
+      currentInput: "",
+      lastMatchedCountry: target,
+      lastMatchSequence: state.lastMatchSequence + 1,
+      currentTargetHints: [],
+      smartHint: null,
+    });
+
+    return { outcome: resultStatus, country: target };
+  },
+  submitCapitalGuess: (country) => {
+    const state = get();
+    const target = state.currentTargetCountry;
+
+    if (
+      state.gameStatus !== "running" ||
+      state.selectedMode !== "capital-challenge" ||
+      !target
+    ) {
+      return { outcome: "ignored" };
+    }
+
+    const advanceTarget = (
+      countryResults: Record<string, CountryResult>,
+    ) => {
+      const [nextTargetId, ...targetQueue] = state.targetQueue;
+      const nextTarget = getCountryById(state.quizCountries, nextTargetId);
+      const isComplete = !nextTarget;
+      const score = Object.values(countryResults).filter(
+        (result) => result.status === "correct" || result.status === "assisted",
+      ).length;
+      const isPerfectRun =
+        isComplete &&
+        isPerfectCountryResultSet(countryResults, state.quizCountries.length);
+
+      return {
+        currentTargetCountry: nextTarget,
+        targetQueue,
+        score,
+        gameStatus: isComplete ? ("completed" as GameStatus) : state.gameStatus,
+        isPerfectRun,
+        perfectRunSequence: isPerfectRun
+          ? state.perfectRunSequence + 1
+          : state.perfectRunSequence,
+      };
+    };
+
+    if (!country || country.iso_a3 !== target.iso_a3) {
+      const attempts = (state.incorrectAttempts[target.iso_a3] ?? 0) + 1;
+      const incorrectAttempts = {
+        ...state.incorrectAttempts,
+        [target.iso_a3]: attempts,
+      };
+
+      if (attempts >= 3) {
+        const countryResults = {
+          ...state.countryResults,
+          [target.iso_a3]: {
+            status: "missed" as CountryResultStatus,
+            attemptsUsed: 3,
+          },
+        };
+        const nextState = advanceTarget(countryResults);
+
+        set({
+          ...nextState,
+          countryResults,
+          incorrectAttempts,
+          currentInput: "",
+          currentTargetHints: [],
+          smartHint: null,
+        });
+
+        return { outcome: "missed", country: target };
+      }
+
+      const currentTargetHints = getCapitalChallengeHints(
+        target,
+        attempts,
+        state.selectedRegion,
       );
 
       set({
@@ -522,12 +687,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       const score = Object.values(countryResults).filter(
         (result) => result.status === "correct" || result.status === "assisted",
       ).length;
+      const isPerfectRun =
+        isComplete &&
+        isPerfectCountryResultSet(countryResults, state.quizCountries.length);
 
       return {
         currentTargetCountry: nextTarget,
         targetQueue,
         score,
         gameStatus: isComplete ? ("completed" as GameStatus) : state.gameStatus,
+        isPerfectRun,
+        perfectRunSequence: isPerfectRun
+          ? state.perfectRunSequence + 1
+          : state.perfectRunSequence,
       };
     };
 
@@ -615,6 +787,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         ? {
             remainingSeconds,
             gameStatus: "failed",
+            isPerfectRun: false,
             currentInput: "",
             currentTargetCountry: null,
             targetQueue: [],

@@ -28,6 +28,10 @@ const labelForFeature = (feature: LearningFeature) => {
     return typeLabel;
   }
 
+  if (feature.kind === "city") {
+    return "City";
+  }
+
   if (feature.kind === "physical") {
     return feature.feature.type
       .split("_")
@@ -61,8 +65,16 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
   const parentCountry =
     feature.kind === "subdivision"
       ? getParentCountryName(feature.feature.countryIsoA3)
+      : feature.kind === "city"
+        ? `${feature.feature.subdivision}, ${getParentCountryName(feature.feature.countryIsoA3) ?? "Canada"}`
       : feature.kind === "landmark"
-        ? getParentCountryName(feature.feature.countryIsoA3)
+        ? [
+            feature.feature.city,
+            feature.feature.subdivision,
+            getParentCountryName(feature.feature.countryIsoA3),
+          ]
+            .filter(Boolean)
+            .join(", ")
         : undefined;
 
   return (
@@ -108,13 +120,22 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
             </div>
           </div>
 
-          {feature.kind === "subdivision" ? (
+          {feature.kind === "subdivision" || feature.kind === "city" ? (
             <>
+              {feature.kind === "city" ? (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/8 px-3 py-3">
+                  <p className="text-sm leading-5 text-white/74">
+                    {feature.feature.education.description}
+                  </p>
+                </div>
+              ) : null}
               <dl className="mt-4 grid grid-cols-2 gap-2">
-                <DetailRow
-                  label="Capital"
-                  value={feature.feature.education?.capital}
-                />
+                {feature.kind === "subdivision" ? (
+                  <DetailRow
+                    label="Capital"
+                    value={feature.feature.education?.capital}
+                  />
+                ) : null}
                 <DetailRow
                   label="Population"
                   value={formatPopulation(
@@ -134,16 +155,45 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
               ) : null}
             </>
           ) : (
-            <div className="mt-4 rounded-2xl border border-white/10 bg-white/8 px-3 py-3">
-              <p className="text-sm leading-5 text-white/74">
-                {feature.feature.education.description}
-              </p>
-              {feature.feature.education.funFact ? (
-                <p className="mt-3 text-sm leading-5 text-emerald-100/76">
-                  {feature.feature.education.funFact}
-                </p>
+            <>
+              {feature.kind === "landmark" ? (
+                feature.feature.image ? (
+                  <figure className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-white/8">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={feature.feature.image.src}
+                      alt={feature.feature.image.alt}
+                      className="h-36 w-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                    />
+                    {feature.feature.image.credit ? (
+                      <figcaption className="border-t border-white/10 px-3 py-2 text-[0.65rem] leading-4 text-white/46">
+                        {feature.feature.image.credit}
+                        {feature.feature.image.license ? ` · ${feature.feature.image.license}` : ""}
+                      </figcaption>
+                    ) : null}
+                  </figure>
+                ) : (
+                  <div className="mt-4 grid h-32 place-items-center rounded-2xl border border-dashed border-white/14 bg-gradient-to-br from-sky-300/12 via-white/6 to-emerald-300/10 px-4 text-center">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/44">
+                      Landmark image coming soon
+                    </p>
+                  </div>
+                )
               ) : null}
-            </div>
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/8 px-3 py-3">
+                <p className="text-sm leading-5 text-white/74">
+                  {feature.feature.education.description}
+                </p>
+                {feature.feature.education.funFact ? (
+                  <p className="mt-3 text-sm leading-5 text-emerald-100/76">
+                    {feature.feature.education.funFact}
+                  </p>
+                ) : null}
+              </div>
+            </>
           )}
         </article>
       )}

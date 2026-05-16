@@ -1,4 +1,5 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
+import { cities, type City } from "@/data/cities";
 import { countries, type Country } from "@/data/countries";
 import { landmarks, type Landmark } from "@/data/landmarks";
 import {
@@ -9,6 +10,7 @@ import { subdivisions, type Subdivision } from "@/data/subdivisions";
 
 export type LearningFeature =
   | { kind: "country"; country: Country }
+  | { kind: "city"; feature: City }
   | { kind: "subdivision"; feature: Subdivision }
   | { kind: "physical"; feature: PhysicalFeature }
   | { kind: "landmark"; feature: Landmark };
@@ -53,6 +55,14 @@ export const subdivisionFeatureCollection = toFeatureCollection(
   }),
 );
 
+export const cityFeatureCollection = toFeatureCollection(cities, (city) => ({
+  id: city.id,
+  name: city.name,
+  type: "city",
+  parent: `${city.subdivision}, ${countryNameByIso.get(city.countryIsoA3) ?? "Canada"}`,
+  zoomMin: city.zoomMin,
+}));
+
 export const physicalFeatureCollection = toFeatureCollection(
   physicalFeatures,
   (feature) => ({
@@ -86,6 +96,11 @@ export const findLearningFeature = (
 
   if (kind === "subdivision") {
     const feature = subdivisions.find((item) => item.id === id);
+    return feature ? { kind, feature } : null;
+  }
+
+  if (kind === "city") {
+    const feature = cities.find((item) => item.id === id);
     return feature ? { kind, feature } : null;
   }
 

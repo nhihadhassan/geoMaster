@@ -117,7 +117,10 @@ const clickHintOverrides: Record<string, [string, string]> = {
   WSM: ["It is a Pacific island country.", "Look in Polynesia, west of American Samoa."],
 };
 
-const regionLocationHint = (country: Country, selectedRegion: QuizRegion) => {
+const regionLocationHint = (
+  country: Country,
+  selectedRegion: QuizRegion,
+): string => {
   const { lat, lng } = country.center;
 
   switch (selectedRegion) {
@@ -157,10 +160,20 @@ const regionLocationHint = (country: Country, selectedRegion: QuizRegion) => {
       if (lng < 160) return "It is in the western Pacific.";
       if (lng > 180 || lng < -170) return "It is in the central Pacific.";
       return "It is in the South Pacific.";
+    case "world": {
+      const primaryRegion = country.continentQuizGroups[0];
+
+      return primaryRegion
+        ? regionLocationHint(country, primaryRegion)
+        : "It is in the world country set.";
+    }
   }
 };
 
-const strongerLocationHint = (country: Country, selectedRegion: QuizRegion) => {
+const strongerLocationHint = (
+  country: Country,
+  selectedRegion: QuizRegion,
+): string => {
   const { lat, lng } = country.center;
 
   if (country.isSmall) {
@@ -194,6 +207,13 @@ const strongerLocationHint = (country: Country, selectedRegion: QuizRegion) => {
       return "Look toward Africa's eastern side.";
     case "oceania":
       return "Use the Pacific island guide circles to narrow the area.";
+    case "world": {
+      const primaryRegion = country.continentQuizGroups[0];
+
+      return primaryRegion
+        ? strongerLocationHint(country, primaryRegion)
+        : "Narrow it down by continent first.";
+    }
   }
 };
 
@@ -225,5 +245,41 @@ export const getClickCountryHints = (
   return uniqueHints([
     firstHint,
     ...(attempts >= 2 ? [secondHint] : []),
+  ]).slice(0, Math.min(attempts, 2));
+};
+
+export const getCapitalChallengeHints = (
+  country: Country,
+  attempts: number,
+  selectedRegion: QuizRegion,
+) => {
+  if (attempts <= 0) {
+    return [];
+  }
+
+  const firstLetter = country.name.charAt(0).toUpperCase();
+  const lastLetter = country.name.charAt(country.name.length - 1).toUpperCase();
+  const activeRegion = selectedRegion === "world"
+    ? country.continentQuizGroups[0] ?? selectedRegion
+    : selectedRegion;
+  const geographyHint =
+    !isWeakClickHint(country, country.hints?.subregionHint)
+      ? country.hints?.subregionHint ?? regionLocationHint(country, activeRegion)
+      : regionLocationHint(country, activeRegion);
+  const secondHint =
+    !isWeakClickHint(country, country.hints?.neighborHint)
+      ? country.hints?.neighborHint ?? geographyHint
+      : !isWeakClickHint(country, country.hints?.locationHint)
+        ? country.hints?.locationHint ?? geographyHint
+        : geographyHint;
+
+  return uniqueHints([
+    `Country starts with ${firstLetter}`,
+    ...(attempts >= 2
+      ? [
+          secondHint,
+          `Country starts with ${firstLetter} and ends with ${lastLetter}`,
+        ]
+      : []),
   ]).slice(0, Math.min(attempts, 2));
 };

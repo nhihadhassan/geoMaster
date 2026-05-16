@@ -1,14 +1,14 @@
-import type { QuizRegion } from "./countries";
+import type { ContinentQuizRegion } from "./countries";
 
 export type QuizCountrySeed = {
   name: string;
-  region: QuizRegion;
+  region: ContinentQuizRegion;
 };
 
 export const expectedUniqueCountryCount = 196;
 export const expectedRegionMembershipCount = 198;
 
-export const expectedRegionCounts: Record<QuizRegion, number> = {
+export const expectedRegionCounts: Record<ContinentQuizRegion, number> = {
   "north-america": 23,
   "south-america": 12,
   europe: 47,
@@ -233,7 +233,7 @@ const oceania = [
   "Vanuatu",
 ];
 
-const toSeeds = (region: QuizRegion, names: string[]) =>
+const toSeeds = (region: ContinentQuizRegion, names: string[]) =>
   names.map((name) => ({ name, region }));
 
 export const quizCountrySeeds: QuizCountrySeed[] = [

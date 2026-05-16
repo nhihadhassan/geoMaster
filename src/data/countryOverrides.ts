@@ -1,4 +1,4 @@
-import type { CountryEducation, QuizRegion } from "./countries";
+import type { ContinentQuizRegion, CountryEducation } from "./countries";
 
 export type CountryOverride = {
   iso_a3?: string;
@@ -267,10 +267,10 @@ const smallCountries = new Set([
   "WSM",
 ]);
 
-const formatRegionList = (regions: QuizRegion[]) =>
+const formatRegionList = (regions: ContinentQuizRegion[]) =>
   regions.map((region) => region.replace("-", " ")).join(" and ");
 
-const broadHintFor = (regions: QuizRegion[], isSmall: boolean) => {
+const broadHintFor = (regions: ContinentQuizRegion[], isSmall: boolean) => {
   if (isSmall) {
     return regions.includes("oceania")
       ? "It is a Pacific island country."
@@ -280,12 +280,12 @@ const broadHintFor = (regions: QuizRegion[], isSmall: boolean) => {
   return `It is in ${formatRegionList(regions)}.`;
 };
 
-const locationHintFor = (name: string, regions: QuizRegion[]) =>
+const locationHintFor = (name: string, regions: ContinentQuizRegion[]) =>
   `Look for ${name} within the ${formatRegionList(regions)} quiz region.`;
 
 export const buildGeneratedHints = (
   name: string,
-  regionOrRegions: QuizRegion | QuizRegion[],
+  regionOrRegions: ContinentQuizRegion | ContinentQuizRegion[],
   iso: string,
 ) => {
   const regions = Array.isArray(regionOrRegions)
@@ -308,6 +308,7 @@ export const countryOverrides: Record<string, CountryOverride> = {
   BRA: { acceptedNames: ["Brasil"] },
   BIH: { acceptedNames: ["Bosnia"] },
   MKD: { acceptedNames: ["Macedonia"] },
+  CAF: { acceptedNames: ["CAR"] },
   USA: { acceptedNames: ["USA", "US", "United States of America"] },
   ARE: { acceptedNames: ["UAE", "Emirates"] },
   SAU: { acceptedNames: ["Saudi"] },

@@ -6,7 +6,10 @@ export type QuizRegion =
   | "europe"
   | "asia"
   | "africa"
-  | "oceania";
+  | "oceania"
+  | "world";
+
+export type ContinentQuizRegion = Exclude<QuizRegion, "world">;
 
 export type RegionSelectorId = QuizRegion | "antarctica";
 
@@ -31,9 +34,9 @@ export type Country = {
   iso_a3: string;
   name: string;
   acceptedNames: string[];
-  continentQuizGroups: QuizRegion[];
+  continentQuizGroups: ContinentQuizRegion[];
   /** @deprecated Use continentQuizGroups for runtime quiz membership. */
-  continentQuizGroup: QuizRegion;
+  continentQuizGroup: ContinentQuizRegion;
   capital: string;
   flag: string;
   flagCode?: string;
@@ -74,6 +77,12 @@ export type RegionSelectorConfig = {
 };
 
 export const countries: Country[] = generatedCountries;
+
+export type QuizTimerMode =
+  | "type-to-fill"
+  | "identify-shaded"
+  | "click-country"
+  | "capital-challenge";
 
 export const regionConfigs: Record<QuizRegion, RegionConfig> = {
   "north-america": {
@@ -154,6 +163,19 @@ export const regionConfigs: Record<QuizRegion, RegionConfig> = {
     pitch: 32,
     bearing: 0,
   },
+  world: {
+    id: "world",
+    label: "Whole World",
+    timerSeconds: 1200,
+    bounds: [
+      [-170, -58],
+      [190, 78],
+    ],
+    center: { lat: 19, lng: 8 },
+    zoom: 1.65,
+    pitch: 18,
+    bearing: 0,
+  },
 };
 
 const regionOrder: QuizRegion[] = [
@@ -163,12 +185,23 @@ const regionOrder: QuizRegion[] = [
   "asia",
   "africa",
   "oceania",
+  "world",
 ];
 
 export const getCountriesForRegion = (region: QuizRegion) =>
-  countries.filter((country) => country.continentQuizGroups.includes(region));
+  region === "world"
+    ? countries
+    : countries.filter((country) => country.continentQuizGroups.includes(region));
 
 export const getRegionConfig = (region: QuizRegion) => regionConfigs[region];
+
+export const getTimerSeconds = (region: QuizRegion, mode: QuizTimerMode) => {
+  if (region !== "world") {
+    return regionConfigs[region].timerSeconds;
+  }
+
+  return mode === "type-to-fill" ? 15 * 60 : 20 * 60;
+};
 
 export const regionSelectorConfigs: RegionSelectorConfig[] = [
   ...regionOrder.map((region) => ({

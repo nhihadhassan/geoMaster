@@ -28,6 +28,9 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
   const submitIdentifyGuess = useGameStore(
     (state) => state.submitIdentifyGuess,
   );
+  const submitCapitalGuess = useGameStore(
+    (state) => state.submitCapitalGuess,
+  );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
   const availableCountries = useMemo(
     () =>
@@ -123,14 +126,20 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
 
     const match = findCountryMatch(currentInput, quizCountries);
 
-    if (selectedMode === "identify-shaded") {
+    if (
+      selectedMode === "identify-shaded" ||
+      selectedMode === "capital-challenge"
+    ) {
       if (currentInput.trim().length < 2) {
         setLocalHint("Type an answer");
         vibrate([18, 24, 18]);
         return;
       }
 
-      const result = submitIdentifyGuess(match?.country ?? null);
+      const result =
+        selectedMode === "capital-challenge"
+          ? submitCapitalGuess(match?.country ?? null)
+          : submitIdentifyGuess(match?.country ?? null);
       setLocalHint(null);
 
       recordMatchDebug(
@@ -191,11 +200,15 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
                   ? "Quiz ended"
                   : selectedMode === "identify-shaded"
                     ? "Identify the glowing country, then press Enter"
+                    : selectedMode === "capital-challenge"
+                      ? "Name the country from the capital, then press Enter"
                     : "Type a country..."
         }
         className="h-16 w-full rounded-[1.55rem] border border-white/10 bg-white/10 px-6 text-center text-base font-medium text-white outline-none ring-0 transition placeholder:text-white/36 focus:border-emerald-300/40 focus:bg-white/14 focus:shadow-[0_0_40px_rgba(52,211,153,0.18)] disabled:cursor-not-allowed disabled:opacity-70 sm:text-2xl"
       />
-      {selectedMode === "identify-shaded" && gameStatus === "running" ? (
+      {(selectedMode === "identify-shaded" ||
+        selectedMode === "capital-challenge") &&
+      gameStatus === "running" ? (
         <button
           type="button"
           onClick={handleSubmit}

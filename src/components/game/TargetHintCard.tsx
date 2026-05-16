@@ -5,7 +5,10 @@ import type { Country } from "@/data/countries";
 import type { GameMode } from "@/store/gameStore";
 
 type TargetHintCardProps = {
-  mode: Extract<GameMode, "identify-shaded" | "click-country">;
+  mode: Extract<
+    GameMode,
+    "identify-shaded" | "click-country" | "capital-challenge"
+  >;
   targetCountry: Country | null;
   smartHint: string | null;
   currentTargetHints: string[];
@@ -37,20 +40,28 @@ export function TargetHintCard({
         stiffness: 320,
         damping: 30,
       }}
-      className="absolute left-5 top-28 z-20 w-[min(20rem,calc(100vw-2.5rem))] rounded-3xl border border-cyan-200/18 bg-black/42 p-4 text-white shadow-2xl shadow-cyan-950/35 backdrop-blur-2xl"
+      className="absolute inset-x-3 top-40 z-20 mx-auto w-[min(20rem,calc(100vw-1.5rem))] rounded-3xl border border-cyan-200/18 bg-black/42 p-4 text-white shadow-2xl shadow-cyan-950/35 backdrop-blur-2xl sm:inset-x-auto sm:left-5 sm:top-28 sm:mx-0 sm:w-[min(20rem,calc(100vw-2.5rem))]"
     >
       <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-cyan-100/60">
-        {mode === "click-country" ? "Map Click" : "Identify"}
+        {mode === "click-country"
+          ? "Map Click"
+          : mode === "capital-challenge"
+            ? "Capital Challenge"
+            : "Identify"}
       </p>
       <p className="mt-3 text-lg font-semibold leading-tight text-white">
         {mode === "click-country"
           ? `Find ${targetCountry.name}`
-          : "Name the highlighted country."}
+          : mode === "capital-challenge"
+            ? `Capital: ${targetCountry.capital}`
+            : "Name the highlighted country."}
       </p>
       <p className="mt-2 text-sm leading-5 text-white/58">
         {mode === "click-country"
           ? "Click the country on the map."
-          : "Use the pulsing shape on the map as your prompt."}
+          : mode === "capital-challenge"
+            ? "Type the country that uses this capital."
+            : "Use the pulsing shape on the map as your prompt."}
       </p>
       <p className="mt-3 inline-flex rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs font-semibold text-white/64">
         Attempt {Math.min(attemptCount + 1, 3)} / 3
