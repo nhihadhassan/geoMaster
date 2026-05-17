@@ -1,6 +1,7 @@
 import worldCountries from "../src/data/world-countries.geo.json" with { type: "json" };
 import { cities } from "../src/data/cities.ts";
 import { countries, type ContinentQuizRegion } from "../src/data/countries.ts";
+import { countryStories } from "../src/data/countryStories.ts";
 import {
   expectedRegionCounts,
   expectedRegionMembershipCount,
@@ -56,6 +57,12 @@ const names = new Set<string>();
 const isos = new Set<string>();
 const errors: string[] = [];
 const warnings: string[] = [];
+
+const wordCount = (value: string) =>
+  value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
 
 if (countries.length !== expectedUniqueCountryCount) {
   errors.push(
@@ -221,6 +228,26 @@ for (const country of countries) {
     errors.push(`${country.name} (${country.iso_a3}) does not match map geometry.`);
   }
 
+  const story = countryStories[country.iso_a3];
+  if (!story) {
+    errors.push(`${country.name} (${country.iso_a3}) is missing a country story.`);
+  } else {
+    if (story.iso_a3 !== country.iso_a3) {
+      errors.push(`${country.name} story key/iso mismatch: key ${country.iso_a3}, story ${story.iso_a3}.`);
+    }
+
+    const storyWords = wordCount(story.story);
+    if (storyWords < 80) {
+      errors.push(`${country.name} story is too short (${storyWords} words).`);
+    }
+
+    if (storyWords > 450) {
+      errors.push(`${country.name} story is too long (${storyWords} words).`);
+    } else if (storyWords > 350) {
+      warnings.push(`${country.name} story is long (${storyWords} words).`);
+    }
+  }
+
   const placement = labelPlacements[country.iso_a3]?.main;
 
   if (!placement) {
@@ -238,6 +265,20 @@ for (const country of countries) {
 
 if (dataNames.has("French Guiana")) {
   errors.push("French Guiana must not be included in the sovereign-country quiz.");
+}
+
+for (const [iso, story] of Object.entries(countryStories)) {
+  if (!isos.has(iso)) {
+    errors.push(`Country story ${iso} does not match an active quiz country.`);
+  }
+
+  if (story.iso_a3 !== iso) {
+    errors.push(`Country story key ${iso} has mismatched iso_a3 ${story.iso_a3}.`);
+  }
+
+  if (!story.story.trim()) {
+    errors.push(`Country story ${iso} is empty.`);
+  }
 }
 
 const requiredGuideCountries = [

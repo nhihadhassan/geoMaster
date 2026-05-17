@@ -2,7 +2,9 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import { useMemo, useState } from "react";
 import type { Country } from "@/data/countries";
+import { getCountryStory } from "@/data/countryStories";
 import { formatCountryEducation } from "@/utils/countryEducation";
 import { getCountryFlagDisplay } from "@/utils/countryFlags";
 
@@ -18,6 +20,18 @@ export function CountryEducationCard({
   const education = formatCountryEducation(country);
   const isPopup = variant === "popup";
   const flag = getCountryFlagDisplay(country);
+  const story = getCountryStory(country.iso_a3);
+  const [storyExpanded, setStoryExpanded] = useState(false);
+  const storyParagraphs = useMemo(
+    () =>
+      story?.story
+        .split(/\n{2,}/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean) ?? [],
+    [story],
+  );
+  const visibleStoryParagraphs =
+    storyExpanded || isPopup ? storyParagraphs : storyParagraphs.slice(0, 1);
 
   return (
     <article
@@ -92,6 +106,46 @@ export function CountryEducationCard({
         <p className="mt-3 text-[0.68rem] font-medium text-white/36">
           Stats source year: {education.sourceYear}
         </p>
+      ) : null}
+
+      {story ? (
+        <section
+          className={
+            isPopup
+              ? "mt-3 rounded-2xl border border-sky-100/14 bg-sky-300/8 px-3 py-2"
+              : "mt-4 rounded-2xl border border-sky-100/14 bg-sky-300/8 px-3 py-3"
+          }
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-sky-100/58">
+                Country Story
+              </p>
+              {story.title ? (
+                <h4 className="mt-1 text-sm font-semibold leading-5 text-white/86">
+                  {story.title}
+                </h4>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => setStoryExpanded((expanded) => !expanded)}
+              className="shrink-0 rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/64 transition hover:bg-white/14 hover:text-white"
+            >
+              {storyExpanded ? "Hide" : isPopup ? "Read" : "Read more"}
+            </button>
+          </div>
+
+          {isPopup && !storyExpanded ? null : (
+            <div className="mt-3 space-y-3">
+              {visibleStoryParagraphs.map((paragraph) => (
+                <p key={paragraph} className="text-sm leading-6 text-white/72">
+                  {paragraph}
+                </p>
+              ))}
+            </div>
+          )}
+        </section>
       ) : null}
     </article>
   );
