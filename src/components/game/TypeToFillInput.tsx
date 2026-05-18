@@ -48,9 +48,9 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
         initial={{ opacity: 0, y: 28, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        className="pointer-events-none absolute inset-x-4 bottom-6 z-20 mx-auto max-w-2xl rounded-[2rem] border border-white/16 bg-black/38 p-2 shadow-2xl shadow-black/40 backdrop-blur-2xl"
+        className="pointer-events-none absolute inset-x-4 bottom-6 z-20 mx-auto max-w-2xl rounded-3xl border border-white/12 bg-zinc-950/56 p-2 shadow-xl shadow-black/30 backdrop-blur-xl"
       >
-        <div className="grid h-16 place-items-center rounded-[1.55rem] border border-white/10 bg-white/10 px-6 text-center text-sm font-semibold text-white/70 sm:text-base">
+        <div className="grid h-14 place-items-center rounded-2xl border border-white/10 bg-white/9 px-6 text-center text-sm font-semibold text-white/70 sm:h-16 sm:text-base">
           {gameStatus === "running"
             ? "Click the country shown in the prompt"
             : gameStatus === "completed"
@@ -172,7 +172,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
       initial={{ opacity: 0, y: 28, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 280, damping: 30 }}
-      className="absolute inset-x-4 bottom-6 z-20 mx-auto max-w-2xl rounded-[2rem] border border-white/16 bg-black/38 p-2 shadow-2xl shadow-black/40 backdrop-blur-2xl"
+      className="absolute inset-x-4 bottom-6 z-20 mx-auto max-w-2xl rounded-3xl border border-white/12 bg-zinc-950/56 p-2 shadow-xl shadow-black/30 backdrop-blur-xl"
     >
       <label className="sr-only" htmlFor="country-guess">
         Type a country name
@@ -204,7 +204,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
                       ? "Name the country from the capital, then press Enter"
                     : "Type a country..."
         }
-        className="h-16 w-full rounded-[1.55rem] border border-white/10 bg-white/10 px-6 text-center text-base font-medium text-white outline-none ring-0 transition placeholder:text-white/36 focus:border-emerald-300/40 focus:bg-white/14 focus:shadow-[0_0_40px_rgba(52,211,153,0.18)] disabled:cursor-not-allowed disabled:opacity-70 sm:text-2xl"
+        className="h-14 w-full rounded-2xl border border-white/10 bg-white/9 px-6 text-center text-base font-medium text-white outline-none ring-0 transition placeholder:text-white/36 focus:border-emerald-300/40 focus:bg-white/14 focus:shadow-[0_0_34px_rgba(52,211,153,0.16)] disabled:cursor-not-allowed disabled:opacity-70 sm:h-16 sm:text-2xl"
       />
       {(selectedMode === "identify-shaded" ||
         selectedMode === "capital-challenge") &&
@@ -218,7 +218,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
         </button>
       ) : null}
       {localHint || smartHint ? (
-        <p className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 rounded-full border border-amber-200/20 bg-black/56 px-3 py-1 text-xs font-semibold text-amber-100 backdrop-blur-xl">
+        <p className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 rounded-full border border-amber-200/20 bg-zinc-950/68 px-3 py-1 text-xs font-semibold text-amber-100 backdrop-blur-xl">
           {smartHint ?? localHint}
         </p>
       ) : null}

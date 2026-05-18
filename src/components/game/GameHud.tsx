@@ -61,6 +61,7 @@ export function GameHud() {
       ? modeBResults.length
       : guessedCountryIds.length;
   const progress = total === 0 ? 0 : progressCount / total;
+  const isIdle = gameStatus === "idle";
 
   useEffect(() => {
     if (gameStatus !== "running") {
@@ -77,23 +78,27 @@ export function GameHud() {
       initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute left-1/2 top-4 z-20 flex w-[min(58rem,calc(100vw-1rem))] -translate-x-1/2 flex-wrap items-center justify-between gap-2 rounded-[1.65rem] border border-white/16 bg-black/38 px-3 py-2.5 text-white shadow-2xl shadow-black/35 backdrop-blur-2xl sm:top-5 sm:w-[min(58rem,calc(100vw-2rem))] sm:gap-3 sm:rounded-full sm:px-4 sm:py-3"
+      className={`absolute left-1/2 top-3 z-20 flex -translate-x-1/2 flex-wrap items-center justify-between gap-2 rounded-3xl border border-white/12 bg-zinc-950/56 px-3 py-2 text-white shadow-xl shadow-black/28 backdrop-blur-xl sm:top-4 sm:gap-3 sm:px-4 sm:py-2.5 ${
+        isIdle
+          ? "w-[min(50rem,calc(100vw-1rem))] sm:w-[min(50rem,calc(100vw-2rem))]"
+          : "w-[min(44rem,calc(100vw-1rem))] sm:w-[min(44rem,calc(100vw-2rem))]"
+      }`}
     >
       <div className="min-w-0">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-white/48">
+        <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/48">
           {region.label}
         </p>
         <p className="text-sm font-medium text-white/82">
           {identifiedCount}/{total} countries
         </p>
         {isTargetQueueMode && modeBResults.length > 0 ? (
-          <p className="mt-0.5 text-[0.68rem] font-medium text-white/48">
+          <p className="mt-0.5 text-[0.68rem] font-medium text-white/50">
             Perfect {perfectCount} · Hints {assistedCount} · Missed {missedCount}
           </p>
         ) : null}
       </div>
 
-      <div className="hidden min-w-48 items-center gap-2 lg:flex">
+      <div className="hidden min-w-32 items-center gap-2 md:flex">
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
           <motion.div
             className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-lime-200 to-sky-300"
@@ -104,23 +109,28 @@ export function GameHud() {
         </div>
       </div>
 
-      <div className="order-3 flex w-full overflow-x-auto rounded-full border border-white/10 bg-white/6 p-1 sm:order-none sm:w-auto">
-        {(Object.keys(modeLabels) as GameMode[]).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => selectMode(mode)}
-            disabled={gameStatus === "running" || gameStatus === "paused"}
-            className={`shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 ${
-              selectedMode === mode
-                ? "bg-white text-slate-950"
-                : "text-white/58 hover:text-white"
-            } disabled:cursor-not-allowed disabled:opacity-70`}
-          >
-            {modeLabels[mode]}
-          </button>
-        ))}
-      </div>
+      {isIdle ? (
+        <div className="order-3 flex w-full overflow-x-auto rounded-full border border-white/10 bg-white/6 p-1 sm:order-none sm:w-auto">
+          {(Object.keys(modeLabels) as GameMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => selectMode(mode)}
+              className={`shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 ${
+                selectedMode === mode
+                  ? "bg-white text-slate-950"
+                  : "text-white/58 hover:text-white"
+              }`}
+            >
+              {modeLabels[mode]}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-full border border-white/10 bg-white/7 px-3 py-1.5 text-xs font-semibold text-white/68">
+          {modeLabels[selectedMode]}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         {gameStatus === "idle" ? (
@@ -135,7 +145,7 @@ export function GameHud() {
         <button
           type="button"
           onClick={backToRegionSelect}
-          className="hidden rounded-full border border-white/12 bg-white/8 px-3 py-2 text-xs font-semibold text-white/68 transition hover:bg-white/14 hover:text-white sm:block"
+          className="hidden rounded-full border border-white/10 bg-white/7 px-3 py-2 text-xs font-semibold text-white/62 transition hover:bg-white/12 hover:text-white sm:block"
         >
           Back to Region Select
         </button>
@@ -178,7 +188,7 @@ export function GameHud() {
           </button>
         ) : null}
         <div className="min-w-16 text-right">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-white/48">
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/48">
             Timer
           </p>
           <p className="font-mono text-lg font-semibold text-white">

@@ -761,7 +761,7 @@ export function CaribbeanInsetMap({
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute right-5 top-36 z-20 w-[min(21rem,calc(100vw-2.5rem))] overflow-hidden rounded-3xl border border-white/14 bg-black/38 p-3 text-white shadow-2xl shadow-black/40 backdrop-blur-2xl"
+      className="absolute right-5 top-36 z-20 w-[min(19rem,calc(100vw-2.5rem))] overflow-hidden rounded-3xl border border-white/12 bg-zinc-950/52 p-3 text-white shadow-xl shadow-black/28 backdrop-blur-xl"
     >
       <div className="mb-2 flex items-center justify-between">
         <div>
@@ -776,7 +776,7 @@ export function CaribbeanInsetMap({
           </span>
         ) : null}
       </div>
-      <div className="relative h-56 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50">
+      <div className="relative h-52 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50">
         <div ref={mapNodeRef} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,0.10),transparent_10rem)]" />
       </div>

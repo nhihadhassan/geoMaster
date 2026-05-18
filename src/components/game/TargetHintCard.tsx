@@ -40,7 +40,7 @@ export function TargetHintCard({
         stiffness: 320,
         damping: 30,
       }}
-      className="absolute inset-x-3 top-40 z-20 mx-auto w-[min(20rem,calc(100vw-1.5rem))] rounded-3xl border border-cyan-200/18 bg-black/42 p-4 text-white shadow-2xl shadow-cyan-950/35 backdrop-blur-2xl sm:inset-x-auto sm:left-5 sm:top-28 sm:mx-0 sm:w-[min(20rem,calc(100vw-2.5rem))]"
+      className="absolute inset-x-3 top-36 z-20 mx-auto w-[min(20rem,calc(100vw-1.5rem))] rounded-3xl border border-cyan-200/16 bg-zinc-950/58 p-4 text-white shadow-xl shadow-cyan-950/24 backdrop-blur-xl sm:inset-x-auto sm:left-5 sm:top-28 sm:mx-0 sm:w-[min(20rem,calc(100vw-2.5rem))]"
     >
       <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-cyan-100/60">
         {mode === "click-country"

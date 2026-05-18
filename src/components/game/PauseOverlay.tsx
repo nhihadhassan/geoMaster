@@ -10,7 +10,7 @@ export function PauseOverlay() {
 
   return (
     <motion.div
-      className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-slate-950/42 px-4 backdrop-blur-[2px]"
+      className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-slate-950/38 px-4 backdrop-blur-[2px]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -21,7 +21,7 @@ export function PauseOverlay() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.98 }}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        className="pointer-events-auto w-[min(28rem,calc(100vw-2rem))] rounded-[2rem] border border-white/16 bg-black/62 p-5 text-center text-white shadow-2xl shadow-black/45 backdrop-blur-3xl"
+        className="pointer-events-auto w-[min(28rem,calc(100vw-2rem))] rounded-3xl border border-white/16 bg-zinc-950/72 p-5 text-center text-white shadow-xl shadow-black/36 backdrop-blur-2xl"
       >
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.3em] text-sky-100/64">
           Paused

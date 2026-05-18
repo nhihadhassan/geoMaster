@@ -84,7 +84,7 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
       animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
       exit={{ opacity: 0, x: 18, y: 8, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute inset-x-4 bottom-28 z-30 mx-auto max-h-[min(66vh,34rem)] overflow-y-auto rounded-3xl border border-white/14 bg-black/58 p-4 text-white shadow-2xl shadow-black/42 backdrop-blur-3xl md:inset-x-auto md:bottom-auto md:right-5 md:top-28 md:w-[22rem]"
+      className="absolute inset-x-4 bottom-28 z-30 mx-auto max-h-[min(66vh,34rem)] overflow-y-auto rounded-3xl border border-white/14 bg-zinc-950/68 p-4 text-white shadow-xl shadow-black/34 backdrop-blur-2xl md:inset-x-auto md:bottom-auto md:right-5 md:top-28 md:w-[22rem]"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>

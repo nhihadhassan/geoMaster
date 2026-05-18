@@ -2172,27 +2172,27 @@ export function MapContainer() {
         </p>
       </motion.div>
 
-      {selectedSpecialRegion ? null : <GameHud />}
+      {!landingOpen && !selectedSpecialRegion ? <GameHud /> : null}
       {!landingOpen && learningModeActive ? (
         <button
           type="button"
           onClick={reopenLanding}
-          className="absolute right-4 top-24 z-20 rounded-full border border-white/14 bg-black/42 px-4 py-2 text-sm font-semibold text-white/70 shadow-2xl shadow-black/35 backdrop-blur-2xl transition hover:bg-black/52 hover:text-white sm:right-5 sm:top-28"
+          className="absolute right-4 top-24 z-20 rounded-full border border-white/12 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/64 hover:text-white sm:right-5 sm:top-28"
         >
           GeoMaster
         </button>
       ) : null}
-      {learningModeActive ? (
-        <div className="pointer-events-none absolute left-5 top-28 z-20 rounded-full border border-sky-100/18 bg-black/42 px-4 py-2 text-sm font-semibold text-white/70 shadow-2xl shadow-black/35 backdrop-blur-2xl">
+      {!landingOpen && learningModeActive ? (
+        <div className="pointer-events-none absolute left-5 top-28 z-20 rounded-full border border-sky-100/16 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl">
           <span className="text-sky-100/82">Learning Mode</span>
           <span className="ml-2 text-white/42">
             Zoom in for states, features, and landmarks
           </span>
         </div>
       ) : null}
-      <PremiumControls />
+      {!landingOpen ? <PremiumControls /> : null}
       <AnimatePresence>
-        {selectedSpecialRegion === "antarctica" ? (
+        {!landingOpen && selectedSpecialRegion === "antarctica" ? (
           <AntarcticaEducationCard
             key="antarctica-card"
             onBack={clearSpecialRegion}
@@ -2200,7 +2200,7 @@ export function MapContainer() {
         ) : null}
       </AnimatePresence>
       <AnimatePresence>
-        {caribbeanInsetMounted && topologyData ? (
+        {!landingOpen && caribbeanInsetMounted && topologyData ? (
           <CaribbeanInsetMap
             key="caribbean-inset"
             mapboxToken={mapboxToken}
@@ -2223,7 +2223,8 @@ export function MapContainer() {
           />
         ) : null}
       </AnimatePresence>
-      {!selectedSpecialRegion &&
+      {!landingOpen &&
+      !selectedSpecialRegion &&
       (selectedMode === "identify-shaded" ||
         selectedMode === "click-country" ||
         selectedMode === "capital-challenge") &&
@@ -2238,7 +2239,7 @@ export function MapContainer() {
           onCapitalHintChange={setCapitalHintEnabled}
         />
       ) : null}
-      {selectedSpecialRegion ? null : (
+      {!landingOpen && !selectedSpecialRegion ? (
         <>
           <AnimatePresence>
             {isPerfectRun && perfectRunSequence > 0 ? (
@@ -2270,9 +2271,11 @@ export function MapContainer() {
           <TypeToFillInput onCountryMatched={handleCountryMatched} />
           <ResultsDashboard />
         </>
-      )}
+      ) : null}
       <AnimatePresence>
-        {gameStatus === "paused" ? <PauseOverlay key="pause-overlay" /> : null}
+        {!landingOpen && gameStatus === "paused" ? (
+          <PauseOverlay key="pause-overlay" />
+        ) : null}
       </AnimatePresence>
       <AnimatePresence>
         {landingOpen ? (

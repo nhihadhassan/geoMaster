@@ -135,8 +135,8 @@ export function ResultsDashboard() {
       initial={{ opacity: 0, y: 26, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 240, damping: 28 }}
-      className={`absolute left-1/2 bottom-5 z-30 w-[min(54rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/16 bg-black/58 text-white shadow-2xl shadow-black/42 backdrop-blur-3xl ${
-        expanded ? "max-h-[min(72vh,42rem)] overflow-y-auto p-5" : "p-3"
+      className={`absolute left-1/2 bottom-5 z-30 w-[min(48rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/14 bg-zinc-950/68 text-white shadow-xl shadow-black/34 backdrop-blur-2xl ${
+        expanded ? "max-h-[min(72vh,40rem)] overflow-y-auto p-5" : "p-3"
       }`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -168,14 +168,14 @@ export function ResultsDashboard() {
                   state.key === reviewKey ? state.selectedCountryId : null,
               }))
             }
-            className="rounded-full border border-white/14 bg-white/8 px-4 py-2 text-sm font-semibold text-white/76 transition hover:bg-white/14 hover:text-white"
+            className="rounded-full border border-white/12 bg-white/7 px-4 py-2 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
           >
             {expanded ? "Minimize" : "Expand Review"}
           </button>
           <button
             type="button"
             onClick={resetQuiz}
-            className="rounded-full border border-emerald-100/30 bg-emerald-300/18 px-4 py-2 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-300/26"
+            className="rounded-full border border-emerald-100/34 bg-emerald-300/22 px-4 py-2 text-sm font-semibold text-emerald-50 shadow-sm shadow-emerald-950/20 transition hover:bg-emerald-300/30"
           >
             Try Again
           </button>

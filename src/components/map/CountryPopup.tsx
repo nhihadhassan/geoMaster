@@ -53,7 +53,7 @@ export function CountryPopup({
           onClose();
         }
       }}
-      className="pointer-events-none absolute inset-x-4 top-24 z-30 mx-auto max-h-[calc(100vh-8rem)] w-[min(31rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-3xl border border-emerald-100/22 bg-black/56 shadow-2xl shadow-emerald-950/40 backdrop-blur-2xl md:inset-x-auto md:right-5 md:top-28 md:mx-0 md:w-[24rem]"
+      className="pointer-events-none absolute inset-x-4 top-24 z-30 mx-auto max-h-[calc(100vh-8rem)] w-[min(31rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-3xl border border-emerald-100/20 bg-zinc-950/68 shadow-xl shadow-emerald-950/28 backdrop-blur-2xl md:inset-x-auto md:right-5 md:top-28 md:mx-0 md:w-[24rem]"
     >
       <div className="flex items-center gap-4 px-4 pt-4">
         <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/15 bg-white/8 text-3xl shadow-inner">
