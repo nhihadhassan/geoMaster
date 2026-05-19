@@ -80,13 +80,13 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
   return (
     <motion.aside
       key={`${feature.kind}-${name}`}
-      initial={{ opacity: 0, x: 28, y: 10, scale: 0.97 }}
+      initial={{ opacity: 0, y: 28, scale: 0.97 }}
       animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 18, y: 8, scale: 0.98 }}
+      exit={{ opacity: 0, y: 16, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute inset-x-4 bottom-28 z-30 mx-auto max-h-[min(66vh,34rem)] overflow-y-auto rounded-3xl border border-white/14 bg-zinc-950/68 p-4 text-white shadow-xl shadow-black/34 backdrop-blur-2xl md:inset-x-auto md:bottom-auto md:right-5 md:top-28 md:w-[22rem]"
+      className="absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-h-[70dvh] overflow-y-auto rounded-3xl border border-white/14 bg-zinc-950/74 p-4 text-white shadow-xl shadow-black/34 backdrop-blur-2xl md:inset-x-auto md:bottom-auto md:right-5 md:top-28 md:w-[22rem] md:max-h-[min(66vh,34rem)]"
     >
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/86 px-4 py-3 backdrop-blur-2xl md:static md:-mx-0 md:-mt-0 md:border-b-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
         <div>
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-sky-100/56">
             Learning Mode
@@ -96,7 +96,7 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
         <button
           type="button"
           onClick={onClose}
-          className="grid size-9 shrink-0 place-items-center rounded-full border border-white/12 bg-white/8 text-lg leading-none text-white/64 transition hover:bg-white/14 hover:text-white"
+          className="grid size-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/8 text-lg leading-none text-white/64 transition hover:bg-white/14 hover:text-white md:size-9"
           aria-label="Close learning card"
         >
           ×

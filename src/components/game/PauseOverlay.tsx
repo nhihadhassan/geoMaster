@@ -6,11 +6,12 @@ import { useGameStore } from "@/store/gameStore";
 export function PauseOverlay() {
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
   const resetQuiz = useGameStore((state) => state.resetQuiz);
+  const giveUp = useGameStore((state) => state.giveUp);
   const backToRegionSelect = useGameStore((state) => state.backToRegionSelect);
 
   return (
     <motion.div
-      className="pointer-events-none absolute inset-0 z-40 grid place-items-center bg-slate-950/38 px-4 backdrop-blur-[2px]"
+      className="pointer-events-none absolute inset-0 z-40 grid items-end bg-slate-950/38 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-[2px] sm:place-items-center sm:px-4 sm:pb-0"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -21,7 +22,7 @@ export function PauseOverlay() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.98 }}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        className="pointer-events-auto w-[min(28rem,calc(100vw-2rem))] rounded-3xl border border-white/16 bg-zinc-950/72 p-5 text-center text-white shadow-xl shadow-black/36 backdrop-blur-2xl"
+        className="pointer-events-auto w-full rounded-3xl border border-white/16 bg-zinc-950/76 p-4 text-center text-white shadow-xl shadow-black/36 backdrop-blur-2xl sm:w-[min(32rem,calc(100vw-2rem))] sm:p-5"
       >
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.3em] text-sky-100/64">
           Paused
@@ -32,25 +33,32 @@ export function PauseOverlay() {
         <p className="mt-2 text-sm leading-5 text-white/58">
           The timer is stopped and answers are disabled until you resume.
         </p>
-        <div className="mt-5 grid gap-2 sm:grid-cols-3">
+        <div className="mt-5 grid gap-2 sm:grid-cols-4">
           <button
             type="button"
             onClick={resumeQuiz}
-            className="rounded-full border border-emerald-100/30 bg-emerald-300/20 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-300/28"
+            className="min-h-11 rounded-full border border-emerald-100/30 bg-emerald-300/20 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-300/28"
           >
             Resume
           </button>
           <button
             type="button"
             onClick={resetQuiz}
-            className="rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+            className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
             Try Again
           </button>
           <button
             type="button"
+            onClick={giveUp}
+            className="min-h-11 rounded-full border border-rose-200/24 bg-rose-300/14 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-300/22"
+          >
+            Give Up
+          </button>
+          <button
+            type="button"
             onClick={backToRegionSelect}
-            className="rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+            className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
             Regions
           </button>

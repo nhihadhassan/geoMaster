@@ -135,11 +135,19 @@ export function ResultsDashboard() {
       initial={{ opacity: 0, y: 26, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 240, damping: 28 }}
-      className={`absolute left-1/2 bottom-5 z-30 w-[min(48rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/14 bg-zinc-950/68 text-white shadow-xl shadow-black/34 backdrop-blur-2xl ${
-        expanded ? "max-h-[min(72vh,40rem)] overflow-y-auto p-5" : "p-3"
+      className={`absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-3xl border border-white/14 bg-zinc-950/72 text-white shadow-xl shadow-black/34 backdrop-blur-2xl sm:left-1/2 sm:bottom-5 sm:w-[min(48rem,calc(100vw-2rem))] sm:-translate-x-1/2 ${
+        expanded
+          ? "max-h-[82dvh] overflow-y-auto p-4 sm:max-h-[min(72vh,40rem)] sm:p-5"
+          : "p-3"
       }`}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${
+          expanded
+            ? "sticky top-0 z-10 -mx-4 -mt-4 border-b border-white/10 bg-zinc-950/86 px-4 py-3 backdrop-blur-2xl sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4"
+            : ""
+        }`}
+      >
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-100/60">
             {statusLabel}
@@ -168,14 +176,21 @@ export function ResultsDashboard() {
                   state.key === reviewKey ? state.selectedCountryId : null,
               }))
             }
-            className="rounded-full border border-white/12 bg-white/7 px-4 py-2 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
+            className="min-h-11 rounded-full border border-white/12 bg-white/7 px-4 py-2 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
           >
-            {expanded ? "Minimize" : "Expand Review"}
+            {expanded ? (
+              "Minimize"
+            ) : (
+              <>
+                <span className="sm:hidden">Review</span>
+                <span className="hidden sm:inline">Expand Review</span>
+              </>
+            )}
           </button>
           <button
             type="button"
             onClick={resetQuiz}
-            className="rounded-full border border-emerald-100/34 bg-emerald-300/22 px-4 py-2 text-sm font-semibold text-emerald-50 shadow-sm shadow-emerald-950/20 transition hover:bg-emerald-300/30"
+            className="min-h-11 rounded-full border border-emerald-100/34 bg-emerald-300/22 px-4 py-2 text-sm font-semibold text-emerald-50 shadow-sm shadow-emerald-950/20 transition hover:bg-emerald-300/30"
           >
             Try Again
           </button>
@@ -183,7 +198,7 @@ export function ResultsDashboard() {
       </div>
 
       {expanded ? (
-        <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_20rem]">
+        <div className="mt-4 grid gap-4 pb-1 sm:mt-5 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
             {reviewGroups.map((group) =>
               group.countries.length > 0 ? (

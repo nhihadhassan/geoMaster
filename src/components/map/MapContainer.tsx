@@ -581,6 +581,7 @@ export function MapContainer() {
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
   const [landingOpen, setLandingOpen] = useState(false);
+  const [learningHelpOpen, setLearningHelpOpen] = useState(false);
   const [debugUiEnabled] = useState(() => {
     if (!IS_DEVELOPMENT || typeof window === "undefined") {
       return false;
@@ -2157,7 +2158,7 @@ export function MapContainer() {
   }
 
   return (
-    <main className="relative h-screen min-h-screen w-full overflow-hidden bg-slate-100 text-white">
+    <main className="relative h-dvh min-h-dvh w-full overflow-hidden bg-slate-100 text-white">
       <div ref={mapNodeRef} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_18%,rgba(34,211,238,0.08),transparent_32rem),linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.18))]" />
 
@@ -2183,12 +2184,50 @@ export function MapContainer() {
         </button>
       ) : null}
       {!landingOpen && learningModeActive ? (
-        <div className="pointer-events-none absolute left-5 top-28 z-20 rounded-full border border-sky-100/16 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl">
-          <span className="text-sky-100/82">Learning Mode</span>
-          <span className="ml-2 text-white/42">
-            Zoom in for states, features, and landmarks
-          </span>
-        </div>
+        <>
+          <button
+            type="button"
+            onClick={() => setLearningHelpOpen((open) => !open)}
+            className="absolute left-3 top-[calc(5.1rem+env(safe-area-inset-top))] z-20 min-h-11 rounded-full border border-sky-100/16 bg-zinc-950/58 px-4 text-sm font-semibold text-white/72 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/68 hover:text-white sm:hidden"
+          >
+            <span className="text-sky-100/82">Learning</span>
+          </button>
+          {learningHelpOpen ? (
+            <motion.aside
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 260, damping: 28 }}
+              className="absolute inset-x-2 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 rounded-3xl border border-white/12 bg-zinc-950/74 p-4 text-white shadow-2xl shadow-black/36 backdrop-blur-2xl sm:hidden"
+            >
+              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/22" />
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-sky-100/56">
+                    Learning Mode
+                  </p>
+                  <p className="mt-2 text-sm leading-5 text-white/66">
+                    Zoom in and tap countries, states, cities, features, or
+                    landmarks to open compact learning cards.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLearningHelpOpen(false)}
+                  className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.aside>
+          ) : null}
+          <div className="pointer-events-none absolute left-5 top-28 z-20 hidden rounded-full border border-sky-100/16 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl sm:block">
+            <span className="text-sky-100/82">Learning Mode</span>
+            <span className="ml-2 text-white/42">
+              Zoom in for states, features, and landmarks
+            </span>
+          </div>
+        </>
       ) : null}
       {!landingOpen ? <PremiumControls /> : null}
       <AnimatePresence>
