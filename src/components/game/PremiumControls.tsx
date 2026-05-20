@@ -77,7 +77,7 @@ export function PremiumControls({
         }
       }}
       disabled={isQuizLocked}
-      className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] left-3 z-20 min-h-11 max-w-[calc(100vw-1.5rem)] rounded-full border border-white/12 bg-zinc-950/58 px-4 py-2 text-sm font-semibold text-white/76 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/68 hover:text-white disabled:cursor-default disabled:opacity-78 sm:bottom-28 sm:left-5"
+      className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom))] left-3 z-20 min-h-11 max-w-[calc(100vw-8rem)] rounded-full border border-white/12 bg-zinc-950/58 px-4 py-2 text-sm font-semibold text-white/76 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/68 hover:text-white disabled:cursor-default disabled:opacity-78 sm:bottom-28 sm:left-5 sm:max-w-[calc(100vw-1.5rem)]"
       aria-label={
         isQuizLocked
           ? `Region locked during quiz: ${selectedLabel}`
@@ -87,7 +87,7 @@ export function PremiumControls({
       <span className="block truncate">
         {gameStatus === "idle" ? "Choose Quiz" : `Regions · ${selectedLabel}`}
         {gameStatus === "idle" ? null : (
-          <span className="ml-2 text-white/42">
+          <span className="ml-2 hidden text-white/42 sm:inline">
             Mode · {modeLabels[selectedMode]}
           </span>
         )}

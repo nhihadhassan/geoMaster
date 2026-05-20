@@ -163,18 +163,24 @@ const hideMapLabelsAndRoads = (map: Map) => {
   });
 };
 
-const addTerrainAndFog = (map: Map) => {
+const addTerrainAndFog = (
+  map: Map,
+  { terrainEnabled = true }: { terrainEnabled?: boolean } = {},
+) => {
   try {
-    if (!map.getSource("mapbox-dem")) {
-      map.addSource("mapbox-dem", {
-        type: "raster-dem",
-        url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-        tileSize: 512,
-        maxzoom: 14,
-      });
+    if (terrainEnabled) {
+      if (!map.getSource("mapbox-dem")) {
+        map.addSource("mapbox-dem", {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+
+      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.08 });
     }
 
-    map.setTerrain({ source: "mapbox-dem", exaggeration: 1.08 });
     map.setFog({
       color: "rgb(241, 245, 249)",
       "high-color": "rgb(186, 230, 253)",
@@ -637,23 +643,99 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
+const getInitialDocumentVisible = () =>
+  typeof document === "undefined" ? true : !document.hidden;
+
+function useDocumentVisible() {
+  const [documentVisible, setDocumentVisible] = useState(
+    getInitialDocumentVisible,
+  );
+
+  useEffect(() => {
+    const syncVisibility = () => setDocumentVisible(!document.hidden);
+
+    syncVisibility();
+    document.addEventListener("visibilitychange", syncVisibility);
+
+    return () =>
+      document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
+
+  return documentVisible;
+}
+
+const getInitialMobilePerformanceMode = (prefersReducedMotion: boolean) => {
+  if (typeof window === "undefined") {
+    return prefersReducedMotion;
+  }
+
+  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+  const narrowViewport = window.matchMedia("(max-width: 767px)").matches;
+  const connection = (
+    navigator as Navigator & { connection?: { saveData?: boolean } }
+  ).connection;
+
+  return (
+    prefersReducedMotion ||
+    coarsePointer ||
+    narrowViewport ||
+    Boolean(connection?.saveData)
+  );
+};
+
+function useMobilePerformanceMode(prefersReducedMotion: boolean) {
+  const [mobilePerformanceMode, setMobilePerformanceMode] = useState(() =>
+    getInitialMobilePerformanceMode(prefersReducedMotion),
+  );
+
+  useEffect(() => {
+    const coarsePointer = window.matchMedia("(pointer: coarse)");
+    const narrowViewport = window.matchMedia("(max-width: 767px)");
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection;
+
+    const syncMode = () => {
+      setMobilePerformanceMode(
+        prefersReducedMotion ||
+          coarsePointer.matches ||
+          narrowViewport.matches ||
+          Boolean(connection?.saveData),
+      );
+    };
+
+    syncMode();
+    coarsePointer.addEventListener("change", syncMode);
+    narrowViewport.addEventListener("change", syncMode);
+
+    return () => {
+      coarsePointer.removeEventListener("change", syncMode);
+      narrowViewport.removeEventListener("change", syncMode);
+    };
+  }, [prefersReducedMotion]);
+
+  return mobilePerformanceMode;
+}
+
 function useIdleGlobeRotation({
   enabled,
   idleDelayMs,
   mapRef,
   onInteraction,
   interactionKey,
+  documentVisible,
 }: {
   enabled: boolean;
   idleDelayMs: number;
   mapRef: MutableRefObject<Map | null>;
   onInteraction: () => void;
   interactionKey: number;
+  documentVisible: boolean;
 }) {
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!enabled || !map) {
+    if (!enabled || !documentVisible || !map) {
       return;
     }
 
@@ -717,7 +799,14 @@ function useIdleGlobeRotation({
       map.off("touchstart", handleInteraction);
       canvas.removeEventListener("wheel", handleInteraction);
     };
-  }, [enabled, idleDelayMs, interactionKey, mapRef, onInteraction]);
+  }, [
+    documentVisible,
+    enabled,
+    idleDelayMs,
+    interactionKey,
+    mapRef,
+    onInteraction,
+  ]);
 }
 
 function IdlePromptToast({ prompt }: { prompt: string }) {
@@ -759,7 +848,13 @@ export function MapContainer() {
   const [hasMapInteraction, setHasMapInteraction] = useState(false);
   const [idlePrompt, setIdlePrompt] = useState<string | null>(null);
   const [mapZoom, setMapZoom] = useState(1.7);
+  const [caribbeanInsetExpanded, setCaribbeanInsetExpanded] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const documentVisible = useDocumentVisible();
+  const mobilePerformanceMode = useMobilePerformanceMode(prefersReducedMotion);
+  const initialMapPerformanceModeRef = useRef(mobilePerformanceMode);
+  const mapAnimationsEnabled =
+    documentVisible && !prefersReducedMotion && !mobilePerformanceMode;
   const [debugUiEnabled] = useState(() => {
     if (!IS_DEVELOPMENT || typeof window === "undefined") {
       return false;
@@ -915,11 +1010,13 @@ export function MapContainer() {
   const idleAtmosphereEnabled =
     learningModeActive &&
     mapLoaded &&
+    documentVisible &&
     !landingOpen &&
     !selectedLearningFeature &&
     !regionPanelOpen &&
     !isFinished;
-  const idleRotationEnabled = idleAtmosphereEnabled && !prefersReducedMotion;
+  const idleRotationEnabled =
+    idleAtmosphereEnabled && !prefersReducedMotion && !mobilePerformanceMode;
   const idlePromptEnabled = idleAtmosphereEnabled && idlePrompts.length > 0;
 
   useIdleGlobeRotation({
@@ -930,6 +1027,7 @@ export function MapContainer() {
     mapRef,
     onInteraction: registerMapInteraction,
     interactionKey: idleInteractionKey,
+    documentVisible,
   });
 
   useEffect(() => {
@@ -1039,6 +1137,21 @@ export function MapContainer() {
       selectedMode === "click-country" ||
       selectedMode === "capital-challenge") &&
     gameStatus !== "idle";
+  const correctPopupVisible =
+    Boolean(lastMatchedCountry) && !landingOpen && !selectedSpecialRegion;
+
+  useEffect(() => {
+    if (!correctPopupVisible) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setCaribbeanInsetExpanded(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [correctPopupVisible]);
+
   const labelCollections = useMemo(
     () =>
       buildLabelCollections(quizCountries, visibleLabelIds, "main", {
@@ -2007,7 +2120,7 @@ export function MapContainer() {
       pitch: 38,
       bearing: -12,
       projection: "globe",
-      antialias: true,
+      antialias: !initialMapPerformanceModeRef.current,
       attributionControl: false,
     });
 
@@ -2019,7 +2132,9 @@ export function MapContainer() {
 
     map.once("load", () => {
       hideMapLabelsAndRoads(map);
-      addTerrainAndFog(map);
+      addTerrainAndFog(map, {
+        terrainEnabled: !initialMapPerformanceModeRef.current,
+      });
 
       setMapLoaded(true);
       setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(map) });
@@ -2202,6 +2317,12 @@ export function MapContainer() {
       return;
     }
 
+    if (!mapAnimationsEnabled) {
+      map.setPaintProperty(REMAINING_PULSE_FILL_LAYER_ID, "fill-opacity", 0.13);
+      map.setPaintProperty(REMAINING_PULSE_LINE_LAYER_ID, "line-opacity", 0.42);
+      return;
+    }
+
     const startedAt = performance.now();
     const animate = (now: number) => {
       if (mapRef.current !== map) {
@@ -2230,7 +2351,7 @@ export function MapContainer() {
         remainingPulseFrameRef.current = null;
       }
     };
-  }, [mapLoaded, pulseActive, remainingCountryIds]);
+  }, [mapAnimationsEnabled, mapLoaded, pulseActive, remainingCountryIds]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2345,6 +2466,14 @@ export function MapContainer() {
       targetPulse: 0,
     });
 
+    if (!mapAnimationsEnabled) {
+      setCountryFeatureState(map, currentTargetCountry.iso_a3, {
+        target: true,
+        targetPulse: 0.72,
+      });
+      return;
+    }
+
     const startedAt = performance.now();
     const pulse = (now: number) => {
       if (mapRef.current !== map) {
@@ -2372,6 +2501,7 @@ export function MapContainer() {
   }, [
     currentTargetCountry,
     gameStatus,
+    mapAnimationsEnabled,
     mapLoaded,
     selectedMode,
     syncPaintExpressions,
@@ -2688,6 +2818,11 @@ export function MapContainer() {
             targetCountryId={
               targetHighlightActive ? currentTargetCountry?.iso_a3 ?? null : null
             }
+            mobilePerformanceMode={mobilePerformanceMode}
+            documentVisible={documentVisible}
+            correctPopupVisible={correctPopupVisible}
+            mobileExpanded={caribbeanInsetExpanded}
+            onMobileExpandedChange={setCaribbeanInsetExpanded}
             clickEnabled={
               selectedMode === "click-country" && gameStatus === "running"
             }

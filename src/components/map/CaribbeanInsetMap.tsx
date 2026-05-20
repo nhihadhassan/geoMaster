@@ -61,6 +61,11 @@ type CaribbeanInsetMapProps = {
   pulseActive: boolean;
   targetCountryId: string | null;
   clickEnabled?: boolean;
+  mobilePerformanceMode?: boolean;
+  documentVisible?: boolean;
+  correctPopupVisible?: boolean;
+  mobileExpanded?: boolean;
+  onMobileExpandedChange?: (expanded: boolean) => void;
   onCountryClick?: (iso: string | null) => void;
   onLabelSourceLoaded?: (loaded: boolean) => void;
 };
@@ -148,6 +153,11 @@ export function CaribbeanInsetMap({
   pulseActive,
   targetCountryId,
   clickEnabled = false,
+  mobilePerformanceMode = false,
+  documentVisible = true,
+  correctPopupVisible = false,
+  mobileExpanded = false,
+  onMobileExpandedChange,
   onCountryClick,
   onLabelSourceLoaded,
 }: CaribbeanInsetMapProps) {
@@ -156,6 +166,15 @@ export function CaribbeanInsetMap({
   const pulseFrameRef = useRef<number | null>(null);
   const targetPulseFrameRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const targetIsCaribbean =
+    Boolean(targetCountryId) && caribbeanCountryIds.has(targetCountryId ?? "");
+  const hasCaribbeanAttention =
+    targetIsCaribbean ||
+    remainingCountryIds.some((id) => caribbeanCountryIds.has(id));
+  const shouldRenderInsetMap =
+    !mobilePerformanceMode ||
+    (mobileExpanded && !correctPopupVisible) ||
+    (targetIsCaribbean && !correctPopupVisible);
   const caribbeanData = useMemo(
     () =>
       ({
@@ -186,7 +205,12 @@ export function CaribbeanInsetMap({
   );
 
   useEffect(() => {
-    if (!mapNodeRef.current || mapRef.current || !mapboxToken) {
+    if (
+      !shouldRenderInsetMap ||
+      !mapNodeRef.current ||
+      mapRef.current ||
+      !mapboxToken
+    ) {
       return;
     }
 
@@ -234,7 +258,7 @@ export function CaribbeanInsetMap({
       mapRef.current = null;
       setMapLoaded(false);
     };
-  }, [mapboxToken, onLabelSourceLoaded]);
+  }, [mapboxToken, onLabelSourceLoaded, shouldRenderInsetMap]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -660,6 +684,12 @@ export function CaribbeanInsetMap({
       return;
     }
 
+    if (!documentVisible || mobilePerformanceMode) {
+      map.setPaintProperty(INSET_PULSE_FILL_LAYER_ID, "fill-opacity", 0.14);
+      map.setPaintProperty(INSET_PULSE_LINE_LAYER_ID, "line-opacity", 0.46);
+      return;
+    }
+
     const startedAt = performance.now();
     const animate = (now: number) => {
       if (mapRef.current !== map) {
@@ -688,7 +718,7 @@ export function CaribbeanInsetMap({
         pulseFrameRef.current = null;
       }
     };
-  }, [mapLoaded, pulseActive]);
+  }, [documentVisible, mapLoaded, mobilePerformanceMode, pulseActive]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -716,6 +746,13 @@ export function CaribbeanInsetMap({
       map.setPaintProperty(INSET_TARGET_FILL_LAYER_ID, "fill-opacity", 0);
       map.setPaintProperty(INSET_TARGET_LINE_LAYER_ID, "line-opacity", 0);
       map.setPaintProperty(INSET_TARGET_LINE_LAYER_ID, "line-width", 0);
+      return;
+    }
+
+    if (!documentVisible || mobilePerformanceMode) {
+      map.setPaintProperty(INSET_TARGET_FILL_LAYER_ID, "fill-opacity", 0.36);
+      map.setPaintProperty(INSET_TARGET_LINE_LAYER_ID, "line-opacity", 0.84);
+      map.setPaintProperty(INSET_TARGET_LINE_LAYER_ID, "line-width", 3);
       return;
     }
 
@@ -753,7 +790,28 @@ export function CaribbeanInsetMap({
         targetPulseFrameRef.current = null;
       }
     };
-  }, [mapLoaded, targetCountryId]);
+  }, [documentVisible, mapLoaded, mobilePerformanceMode, targetCountryId]);
+
+  if (mobilePerformanceMode && !shouldRenderInsetMap) {
+    return (
+      <motion.button
+        type="button"
+        initial={{ opacity: 0, y: 12, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+        transition={{ type: "spring", stiffness: 260, damping: 28 }}
+        onClick={() => onMobileExpandedChange?.(true)}
+        className={`absolute bottom-[calc(6.15rem+env(safe-area-inset-bottom))] right-3 z-20 min-h-11 rounded-full border px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-black/25 backdrop-blur-xl transition hover:text-white sm:hidden ${
+          hasCaribbeanAttention
+            ? "border-cyan-100/28 bg-cyan-300/18 text-cyan-50"
+            : "border-white/12 bg-zinc-950/58 text-white/72"
+        }`}
+        aria-label="Open Caribbean detail map"
+      >
+        Caribbean
+      </motion.button>
+    );
+  }
 
   return (
     <motion.aside
@@ -761,22 +819,36 @@ export function CaribbeanInsetMap({
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute right-5 top-36 z-20 w-[min(19rem,calc(100vw-2.5rem))] overflow-hidden rounded-3xl border border-white/12 bg-zinc-950/52 p-3 text-white shadow-xl shadow-black/28 backdrop-blur-xl"
+      className="absolute inset-x-3 bottom-[calc(8.85rem+env(safe-area-inset-bottom))] z-20 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/56 p-2 text-white shadow-xl shadow-black/28 backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-36 sm:w-[min(19rem,calc(100vw-2.5rem))] sm:rounded-3xl sm:p-3"
     >
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/44">
+          <p className="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-white/44 sm:text-[0.65rem] sm:tracking-[0.24em]">
             Caribbean Detail
           </p>
-          <p className="text-xs text-white/58">Island countries magnified</p>
+          <p className="text-[0.68rem] text-white/58 sm:text-xs">
+            Island countries magnified
+          </p>
         </div>
-        {pulseActive ? (
-          <span className="rounded-full border border-white/12 bg-white/10 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-white/72">
-            Hints
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {pulseActive ? (
+            <span className="rounded-full border border-white/12 bg-white/10 px-2 py-1 text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-white/72 sm:text-[0.65rem] sm:tracking-[0.18em]">
+              Hints
+            </span>
+          ) : null}
+          {mobilePerformanceMode ? (
+            <button
+              type="button"
+              onClick={() => onMobileExpandedChange?.(false)}
+              className="grid size-9 place-items-center rounded-full border border-white/12 bg-white/8 text-lg leading-none text-white/62 transition hover:bg-white/14 hover:text-white sm:hidden"
+              aria-label="Minimize Caribbean detail map"
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
       </div>
-      <div className="relative h-52 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50">
+      <div className="relative h-36 max-h-[22dvh] min-h-32 overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 sm:h-52 sm:max-h-none sm:rounded-2xl">
         <div ref={mapNodeRef} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,0.10),transparent_10rem)]" />
       </div>
