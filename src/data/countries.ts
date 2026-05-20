@@ -21,6 +21,7 @@ export type CountryEducation = {
   languages: string[];
   nativeName?: string;
   funFact: string;
+  funFacts?: string[];
 };
 
 export type CountryHints = {

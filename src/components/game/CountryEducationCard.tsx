@@ -32,6 +32,7 @@ export function CountryEducationCard({
   );
   const visibleStoryParagraphs =
     storyExpanded || isPopup ? storyParagraphs : storyParagraphs.slice(0, 1);
+  const quickFacts = education.funFacts.slice(1, 4);
 
   return (
     <article
@@ -98,9 +99,27 @@ export function CountryEducationCard({
           Did you know?
         </p>
         <p className="mt-1 text-sm leading-5 text-white/72">
-          {education.funFact}
+          {education.featuredFunFact}
         </p>
       </div>
+
+      {!isPopup && quickFacts.length > 0 ? (
+        <section className="mt-3 rounded-2xl border border-white/10 bg-white/7 px-3 py-3">
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-white/42">
+            Quick facts
+          </p>
+          <ul className="mt-2 space-y-2">
+            {quickFacts.map((fact) => (
+              <li
+                key={fact}
+                className="rounded-xl border border-white/8 bg-white/[0.055] px-3 py-2 text-sm leading-5 text-white/66"
+              >
+                {fact}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {!isPopup && education.sourceYear ? (
         <p className="mt-3 text-[0.68rem] font-medium text-white/36">

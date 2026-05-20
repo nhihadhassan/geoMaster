@@ -228,8 +228,10 @@ const buildGeneratedCountries = async () => {
       (restCountry?.latlng
         ? { lat: restCountry.latlng[0], lng: restCountry.latlng[1] }
         : { lat: 0, lng: 0 });
-    const funFact =
+    const funFactSource =
       funFactsByIso[iso] ?? buildFunFact(seed.name, restCountry, capital || "its capital");
+    const funFacts = Array.isArray(funFactSource) ? funFactSource : [funFactSource];
+    const [funFact] = funFacts;
 
     return {
       iso_a3: iso,
@@ -256,6 +258,7 @@ const buildGeneratedCountries = async () => {
         languages,
         nativeName: override.nativeName ?? (restCountry ? selectNativeName(restCountry, seed.name) : seed.name),
         funFact,
+        funFacts: funFacts.length > 1 ? funFacts : undefined,
       },
     };
   });

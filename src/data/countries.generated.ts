@@ -198,7 +198,12 @@ export const generatedCountries = [
         "French"
       ],
       "nativeName": "Canada",
-      "funFact": "Canada has the world's longest coastline."
+      "funFact": "Canada has the world's longest coastline.",
+      "funFacts": [
+        "Canada has the world's longest coastline.",
+        "Canada stretches across six time zones.",
+        "More than half of the world's natural lakes are in Canada."
+      ]
     }
   },
   {
@@ -910,7 +915,12 @@ export const generatedCountries = [
         "English"
       ],
       "nativeName": "United States",
-      "funFact": "The United States spans six time zones across its states."
+      "funFact": "The United States spans six time zones across its states.",
+      "funFacts": [
+        "The United States spans six time zones across its states.",
+        "Alaska is the largest U.S. state by area.",
+        "The United States borders both the Atlantic and Pacific oceans."
+      ]
     }
   },
   {
@@ -1032,7 +1042,12 @@ export const generatedCountries = [
         "Portuguese"
       ],
       "nativeName": "Brasil",
-      "funFact": "Brazil contains the largest share of the Amazon rainforest."
+      "funFact": "Brazil contains the largest share of the Amazon rainforest.",
+      "funFacts": [
+        "Brazil contains the largest share of the Amazon rainforest.",
+        "Brazil is the largest country in South America by both area and population.",
+        "Brasilia was purpose-built as Brazil's capital in the 20th century."
+      ]
     }
   },
   {
@@ -2037,7 +2052,12 @@ export const generatedCountries = [
         "Arabic"
       ],
       "nativeName": "مصر",
-      "funFact": "Egypt is home to the Nile Delta, one of the world's major river deltas."
+      "funFact": "Egypt is home to the Nile Delta, one of the world's major river deltas.",
+      "funFacts": [
+        "Egypt is home to the Nile Delta, one of the world's major river deltas.",
+        "Most of Egypt's population lives near the Nile River.",
+        "The Great Pyramid of Giza is one of the ancient world's most famous landmarks."
+      ]
     }
   },
   {
@@ -4132,7 +4152,12 @@ export const generatedCountries = [
         "French"
       ],
       "nativeName": "France",
-      "funFact": "France has territories in multiple oceans, but this quiz uses metropolitan France."
+      "funFact": "France has territories in multiple oceans, but this quiz uses metropolitan France.",
+      "funFacts": [
+        "France has territories in multiple oceans, but this quiz uses metropolitan France.",
+        "Metropolitan France touches both the Atlantic Ocean and the Mediterranean Sea.",
+        "Paris grew around the Seine River."
+      ]
     }
   },
   {
@@ -5876,7 +5901,12 @@ export const generatedCountries = [
         "Tamil"
       ],
       "nativeName": "India",
-      "funFact": "India is one of the world's most linguistically diverse countries."
+      "funFact": "India is one of the world's most linguistically diverse countries.",
+      "funFacts": [
+        "India is one of the world's most linguistically diverse countries.",
+        "The Himalayas form much of India's northern mountain frontier.",
+        "India has coastlines on the Arabian Sea and the Bay of Bengal."
+      ]
     }
   },
   {
@@ -6035,7 +6065,12 @@ export const generatedCountries = [
         "Japanese"
       ],
       "nativeName": "日本",
-      "funFact": "Japan has thousands of islands, with Honshu being the largest."
+      "funFact": "Japan has thousands of islands, with Honshu being the largest.",
+      "funFacts": [
+        "Japan has thousands of islands, with Honshu being the largest.",
+        "Tokyo is one of the world's largest metropolitan areas.",
+        "Mount Fuji is Japan's highest mountain."
+      ]
     }
   },
   {
@@ -7308,7 +7343,12 @@ export const generatedCountries = [
         "English"
       ],
       "nativeName": "Australia",
-      "funFact": "Australia is the only country that covers an entire continent."
+      "funFact": "Australia is the only country that covers an entire continent.",
+      "funFacts": [
+        "Australia is the only country that covers an entire continent.",
+        "Australia has coastlines on the Indian and Pacific oceans.",
+        "Canberra, not Sydney or Melbourne, is Australia's capital."
+      ]
     }
   },
   {

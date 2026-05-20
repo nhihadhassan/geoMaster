@@ -9,6 +9,7 @@ import type { Country } from "@/data/countries";
 type TextAnchor = "center" | "left" | "right" | "top" | "bottom";
 type LabelSize = "small" | "normal" | "large";
 type PlacementKind = "manual" | "fallback";
+export type LearningLabelMode = "major" | "standard" | "small" | "callout";
 
 type LabelSurface = "main" | "inset";
 
@@ -33,6 +34,9 @@ export type LabelProperties = {
   textAnchor: TextAnchor;
   labelSize: LabelSize;
   placementKind: PlacementKind;
+  labelPriority?: 1 | 2 | 3 | 4;
+  learningMinZoom?: number;
+  learningLabelMode?: LearningLabelMode;
 };
 
 export type LeaderProperties = {
@@ -579,6 +583,181 @@ const emptyLeaderCollection = {
   features: [],
 } satisfies FeatureCollection<LineString, LeaderProperties>;
 
+const majorLearningLabelIds = new Set([
+  "ARG",
+  "AUS",
+  "BRA",
+  "CAN",
+  "CHL",
+  "CHN",
+  "COD",
+  "COL",
+  "DZA",
+  "EGY",
+  "FRA",
+  "GBR",
+  "DEU",
+  "IDN",
+  "IND",
+  "IRN",
+  "JPN",
+  "KAZ",
+  "MEX",
+  "NGA",
+  "PER",
+  "RUS",
+  "SAU",
+  "TUR",
+  "USA",
+  "ZAF",
+]);
+
+const denseLearningLabelIds = new Set([
+  "ALB",
+  "AND",
+  "AUT",
+  "BEL",
+  "BIH",
+  "BHR",
+  "BLZ",
+  "BRB",
+  "CHE",
+  "CRI",
+  "CYP",
+  "CZE",
+  "DNK",
+  "DOM",
+  "ECU",
+  "GTM",
+  "HND",
+  "HTI",
+  "IRL",
+  "ISR",
+  "JAM",
+  "JOR",
+  "KNA",
+  "KWT",
+  "LBN",
+  "LIE",
+  "LUX",
+  "MCO",
+  "MLT",
+  "MNE",
+  "NLD",
+  "NIC",
+  "PAN",
+  "PSE",
+  "QAT",
+  "SMR",
+  "SLV",
+  "SVK",
+  "SVN",
+  "VAT",
+]);
+
+const getLearningLabelProfile = (
+  country: Country,
+  placement: Placement | undefined,
+) => {
+  const hasCallout = Boolean(placement?.leaderAnchorCoord);
+
+  if (majorLearningLabelIds.has(country.iso_a3)) {
+    return {
+      labelPriority: 1 as const,
+      learningMinZoom: 1.45,
+      learningLabelMode: "major" as const,
+    };
+  }
+
+  if (
+    country.isSmall ||
+    hasCallout ||
+    placement?.labelSize === "small" ||
+    denseLearningLabelIds.has(country.iso_a3)
+  ) {
+    return {
+      labelPriority: 4 as const,
+      learningMinZoom: 4.15,
+      learningLabelMode: "callout" as const,
+    };
+  }
+
+  if (
+    country.education.population !== null &&
+    country.education.population >= 50_000_000
+  ) {
+    return {
+      labelPriority: 2 as const,
+      learningMinZoom: 2.35,
+      learningLabelMode: "standard" as const,
+    };
+  }
+
+  return {
+    labelPriority: 3 as const,
+    learningMinZoom: country.continentQuizGroups.includes("europe") ? 3.15 : 2.75,
+    learningLabelMode: "small" as const,
+  };
+};
+
+const buildLabelFeature = (
+  country: Country,
+  placement: Placement | undefined,
+  learningProfile?: ReturnType<typeof getLearningLabelProfile>,
+): {
+  labelFeature: Feature<Point, LabelProperties>;
+  leaderFeature: Feature<LineString, LeaderProperties> | null;
+} => {
+  const fallbackLng =
+    country.continentQuizGroups.includes("oceania") && country.center.lng < 0
+      ? country.center.lng + 360
+      : country.center.lng;
+  const fallbackPlacement: Placement = {
+    labelCoord: [fallbackLng, country.center.lat],
+    labelSize: country.isSmall ? "small" : "normal",
+  };
+  const resolvedPlacement = placement ?? fallbackPlacement;
+  const placementKind: PlacementKind = placement ? "manual" : "fallback";
+
+  const labelFeature: Feature<Point, LabelProperties> = {
+    type: "Feature",
+    properties: {
+      iso_a3: country.iso_a3,
+      name: country.name,
+      label: resolvedPlacement.label ?? country.name,
+      textAnchor: resolvedPlacement.textAnchor ?? "center",
+      labelSize: resolvedPlacement.labelSize ?? "normal",
+      placementKind,
+      ...(learningProfile ?? {}),
+    },
+    geometry: {
+      type: "Point",
+      coordinates: resolvedPlacement.labelCoord,
+    },
+  };
+
+  const leaderFeature = resolvedPlacement.leaderAnchorCoord
+    ? {
+        type: "Feature" as const,
+        properties: {
+          iso_a3: country.iso_a3,
+        },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: [
+            resolvedPlacement.leaderAnchorCoord,
+            resolvedPlacement.labelCoord,
+          ],
+        },
+      }
+    : null;
+
+  return {
+    labelFeature,
+    leaderFeature,
+  };
+};
+
 export const buildLabelCollections = (
   countries: Country[],
   countryIds: string[],
@@ -604,49 +783,70 @@ export const buildLabelCollections = (
         return;
       }
 
-      const fallbackLng =
-        country.continentQuizGroups.includes("oceania") && country.center.lng < 0
-          ? country.center.lng + 360
-          : country.center.lng;
-      const fallbackPlacement: Placement = {
-        labelCoord: [fallbackLng, country.center.lat],
-        labelSize: country.isSmall ? "small" : "normal",
-      };
-      const resolvedPlacement = placement ?? fallbackPlacement;
-      const placementKind: PlacementKind = placement ? "manual" : "fallback";
+      const { labelFeature, leaderFeature } = buildLabelFeature(
+        country,
+        placement,
+      );
 
-      labelFeatures.push({
-        type: "Feature",
-        properties: {
-          iso_a3: country.iso_a3,
-          name: country.name,
-          label: resolvedPlacement.label ?? country.name,
-          textAnchor: resolvedPlacement.textAnchor ?? "center",
-          labelSize: resolvedPlacement.labelSize ?? "normal",
-          placementKind,
-        },
-        geometry: {
-          type: "Point",
-          coordinates: resolvedPlacement.labelCoord,
-        },
-      });
+      labelFeatures.push(labelFeature);
 
-      if (resolvedPlacement.leaderAnchorCoord) {
-        leaderFeatures.push({
-          type: "Feature",
-          properties: {
-            iso_a3: country.iso_a3,
-          },
-          geometry: {
-            type: "LineString",
-            coordinates: [
-              resolvedPlacement.leaderAnchorCoord,
-              resolvedPlacement.labelCoord,
-            ],
-          },
-        });
+      if (leaderFeature) {
+        leaderFeatures.push(leaderFeature);
       }
     });
+
+  return {
+    labels: {
+      ...emptyLabelCollection,
+      features: labelFeatures,
+    },
+    leaders: {
+      ...emptyLeaderCollection,
+      features: leaderFeatures,
+    },
+  };
+};
+
+export const buildLearningLabelCollections = (
+  countries: Country[],
+  zoom: number,
+  surface: LabelSurface,
+  options: { hideMainInsetLabels?: boolean } = {},
+) => {
+  const labelFeatures: Feature<Point, LabelProperties>[] = [];
+  const leaderFeatures: Feature<LineString, LeaderProperties>[] = [];
+
+  countries.forEach((country) => {
+    const placement =
+      labelPlacements[country.iso_a3]?.[surface] ??
+      labelPlacements[country.iso_a3]?.main;
+
+    if (
+      surface === "main" &&
+      options.hideMainInsetLabels &&
+      placement?.hideOnMainWhenInset
+    ) {
+      return;
+    }
+
+    const learningProfile = getLearningLabelProfile(country, placement);
+
+    if (zoom < learningProfile.learningMinZoom) {
+      return;
+    }
+
+    const { labelFeature, leaderFeature } = buildLabelFeature(
+      country,
+      placement,
+      learningProfile,
+    );
+
+    labelFeatures.push(labelFeature);
+
+    if (leaderFeature && zoom >= 4.15) {
+      leaderFeatures.push(leaderFeature);
+    }
+  });
 
   return {
     labels: {

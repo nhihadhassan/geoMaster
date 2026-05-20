@@ -2,7 +2,14 @@
 
 import mapboxgl, { type GeoJSONSource, type Map } from "mapbox-gl";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
 import type { FeatureCollection, Geometry } from "geojson";
 import { AntarcticaEducationCard } from "@/components/game/AntarcticaEducationCard";
 import { GameHud } from "@/components/game/GameHud";
@@ -25,7 +32,10 @@ import {
   quizCountryIds,
   type Country,
 } from "@/data/countries";
-import { buildLabelCollections } from "@/data/labelPlacements";
+import {
+  buildLabelCollections,
+  buildLearningLabelCollections,
+} from "@/data/labelPlacements";
 import {
   cityFeatureCollection,
   findLearningFeature,
@@ -39,6 +49,7 @@ import {
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
 import { useGameStore, type CountryResult } from "@/store/gameStore";
+import { getCountryFunFacts } from "@/utils/countryEducation";
 
 const SOURCE_ID = "geomaster-countries";
 const FILL_LAYER_ID = "geomaster-country-fill";
@@ -48,6 +59,8 @@ const REMAINING_PULSE_FILL_LAYER_ID = "geomaster-remaining-pulse-fill";
 const REMAINING_PULSE_LINE_LAYER_ID = "geomaster-remaining-pulse-line";
 const LABEL_SOURCE_ID = "geomaster-country-labels";
 const LEADER_SOURCE_ID = "geomaster-country-leaders";
+const LEARNING_LABEL_SOURCE_ID = "geomaster-learning-country-labels";
+const LEARNING_LEADER_SOURCE_ID = "geomaster-learning-country-leaders";
 const GUIDE_CIRCLE_SOURCE_ID = "geomaster-small-country-guide-circles";
 const GUIDE_LINE_SOURCE_ID = "geomaster-small-country-guide-lines";
 const GUIDE_CIRCLE_LAYER_ID = "geomaster-small-country-guide-circle-layer";
@@ -64,6 +77,8 @@ const LANDMARK_CIRCLE_LAYER_ID = "geomaster-landmark-circle-layer";
 const LANDMARK_LABEL_LAYER_ID = "geomaster-landmark-label-layer";
 const LABEL_LAYER_PREFIX = "geomaster-country-label-layer";
 const LEADER_LAYER_ID = "geomaster-country-leader-layer";
+const LEARNING_LABEL_LAYER_PREFIX = "geomaster-learning-country-label-layer";
+const LEARNING_LEADER_LAYER_ID = "geomaster-learning-country-leader-layer";
 const DEBUG_LABEL_SOURCE_ID = "geomaster-debug-country-labels";
 const DEBUG_LEADER_SOURCE_ID = "geomaster-debug-country-leaders";
 const DEBUG_LABEL_LAYER_ID = "geomaster-debug-country-label-layer";
@@ -71,10 +86,36 @@ const DEBUG_LEADER_LAYER_ID = "geomaster-debug-country-leader-layer";
 const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const LANDING_SEEN_KEY = "geomaster-landing-seen";
+const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
+const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
+const IDLE_PROMPT_INITIAL_DELAY_MS = 16_000;
+const IDLE_PROMPT_INTERVAL_MS = 48_000;
+const IDLE_PROMPT_VISIBLE_MS = 6_500;
+const IDLE_PROMPT_COUNTRY_IDS = [
+  "CAN",
+  "USA",
+  "BRA",
+  "FRA",
+  "JPN",
+  "EGY",
+  "AUS",
+  "IND",
+];
+const GENERIC_IDLE_PROMPTS = [
+  "Click any country to learn its capital, languages, and story.",
+  "Zoom in to discover states, cities, landmarks, and natural features.",
+  "Choose a region when you are ready to turn exploration into a quiz.",
+  "Try dragging the globe, then click a country that catches your eye.",
+];
 const LABEL_ANCHORS = ["center", "left", "right", "top", "bottom"] as const;
 const LABEL_KINDS = ["fallback", "manual"] as const;
 const LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
   LABEL_ANCHORS.map((anchor) => `${LABEL_LAYER_PREFIX}-${kind}-${anchor}`),
+);
+const LEARNING_LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
+  LABEL_ANCHORS.map(
+    (anchor) => `${LEARNING_LABEL_LAYER_PREFIX}-${kind}-${anchor}`,
+  ),
 );
 const GEOMASTER_LAYER_IDS = [
   FILL_LAYER_ID,
@@ -84,6 +125,7 @@ const GEOMASTER_LAYER_IDS = [
   REMAINING_PULSE_LINE_LAYER_ID,
   GUIDE_LINE_LAYER_ID,
   GUIDE_CIRCLE_LAYER_ID,
+  LEARNING_LEADER_LAYER_ID,
   SUBDIVISION_LABEL_LAYER_ID,
   CITY_CIRCLE_LAYER_ID,
   CITY_LABEL_LAYER_ID,
@@ -91,6 +133,7 @@ const GEOMASTER_LAYER_IDS = [
   LANDMARK_CIRCLE_LAYER_ID,
   LANDMARK_LABEL_LAYER_ID,
   LEADER_LAYER_ID,
+  ...LEARNING_LABEL_LAYER_IDS,
   ...LABEL_LAYER_IDS,
   DEBUG_LEADER_LAYER_ID,
   DEBUG_LABEL_LAYER_ID,
@@ -270,14 +313,22 @@ const getMapDebugSnapshot = (map: Map) => ({
     LANDMARK_SOURCE_ID,
     LEADER_SOURCE_ID,
     LABEL_SOURCE_ID,
+    LEARNING_LEADER_SOURCE_ID,
+    LEARNING_LABEL_SOURCE_ID,
     DEBUG_LEADER_SOURCE_ID,
     DEBUG_LABEL_SOURCE_ID,
   ].filter((sourceId) => Boolean(map.getSource(sourceId))),
   layerIds: GEOMASTER_LAYER_IDS.filter((layerId) => Boolean(map.getLayer(layerId))),
   labelSourceLoaded: Boolean(map.getSource(LABEL_SOURCE_ID)),
-  labelLayerLoaded: LABEL_LAYER_IDS.some((layerId) => Boolean(map.getLayer(layerId))),
-  leaderSourceLoaded: Boolean(map.getSource(LEADER_SOURCE_ID)),
-  leaderLayerLoaded: Boolean(map.getLayer(LEADER_LAYER_ID)),
+  labelLayerLoaded: [...LABEL_LAYER_IDS, ...LEARNING_LABEL_LAYER_IDS].some(
+    (layerId) => Boolean(map.getLayer(layerId)),
+  ),
+  leaderSourceLoaded:
+    Boolean(map.getSource(LEADER_SOURCE_ID)) ||
+    Boolean(map.getSource(LEARNING_LEADER_SOURCE_ID)),
+  leaderLayerLoaded:
+    Boolean(map.getLayer(LEADER_LAYER_ID)) ||
+    Boolean(map.getLayer(LEARNING_LEADER_LAYER_ID)),
   projection: map.getProjection?.().name ?? "unknown",
 });
 
@@ -288,6 +339,8 @@ const LEARNING_LAYER_IDS = [
   PHYSICAL_LABEL_LAYER_ID,
   LANDMARK_CIRCLE_LAYER_ID,
   LANDMARK_LABEL_LAYER_ID,
+  LEARNING_LEADER_LAYER_ID,
+  ...LEARNING_LABEL_LAYER_IDS,
 ];
 
 const setLearningLayerVisibility = (map: Map, visible: boolean) => {
@@ -568,6 +621,123 @@ function MapDebugPanel({
   );
 }
 
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncPreference = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    syncPreference();
+    mediaQuery.addEventListener("change", syncPreference);
+
+    return () => mediaQuery.removeEventListener("change", syncPreference);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
+function useIdleGlobeRotation({
+  enabled,
+  idleDelayMs,
+  mapRef,
+  onInteraction,
+  interactionKey,
+}: {
+  enabled: boolean;
+  idleDelayMs: number;
+  mapRef: MutableRefObject<Map | null>;
+  onInteraction: () => void;
+  interactionKey: number;
+}) {
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!enabled || !map) {
+      return;
+    }
+
+    let timeoutId: number | null = null;
+    let frameId: number | null = null;
+    let previousTimestamp = 0;
+
+    const stopRotation = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+    };
+
+    const handleInteraction = () => {
+      stopRotation();
+      onInteraction();
+    };
+
+    const animate = (timestamp: number) => {
+      if (mapRef.current !== map) {
+        return;
+      }
+
+      if (!previousTimestamp) {
+        previousTimestamp = timestamp;
+      }
+
+      const elapsedSeconds = (timestamp - previousTimestamp) / 1000;
+      previousTimestamp = timestamp;
+      map.setBearing(map.getBearing() + elapsedSeconds * 0.18);
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    timeoutId = window.setTimeout(() => {
+      previousTimestamp = 0;
+      frameId = window.requestAnimationFrame(animate);
+    }, idleDelayMs);
+
+    map.on("dragstart", handleInteraction);
+    map.on("zoomstart", handleInteraction);
+    map.on("rotatestart", handleInteraction);
+    map.on("pitchstart", handleInteraction);
+    map.on("mousedown", handleInteraction);
+    map.on("touchstart", handleInteraction);
+    const canvas = map.getCanvas();
+    canvas.addEventListener("wheel", handleInteraction, { passive: true });
+
+    return () => {
+      stopRotation();
+      map.off("dragstart", handleInteraction);
+      map.off("zoomstart", handleInteraction);
+      map.off("rotatestart", handleInteraction);
+      map.off("pitchstart", handleInteraction);
+      map.off("mousedown", handleInteraction);
+      map.off("touchstart", handleInteraction);
+      canvas.removeEventListener("wheel", handleInteraction);
+    };
+  }, [enabled, idleDelayMs, interactionKey, mapRef, onInteraction]);
+}
+
+function IdlePromptToast({ prompt }: { prompt: string }) {
+  return (
+    <motion.aside
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+      className="pointer-events-none absolute inset-x-3 bottom-[calc(5.9rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-sm rounded-2xl border border-white/12 bg-zinc-950/54 px-4 py-3 text-sm font-medium leading-5 text-white/72 shadow-lg shadow-black/24 backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-5 sm:max-w-xs"
+      aria-live="polite"
+    >
+      <span className="block text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-emerald-100/54">
+        Atlas note
+      </span>
+      <span className="mt-1 block">{prompt}</span>
+    </motion.aside>
+  );
+}
+
 export function MapContainer() {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -581,7 +751,15 @@ export function MapContainer() {
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
   const [landingOpen, setLandingOpen] = useState(false);
-  const [learningHelpOpen, setLearningHelpOpen] = useState(false);
+  const [regionPanelOpen, setRegionPanelOpen] = useState(false);
+  const [regionPanelTab, setRegionPanelTab] = useState<"region" | "mode">(
+    "region",
+  );
+  const [idleInteractionKey, setIdleInteractionKey] = useState(0);
+  const [hasMapInteraction, setHasMapInteraction] = useState(false);
+  const [idlePrompt, setIdlePrompt] = useState<string | null>(null);
+  const [mapZoom, setMapZoom] = useState(1.7);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [debugUiEnabled] = useState(() => {
     if (!IS_DEVELOPMENT || typeof window === "undefined") {
       return false;
@@ -693,10 +871,109 @@ export function MapContainer() {
     selectedMode === "click-country" ||
     selectedMode === "capital-challenge";
   const learningModeActive = gameStatus === "idle" && !selectedSpecialRegion;
-  const learningLabelIds = useMemo(
-    () => countries.map((country) => country.iso_a3),
-    [],
+  const isFinished =
+    gameStatus === "completed" ||
+    gameStatus === "failed" ||
+    gameStatus === "gave-up";
+  const idlePrompts = useMemo(() => {
+    const countryPrompts = IDLE_PROMPT_COUNTRY_IDS.flatMap((iso) => {
+      const country = countries.find((item) => item.iso_a3 === iso);
+
+      if (!country) {
+        return [];
+      }
+
+      const [fact] = getCountryFunFacts(country);
+
+      return fact ? [`Did you know? ${fact}`] : [];
+    });
+
+    return [...GENERIC_IDLE_PROMPTS, ...countryPrompts];
+  }, []);
+  const registerMapInteraction = useCallback(() => {
+    setHasMapInteraction(true);
+    setIdleInteractionKey((key) => key + 1);
+  }, []);
+  const openRegionPanel = useCallback(
+    (tab: "region" | "mode" = "region") => {
+      setRegionPanelTab(tab);
+      setRegionPanelOpen(true);
+      registerMapInteraction();
+    },
+    [registerMapInteraction],
   );
+  const closeRegionPanel = useCallback(
+    (open: boolean) => {
+      setRegionPanelOpen(open);
+
+      if (open) {
+        registerMapInteraction();
+      }
+    },
+    [registerMapInteraction],
+  );
+  const idleAtmosphereEnabled =
+    learningModeActive &&
+    mapLoaded &&
+    !landingOpen &&
+    !selectedLearningFeature &&
+    !regionPanelOpen &&
+    !isFinished;
+  const idleRotationEnabled = idleAtmosphereEnabled && !prefersReducedMotion;
+  const idlePromptEnabled = idleAtmosphereEnabled && idlePrompts.length > 0;
+
+  useIdleGlobeRotation({
+    enabled: idleRotationEnabled,
+    idleDelayMs: hasMapInteraction
+      ? IDLE_ROTATION_RESUME_DELAY_MS
+      : IDLE_ROTATION_INITIAL_DELAY_MS,
+    mapRef,
+    onInteraction: registerMapInteraction,
+    interactionKey: idleInteractionKey,
+  });
+
+  useEffect(() => {
+    if (!idlePromptEnabled) {
+      const resetTimeoutId = window.setTimeout(() => setIdlePrompt(null), 0);
+
+      return () => window.clearTimeout(resetTimeoutId);
+    }
+
+    let promptIndex = 0;
+    let showTimeoutId: number | null = null;
+    let hideTimeoutId: number | null = null;
+
+    const clearTimers = () => {
+      if (showTimeoutId) {
+        window.clearTimeout(showTimeoutId);
+        showTimeoutId = null;
+      }
+
+      if (hideTimeoutId) {
+        window.clearTimeout(hideTimeoutId);
+        hideTimeoutId = null;
+      }
+    };
+
+    const schedulePrompt = (delay: number) => {
+      showTimeoutId = window.setTimeout(() => {
+        setIdlePrompt(idlePrompts[promptIndex % idlePrompts.length]);
+        promptIndex += 1;
+        hideTimeoutId = window.setTimeout(() => {
+          setIdlePrompt(null);
+          schedulePrompt(IDLE_PROMPT_INTERVAL_MS);
+        }, IDLE_PROMPT_VISIBLE_MS);
+      }, delay);
+    };
+
+    schedulePrompt(
+      hasMapInteraction ? IDLE_PROMPT_INTERVAL_MS : IDLE_PROMPT_INITIAL_DELAY_MS,
+    );
+
+    return () => {
+      clearTimers();
+    };
+  }, [hasMapInteraction, idleInteractionKey, idlePromptEnabled, idlePrompts]);
   const remainingCountryIds = useMemo(
     () => {
       const completedIds = isTargetQueueMode
@@ -736,10 +1013,6 @@ export function MapContainer() {
   );
   const visibleLabelIds = useMemo(
     () => {
-      if (learningModeActive) {
-        return learningLabelIds;
-      }
-
       if (gameStatus === "failed" || gameStatus === "gave-up") {
         return quizCountryIdList;
       }
@@ -754,8 +1027,6 @@ export function MapContainer() {
       gameStatus,
       guessedCountryIds,
       isTargetQueueMode,
-      learningLabelIds,
-      learningModeActive,
       quizCountryIdList,
       resolvedCountryIds,
     ],
@@ -770,10 +1041,19 @@ export function MapContainer() {
     gameStatus !== "idle";
   const labelCollections = useMemo(
     () =>
-      buildLabelCollections(learningModeActive ? countries : quizCountries, visibleLabelIds, "main", {
+      buildLabelCollections(quizCountries, visibleLabelIds, "main", {
         hideMainInsetLabels: caribbeanInsetMounted,
       }),
-    [caribbeanInsetMounted, learningModeActive, quizCountries, visibleLabelIds],
+    [caribbeanInsetMounted, quizCountries, visibleLabelIds],
+  );
+  const learningLabelCollections = useMemo(
+    () =>
+      learningModeActive
+        ? buildLearningLabelCollections(countries, mapZoom, "main", {
+            hideMainInsetLabels: false,
+          })
+        : buildLabelCollections(countries, [], "main"),
+    [learningModeActive, mapZoom],
   );
   const guideCountryIds = useMemo(() => {
     if (gameStatus !== "running") {
@@ -798,8 +1078,12 @@ export function MapContainer() {
       ),
     [debugLabelIds, gameStatus],
   );
-  const labelCount = labelCollections.labels.features.length;
-  const leaderLineCount = labelCollections.leaders.features.length;
+  const labelCount =
+    labelCollections.labels.features.length +
+    learningLabelCollections.labels.features.length;
+  const leaderLineCount =
+    labelCollections.leaders.features.length +
+    learningLabelCollections.leaders.features.length;
   const isRunningTypeMode =
     selectedMode === "type-to-fill" && gameStatus === "running";
   const pulseReason = getPulseReason(
@@ -919,6 +1203,12 @@ export function MapContainer() {
       const existingLabelSource = map.getSource(LABEL_SOURCE_ID) as
         | GeoJSONSource
         | undefined;
+      const existingLearningLeaderSource = map.getSource(
+        LEARNING_LEADER_SOURCE_ID,
+      ) as GeoJSONSource | undefined;
+      const existingLearningLabelSource = map.getSource(
+        LEARNING_LABEL_SOURCE_ID,
+      ) as GeoJSONSource | undefined;
       const existingGuideCircleSource = map.getSource(
         GUIDE_CIRCLE_SOURCE_ID,
       ) as GeoJSONSource | undefined;
@@ -959,6 +1249,24 @@ export function MapContainer() {
         map.addSource(LABEL_SOURCE_ID, {
           type: "geojson",
           data: labelCollections.labels,
+        });
+      }
+
+      if (existingLearningLeaderSource) {
+        existingLearningLeaderSource.setData(learningLabelCollections.leaders);
+      } else {
+        map.addSource(LEARNING_LEADER_SOURCE_ID, {
+          type: "geojson",
+          data: learningLabelCollections.leaders,
+        });
+      }
+
+      if (existingLearningLabelSource) {
+        existingLearningLabelSource.setData(learningLabelCollections.labels);
+      } else {
+        map.addSource(LEARNING_LABEL_SOURCE_ID, {
+          type: "geojson",
+          data: learningLabelCollections.labels,
         });
       }
 
@@ -1430,6 +1738,111 @@ export function MapContainer() {
         });
       });
 
+      if (!map.getLayer(LEARNING_LEADER_LAYER_ID)) {
+        map.addLayer({
+          id: LEARNING_LEADER_LAYER_ID,
+          type: "line",
+          source: LEARNING_LEADER_SOURCE_ID,
+          layout: {
+            visibility: learningModeActive ? "visible" : "none",
+          },
+          paint: {
+            "line-color": "#334155",
+            "line-opacity": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              3.7,
+              0,
+              4.4,
+              0.34,
+            ],
+            "line-width": 0.85,
+            "line-blur": 0.1,
+          },
+        });
+      }
+
+      LABEL_KINDS.forEach((kind) => {
+        LABEL_ANCHORS.forEach((anchor) => {
+          const isManual = kind === "manual";
+          const layerId = `${LEARNING_LABEL_LAYER_PREFIX}-${kind}-${anchor}`;
+
+          if (!map.getLayer(layerId)) {
+            map.addLayer({
+              id: layerId,
+              type: "symbol",
+              source: LEARNING_LABEL_SOURCE_ID,
+              filter: [
+                "all",
+                ["==", ["get", "textAnchor"], anchor],
+                ["==", ["get", "placementKind"], kind],
+              ],
+              layout: {
+                "text-field": ["get", "label"],
+                "text-font": [
+                  "DIN Offc Pro Medium",
+                  "Arial Unicode MS Regular",
+                ],
+                "text-size": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  1.45,
+                  [
+                    "match",
+                    ["get", "labelSize"],
+                    "small",
+                    7.5,
+                    "large",
+                    10,
+                    9,
+                  ],
+                  4.4,
+                  [
+                    "match",
+                    ["get", "labelSize"],
+                    "small",
+                    isManual ? 10.25 : 9.5,
+                    "large",
+                    13,
+                    isManual ? 11.25 : 10.5,
+                  ],
+                ],
+                "text-anchor": anchor,
+                "text-line-height": 0.95,
+                "text-letter-spacing": 0,
+                "text-allow-overlap": false,
+                "text-ignore-placement": false,
+                "symbol-sort-key": [
+                  "-",
+                  5,
+                  ["coalesce", ["get", "labelPriority"], 3],
+                ],
+                visibility: learningModeActive ? "visible" : "none",
+              },
+              paint: {
+                "text-color": isManual ? "#172033" : "#263449",
+                "text-halo-color": "rgba(248,250,252,0.94)",
+                "text-halo-width": isManual ? 1.65 : 1.35,
+                "text-halo-blur": 0.18,
+                "text-opacity": [
+                  "interpolate",
+                  ["linear"],
+                  ["zoom"],
+                  1.35,
+                  0.7,
+                  2.4,
+                  0.86,
+                  4.4,
+                  0.94,
+                ],
+              },
+            });
+          }
+        });
+      });
+
       if (!map.getLayer(DEBUG_LEADER_LAYER_ID)) {
         map.addLayer({
           id: DEBUG_LEADER_LAYER_ID,
@@ -1476,6 +1889,8 @@ export function MapContainer() {
         LANDMARK_LABEL_LAYER_ID,
         LEADER_LAYER_ID,
         ...LABEL_LAYER_IDS,
+        LEARNING_LEADER_LAYER_ID,
+        ...LEARNING_LABEL_LAYER_IDS,
         DEBUG_LEADER_LAYER_ID,
         DEBUG_LABEL_LAYER_ID,
       ].forEach((layerId) => {
@@ -1515,6 +1930,12 @@ export function MapContainer() {
       const leaderSource = map.getSource(LEADER_SOURCE_ID) as
         | GeoJSONSource
         | undefined;
+      const learningLabelSource = map.getSource(LEARNING_LABEL_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
+      const learningLeaderSource = map.getSource(LEARNING_LEADER_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
       const debugLabelSource = map.getSource(DEBUG_LABEL_SOURCE_ID) as
         | GeoJSONSource
         | undefined;
@@ -1530,6 +1951,8 @@ export function MapContainer() {
 
       labelSource?.setData(labelCollections.labels);
       leaderSource?.setData(labelCollections.leaders);
+      learningLabelSource?.setData(learningLabelCollections.labels);
+      learningLeaderSource?.setData(learningLabelCollections.leaders);
       guideCircleSource?.setData(guideCollections.circles);
       guideLineSource?.setData(guideCollections.leaders);
       debugLabelSource?.setData(debugLabelCollections.labels);
@@ -1539,8 +1962,12 @@ export function MapContainer() {
       setMapDebug({
         countrySourceLoaded: Boolean(map.getSource(SOURCE_ID)),
         countryFeatureCount: countriesData.features.length,
-        labelFeatureCount: labelCollections.labels.features.length,
-        leaderFeatureCount: labelCollections.leaders.features.length,
+        labelFeatureCount:
+          labelCollections.labels.features.length +
+          learningLabelCollections.labels.features.length,
+        leaderFeatureCount:
+          labelCollections.leaders.features.length +
+          learningLabelCollections.leaders.features.length,
         lastLabelLayerError: null,
         ...getMapDebugSnapshot(map),
       });
@@ -1553,6 +1980,7 @@ export function MapContainer() {
       gameStatus,
       guideCollections,
       labelCollections,
+      learningLabelCollections,
       learningModeActive,
       missedCountryIds,
       pulseActive,
@@ -1630,6 +2058,28 @@ export function MapContainer() {
       });
     };
   }, [mapboxToken, setMapDebug]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!mapLoaded || !map) {
+      return;
+    }
+
+    const syncZoom = () => {
+      setMapZoom(Math.round(map.getZoom() * 100) / 100);
+    };
+    const initialTimeoutId = window.setTimeout(syncZoom, 0);
+
+    map.on("moveend", syncZoom);
+    map.on("zoomend", syncZoom);
+
+    return () => {
+      window.clearTimeout(initialTimeoutId);
+      map.off("moveend", syncZoom);
+      map.off("zoomend", syncZoom);
+    };
+  }, [mapLoaded]);
 
   useEffect(() => {
     if (!mapLoaded || !topologyData || !mapRef.current) {
@@ -1798,6 +2248,7 @@ export function MapContainer() {
         selectedMode === "capital-challenge") &&
       gameStatus !== "idle" &&
       !isAntarctica;
+    const shouldFrameIdleRegion = gameStatus === "idle" && regionPanelOpen;
     const regionPadding =
       typeof window !== "undefined" && window.innerWidth < 768
         ? { top: 104, right: 24, bottom: 142, left: 24 }
@@ -1828,12 +2279,21 @@ export function MapContainer() {
         duration: 1300,
         essential: true,
       });
-    } else {
+    } else if (shouldFrameIdleRegion) {
       map.flyTo({
         center: [region.center.lng, region.center.lat],
         zoom: region.zoom,
         pitch: region.pitch,
         bearing: region.bearing,
+        duration: 1300,
+        essential: true,
+      });
+    } else {
+      map.flyTo({
+        center: [-32, 16],
+        zoom: typeof window !== "undefined" && window.innerWidth < 768 ? 1.1 : 1.7,
+        pitch: 24,
+        bearing: -12,
         duration: 1300,
         essential: true,
       });
@@ -1843,6 +2303,7 @@ export function MapContainer() {
   }, [
     gameStatus,
     mapLoaded,
+    regionPanelOpen,
     selectedMode,
     selectedRegion,
     selectedSpecialRegion,
@@ -1989,6 +2450,8 @@ export function MapContainer() {
     }
 
     const handleClick = (event: mapboxgl.MapMouseEvent) => {
+      registerMapInteraction();
+
       if (!map.getLayer(FILL_LAYER_ID)) {
         return;
       }
@@ -2073,6 +2536,7 @@ export function MapContainer() {
     handleCountryMatched,
     mapLoaded,
     quizCountryIdList,
+    registerMapInteraction,
     selectedMode,
     selectedSpecialRegion,
     selectLearningFeature,
@@ -2122,8 +2586,16 @@ export function MapContainer() {
     setMapDebug({ insetLabelLayerLoaded: loaded });
   }, [setMapDebug]);
 
-  const closeLanding = useCallback(() => {
+  const closeLandingForQuiz = useCallback(() => {
     window.localStorage.setItem(LANDING_SEEN_KEY, "1");
+    setRegionPanelTab("region");
+    setRegionPanelOpen(true);
+    setLandingOpen(false);
+  }, []);
+
+  const closeLandingForExplore = useCallback(() => {
+    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
+    setRegionPanelOpen(false);
     setLandingOpen(false);
   }, []);
 
@@ -2173,63 +2645,25 @@ export function MapContainer() {
         </p>
       </motion.div>
 
-      {!landingOpen && !selectedSpecialRegion ? <GameHud /> : null}
-      {!landingOpen && learningModeActive ? (
-        <button
-          type="button"
-          onClick={reopenLanding}
-          className="absolute right-4 top-24 z-20 rounded-full border border-white/12 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/64 hover:text-white sm:right-5 sm:top-28"
-        >
-          GeoMaster
-        </button>
+      {!landingOpen && !selectedSpecialRegion ? (
+        <GameHud
+          onOpenLanding={reopenLanding}
+          onOpenRegionPanel={() => openRegionPanel("region")}
+          regionPanelOpen={regionPanelOpen}
+        />
       ) : null}
-      {!landingOpen && learningModeActive ? (
-        <>
-          <button
-            type="button"
-            onClick={() => setLearningHelpOpen((open) => !open)}
-            className="absolute left-3 top-[calc(5.1rem+env(safe-area-inset-top))] z-20 min-h-11 rounded-full border border-sky-100/16 bg-zinc-950/58 px-4 text-sm font-semibold text-white/72 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/68 hover:text-white sm:hidden"
-          >
-            <span className="text-sky-100/82">Learning</span>
-          </button>
-          {learningHelpOpen ? (
-            <motion.aside
-              initial={{ opacity: 0, y: 24, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 260, damping: 28 }}
-              className="absolute inset-x-2 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 rounded-3xl border border-white/12 bg-zinc-950/74 p-4 text-white shadow-2xl shadow-black/36 backdrop-blur-2xl sm:hidden"
-            >
-              <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/22" />
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-sky-100/56">
-                    Learning Mode
-                  </p>
-                  <p className="mt-2 text-sm leading-5 text-white/66">
-                    Zoom in and tap countries, states, cities, features, or
-                    landmarks to open compact learning cards.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLearningHelpOpen(false)}
-                  className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
-                >
-                  Close
-                </button>
-              </div>
-            </motion.aside>
-          ) : null}
-          <div className="pointer-events-none absolute left-5 top-28 z-20 hidden rounded-full border border-sky-100/16 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl sm:block">
-            <span className="text-sky-100/82">Learning Mode</span>
-            <span className="ml-2 text-white/42">
-              Zoom in for states, features, and landmarks
-            </span>
-          </div>
-        </>
+      <AnimatePresence>
+        {idlePromptEnabled && idlePrompt ? (
+          <IdlePromptToast key={idlePrompt} prompt={idlePrompt} />
+        ) : null}
+      </AnimatePresence>
+      {!landingOpen ? (
+        <PremiumControls
+          panelOpen={regionPanelOpen}
+          onPanelOpenChange={closeRegionPanel}
+          defaultMobileTab={regionPanelTab}
+        />
       ) : null}
-      {!landingOpen ? <PremiumControls /> : null}
       <AnimatePresence>
         {!landingOpen && selectedSpecialRegion === "antarctica" ? (
           <AntarcticaEducationCard
@@ -2307,7 +2741,9 @@ export function MapContainer() {
               />
             ) : null}
           </AnimatePresence>
-          <TypeToFillInput onCountryMatched={handleCountryMatched} />
+          {gameStatus === "running" ? (
+            <TypeToFillInput onCountryMatched={handleCountryMatched} />
+          ) : null}
           <ResultsDashboard />
         </>
       ) : null}
@@ -2320,8 +2756,8 @@ export function MapContainer() {
         {landingOpen ? (
           <LandingPage
             key="landing"
-            onStartQuiz={closeLanding}
-            onExploreMap={closeLanding}
+            onStartQuiz={closeLandingForQuiz}
+            onExploreMap={closeLandingForExplore}
           />
         ) : null}
       </AnimatePresence>

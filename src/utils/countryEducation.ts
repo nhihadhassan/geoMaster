@@ -48,11 +48,23 @@ export const formatGDP = (value: number | null) => {
 
 export const formatLanguages = (languages: string[]) => languages.join(", ");
 
+export const getCountryFunFacts = (country: Country) => {
+  const facts = [
+    country.education.funFact,
+    ...(country.education.funFacts ?? []),
+  ];
+
+  return Array.from(
+    new Set(facts.map((fact) => fact.trim()).filter(Boolean)),
+  );
+};
+
 export const formatCountryEducation = (country: Country) => {
   const { education } = country;
   const population = formatPopulation(education.population);
   const gdp = formatGDP(education.gdpUsd);
   const languages = formatLanguages(education.languages);
+  const funFacts = getCountryFunFacts(country);
 
   return {
     stats: [
@@ -63,7 +75,9 @@ export const formatCountryEducation = (country: Country) => {
         ? { label: "Native name", value: education.nativeName }
         : null,
     ].filter((row): row is { label: string; value: string } => Boolean(row)),
-    funFact: education.funFact,
+    funFact: funFacts[0] ?? education.funFact,
+    funFacts,
+    featuredFunFact: funFacts[0] ?? education.funFact,
     sourceYear: education.populationYear ?? education.gdpYear,
   };
 };

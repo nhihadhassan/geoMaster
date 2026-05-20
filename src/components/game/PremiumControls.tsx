@@ -23,7 +23,17 @@ const modeDescriptions: Record<GameMode, string> = {
   "capital-challenge": "Answer from the capital.",
 };
 
-export function PremiumControls() {
+type PremiumControlsProps = {
+  panelOpen: boolean;
+  onPanelOpenChange: (open: boolean) => void;
+  defaultMobileTab?: "region" | "mode";
+};
+
+export function PremiumControls({
+  panelOpen,
+  onPanelOpenChange,
+  defaultMobileTab = "region",
+}: PremiumControlsProps) {
   const selectedRegion = useGameStore((state) => state.selectedRegion);
   const selectedSpecialRegion = useGameStore(
     (state) => state.selectedSpecialRegion,
@@ -39,23 +49,21 @@ export function PremiumControls() {
   const setAutoHideCorrectCard = useGameStore(
     (state) => state.setAutoHideCorrectCard,
   );
-  const [panelOpen, setPanelOpen] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState<"region" | "mode">(
-    "region",
+    defaultMobileTab,
   );
   const isQuizLocked = gameStatus === "running" || gameStatus === "paused";
-  const isCompact = gameStatus !== "idle" && !selectedSpecialRegion && !panelOpen;
   const selectedLabel = selectedSpecialRegion
     ? "Antarctica"
     : getRegionConfig(selectedRegion).label;
 
   useEffect(() => {
     if (isQuizLocked) {
-      const timeoutId = window.setTimeout(() => setPanelOpen(false), 0);
+      const timeoutId = window.setTimeout(() => onPanelOpenChange(false), 0);
 
       return () => window.clearTimeout(timeoutId);
     }
-  }, [isQuizLocked]);
+  }, [isQuizLocked, onPanelOpenChange]);
 
   const compactChip = (
     <motion.button
@@ -65,7 +73,7 @@ export function PremiumControls() {
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
       onClick={() => {
         if (!isQuizLocked) {
-          setPanelOpen(true);
+          onPanelOpenChange(true);
         }
       }}
       disabled={isQuizLocked}
@@ -77,10 +85,12 @@ export function PremiumControls() {
       }
     >
       <span className="block truncate">
-        Region · {selectedLabel}
-        <span className="ml-2 text-white/42">
-          Mode · {modeLabels[selectedMode]}
-        </span>
+        {gameStatus === "idle" ? "Choose Quiz" : `Regions · ${selectedLabel}`}
+        {gameStatus === "idle" ? null : (
+          <span className="ml-2 text-white/42">
+            Mode · {modeLabels[selectedMode]}
+          </span>
+        )}
       </span>
     </motion.button>
   );
@@ -182,7 +192,11 @@ export function PremiumControls() {
     </button>
   );
 
-  if (isCompact) {
+  if (!panelOpen) {
+    if (gameStatus === "idle") {
+      return null;
+    }
+
     return (
       <>
         <span className="sm:hidden">{compactChip}</span>
@@ -191,8 +205,18 @@ export function PremiumControls() {
           initial={{ opacity: 0, x: -14, scale: 0.96 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          onClick={() => setPanelOpen(true)}
-          className="absolute bottom-28 left-5 z-20 hidden rounded-full border border-white/12 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/64 hover:text-white sm:block"
+          onClick={() => {
+            if (!isQuizLocked) {
+              onPanelOpenChange(true);
+            }
+          }}
+          disabled={isQuizLocked}
+          className="absolute bottom-28 left-5 z-20 hidden min-h-11 rounded-full border border-white/12 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/64 hover:text-white disabled:cursor-default disabled:opacity-72 sm:block"
+          aria-label={
+            isQuizLocked
+              ? `Region locked during quiz: ${selectedLabel}`
+              : "Open region and mode menu"
+          }
         >
           Regions · {selectedLabel}
         </motion.button>
@@ -202,16 +226,14 @@ export function PremiumControls() {
 
   return (
     <>
-      {!panelOpen ? <span className="sm:hidden">{compactChip}</span> : null}
-      {panelOpen ? (
-        <motion.aside
-          initial={{ opacity: 0, y: 28, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          className="absolute inset-x-2 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 max-h-[55dvh] overflow-hidden rounded-3xl border border-white/12 bg-zinc-950/72 text-white shadow-2xl shadow-black/36 backdrop-blur-2xl sm:hidden"
-          role="dialog"
-          aria-label="Region and mode menu"
-        >
+      <motion.aside
+        initial={{ opacity: 0, y: 28, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 28 }}
+        className="absolute inset-x-2 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 max-h-[55dvh] overflow-hidden rounded-3xl border border-white/12 bg-zinc-950/72 text-white shadow-2xl shadow-black/36 backdrop-blur-2xl sm:hidden"
+        role="dialog"
+        aria-label="Region and mode menu"
+      >
           <div className="sticky top-0 z-10 border-b border-white/10 bg-zinc-950/82 px-3 pb-3 pt-2 backdrop-blur-2xl">
             <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/22" />
             <div className="flex items-center justify-between gap-3">
@@ -225,7 +247,7 @@ export function PremiumControls() {
               </div>
               <button
                 type="button"
-                onClick={() => setPanelOpen(false)}
+                onClick={() => onPanelOpenChange(false)}
                 className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
               >
                 Done
@@ -254,8 +276,7 @@ export function PremiumControls() {
               {autoHideToggle}
             </div>
           </div>
-        </motion.aside>
-      ) : null}
+      </motion.aside>
 
       <motion.aside
         initial={{ opacity: 0, x: -18, scale: 0.98 }}
@@ -268,17 +289,21 @@ export function PremiumControls() {
             <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/44">
               Region
             </p>
-            {gameStatus !== "idle" ? (
-              <button
-                type="button"
-                onClick={() => setPanelOpen(false)}
-                className="rounded-full border border-white/10 bg-white/7 px-2.5 py-1 text-xs font-semibold text-white/52 transition hover:bg-white/12 hover:text-white"
-              >
-                Minimize
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => onPanelOpenChange(false)}
+              className="rounded-full border border-white/10 bg-white/7 px-2.5 py-1 text-xs font-semibold text-white/52 transition hover:bg-white/12 hover:text-white"
+            >
+              Minimize
+            </button>
           </div>
           <div className="mt-2">{regionOptions}</div>
+        </div>
+        <div className="mt-3 border-t border-white/10 pt-3">
+          <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/44">
+            Mode
+          </p>
+          {modeOptions}
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">
           {autoHideToggle}
