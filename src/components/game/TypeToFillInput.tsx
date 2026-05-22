@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { motion, useAnimationControls, useReducedMotion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 import type { Country } from "@/data/countries";
 import { useGameStore, type IdentifyGuessResult } from "@/store/gameStore";
 import {
@@ -22,6 +22,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
   const currentInput = useGameStore((state) => state.currentInput);
   const guessedCountryIds = useGameStore((state) => state.guessedCountryIds);
   const gameStatus = useGameStore((state) => state.gameStatus);
+  const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const currentTargetCountry = useGameStore(
     (state) => state.currentTargetCountry,
   );
@@ -34,6 +35,9 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
   const submitCapitalGuess = useGameStore(
     (state) => state.submitCapitalGuess,
   );
+  const recordFeedbackEvent = useGameStore(
+    (state) => state.recordFeedbackEvent,
+  );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
   const availableCountries = useMemo(
     () =>
@@ -43,15 +47,59 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
     [guessedCountryIds, quizCountries],
   );
   const [localHint, setLocalHint] = useState<string | null>(null);
+  const feedbackControls = useAnimationControls();
+  const prefersReducedMotion = useReducedMotion();
   const inputDisabled = gameStatus !== "running";
+
+  useEffect(() => {
+    void feedbackControls.start({
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      x: 0,
+      transition: { type: "spring", stiffness: 280, damping: 30 },
+    });
+  }, [feedbackControls]);
+
+  useEffect(() => {
+    if (
+      lastFeedbackEvent?.kind !== "wrong" &&
+      lastFeedbackEvent?.kind !== "missed"
+    ) {
+      return;
+    }
+
+    const tone = lastFeedbackEvent.kind;
+    const feedbackBorder =
+      tone === "missed" ? "rgba(254,205,211,0.38)" : "rgba(254,205,211,0.32)";
+    const baseBorder = "rgba(255,255,255,0.12)";
+
+    if (!prefersReducedMotion) {
+      void feedbackControls.start({
+        x: tone === "missed" ? [0, -4, 4, -2, 2, 0] : [0, -5, 5, -3, 3, 0],
+        borderColor: [baseBorder, feedbackBorder, baseBorder],
+        boxShadow: [
+          "0 20px 25px -5px rgba(0,0,0,0.3)",
+          "0 20px 38px -8px rgba(136,19,55,0.32)",
+          "0 20px 25px -5px rgba(0,0,0,0.3)",
+        ],
+        transition: { duration: tone === "missed" ? 0.38 : 0.3 },
+      });
+    } else {
+      void feedbackControls.start({
+        borderColor: [baseBorder, feedbackBorder, baseBorder],
+        transition: { duration: 0.28 },
+      });
+    }
+  }, [feedbackControls, lastFeedbackEvent, prefersReducedMotion]);
 
   if (selectedMode === "click-country") {
     return (
       <motion.div
         initial={{ opacity: 0, y: 28, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        animate={feedbackControls}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        className="pointer-events-none absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
+        className="pointer-events-none absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl transition-colors sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
       >
         <div className="grid min-h-12 place-items-center rounded-xl border border-white/10 bg-white/9 px-4 text-center text-sm font-semibold text-white/76 sm:h-16 sm:rounded-2xl sm:px-6 sm:text-base">
           {gameStatus === "running"
@@ -137,6 +185,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
     ) {
       if (currentInput.trim().length < 2) {
         setLocalHint("Type an answer");
+        recordFeedbackEvent("wrong");
         vibrate([18, 24, 18]);
         return;
       }
@@ -168,6 +217,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
     if (!match) {
       recordMatchDebug(currentInput, null, false);
       setLocalHint("No match yet");
+      recordFeedbackEvent("wrong");
       vibrate([18, 24, 18]);
     }
   };
@@ -175,9 +225,9 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 28, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      animate={feedbackControls}
       transition={{ type: "spring", stiffness: 280, damping: 30 }}
-      className="absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
+      className="absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl transition-colors sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
     >
       <label className="sr-only" htmlFor="country-guess">
         Type a country name

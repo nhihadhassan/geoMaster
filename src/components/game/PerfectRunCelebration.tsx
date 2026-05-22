@@ -39,7 +39,9 @@ export function PerfectRunCelebration({
           {burstParticles.map((particle) => (
             <motion.span
               key={particle.id}
-              className="absolute rounded-full shadow-[0_0_18px_rgba(255,255,255,0.35)]"
+              className={`absolute rounded-full shadow-[0_0_18px_rgba(255,255,255,0.35)] ${
+                particle.id >= 12 ? "hidden sm:block" : ""
+              }`}
               style={{
                 width: particle.size,
                 height: particle.size,

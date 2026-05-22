@@ -8,6 +8,7 @@ import {
   type QuizRegion,
 } from "@/data/countries";
 import { useGameStore, type GameMode } from "@/store/gameStore";
+import { unlockGeoAudio } from "@/utils/soundEffects";
 
 const modeLabels: Record<GameMode, string> = {
   "type-to-fill": "Type",
@@ -43,11 +44,17 @@ export function PremiumControls({
   const autoHideCorrectCard = useGameStore(
     (state) => state.autoHideCorrectCard,
   );
+  const soundEffectsEnabled = useGameStore(
+    (state) => state.soundEffectsEnabled,
+  );
   const selectRegion = useGameStore((state) => state.selectRegion);
   const selectSpecialRegion = useGameStore((state) => state.selectSpecialRegion);
   const selectMode = useGameStore((state) => state.selectMode);
   const setAutoHideCorrectCard = useGameStore(
     (state) => state.setAutoHideCorrectCard,
+  );
+  const setSoundEffectsEnabled = useGameStore(
+    (state) => state.setSoundEffectsEnabled,
   );
   const [activeMobileTab, setActiveMobileTab] = useState<"region" | "mode">(
     defaultMobileTab,
@@ -192,6 +199,46 @@ export function PremiumControls({
     </button>
   );
 
+  const soundEffectsToggle = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={soundEffectsEnabled}
+      onClick={() => {
+        const nextEnabled = !soundEffectsEnabled;
+
+        if (nextEnabled) {
+          unlockGeoAudio();
+        }
+
+        setSoundEffectsEnabled(nextEnabled);
+      }}
+      className="mt-2 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/7 px-3 py-2 text-left transition hover:bg-white/12"
+    >
+      <span>
+        <span className="block text-sm font-semibold text-white/72">
+          Sound effects
+        </span>
+        <span className="block text-xs text-white/40">
+          Short quiz feedback tones
+        </span>
+      </span>
+      <span
+        className={`relative h-6 w-11 shrink-0 rounded-full border transition ${
+          soundEffectsEnabled
+            ? "border-cyan-200/40 bg-cyan-300/28"
+            : "border-white/14 bg-white/10"
+        }`}
+      >
+        <span
+          className={`absolute top-1 size-4 rounded-full bg-white shadow transition ${
+            soundEffectsEnabled ? "left-6" : "left-1"
+          }`}
+        />
+      </span>
+    </button>
+  );
+
   if (!panelOpen) {
     if (gameStatus === "idle") {
       return null;
@@ -274,6 +321,7 @@ export function PremiumControls({
             {activeMobileTab === "region" ? regionOptions : modeOptions}
             <div className="mt-3 border-t border-white/10 pt-3">
               {autoHideToggle}
+              {soundEffectsToggle}
             </div>
           </div>
       </motion.aside>
@@ -307,6 +355,7 @@ export function PremiumControls({
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">
           {autoHideToggle}
+          {soundEffectsToggle}
         </div>
       </motion.aside>
     </>

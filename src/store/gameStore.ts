@@ -12,6 +12,7 @@ import {
   getIdentifyHints,
 } from "@/utils/countryHints";
 import type { LearningFeature } from "@/data/learningFeatures";
+import type { GeoSoundEvent } from "@/utils/soundEffects";
 
 export type GameStatus =
   | "idle"
@@ -36,6 +37,14 @@ export type IdentifyGuessResult = {
   outcome: "correct" | "assisted" | "wrong" | "missed" | "ignored";
   country?: Country;
   clickedCountry?: Country | null;
+};
+
+export type QuizFeedbackEvent = {
+  kind: GeoSoundEvent;
+  sequence: number;
+  countryId?: string;
+  completed?: boolean;
+  perfect?: boolean;
 };
 
 type FeatureStateDebug = {
@@ -96,12 +105,15 @@ type GameState = {
   incorrectAttempts: Record<string, number>;
   lastMatchedCountry: Country | null;
   lastMatchSequence: number;
+  feedbackSequence: number;
+  lastFeedbackEvent: QuizFeedbackEvent | null;
   isPerfectRun: boolean;
   perfectRunSequence: number;
   currentTargetHints: string[];
   smartHint: string | null;
   capitalHintEnabled: boolean;
   autoHideCorrectCard: boolean;
+  soundEffectsEnabled: boolean;
   learningCountry: Country | null;
   selectedLearningFeature: LearningFeature | null;
   debug: DebugState;
@@ -118,6 +130,11 @@ type GameState = {
   setCurrentInput: (value: string) => void;
   setCapitalHintEnabled: (enabled: boolean) => void;
   setAutoHideCorrectCard: (enabled: boolean) => void;
+  setSoundEffectsEnabled: (enabled: boolean) => void;
+  recordFeedbackEvent: (
+    kind: GeoSoundEvent,
+    options?: Omit<QuizFeedbackEvent, "kind" | "sequence">,
+  ) => void;
   clearCorrectCard: () => void;
   selectLearningCountry: (iso: string | null) => void;
   selectLearningFeature: (feature: LearningFeature | null) => void;
@@ -157,6 +174,7 @@ const isPerfectCountryResultSet = (
   Object.values(countryResults).every((result) => result.status === "correct");
 
 const AUTO_HIDE_CORRECT_CARD_KEY = "geomaster-auto-hide-correct-card";
+const SOUND_EFFECTS_ENABLED_KEY = "geomaster-sound-effects-enabled";
 
 const readInitialAutoHideCorrectCard = () => {
   if (typeof window === "undefined") {
@@ -172,6 +190,39 @@ const persistAutoHideCorrectCard = (enabled: boolean) => {
   }
 
   window.localStorage.setItem(AUTO_HIDE_CORRECT_CARD_KEY, String(enabled));
+};
+
+const readInitialSoundEffectsEnabled = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(SOUND_EFFECTS_ENABLED_KEY) === "true";
+};
+
+const persistSoundEffectsEnabled = (enabled: boolean) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(SOUND_EFFECTS_ENABLED_KEY, String(enabled));
+};
+
+const buildFeedbackEvent = (
+  state: Pick<GameState, "feedbackSequence">,
+  kind: GeoSoundEvent,
+  options: Omit<QuizFeedbackEvent, "kind" | "sequence"> = {},
+) => {
+  const sequence = state.feedbackSequence + 1;
+
+  return {
+    feedbackSequence: sequence,
+    lastFeedbackEvent: {
+      kind,
+      sequence,
+      ...options,
+    },
+  };
 };
 
 const createResetState = (
@@ -197,6 +248,8 @@ const createResetState = (
     incorrectAttempts: {},
     lastMatchedCountry: null,
     lastMatchSequence: 0,
+    feedbackSequence: 0,
+    lastFeedbackEvent: null,
     isPerfectRun: false,
     perfectRunSequence: 0,
     currentTargetHints: [],
@@ -210,6 +263,7 @@ const createResetState = (
 export const useGameStore = create<GameState>((set, get) => ({
   ...createResetState("south-america", "type-to-fill"),
   autoHideCorrectCard: readInitialAutoHideCorrectCard(),
+  soundEffectsEnabled: readInitialSoundEffectsEnabled(),
   debug: {
     mapLoaded: false,
     countrySourceLoaded: false,
@@ -292,6 +346,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         incorrectAttempts: {},
         learningCountry: null,
         selectedLearningFeature: null,
+        ...buildFeedbackEvent(state, "quiz-start"),
       });
 
       return;
@@ -312,6 +367,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       incorrectAttempts: {},
       learningCountry: null,
       selectedLearningFeature: null,
+      ...buildFeedbackEvent(state, "quiz-start"),
     });
   },
   pauseQuiz: () => {
@@ -359,6 +415,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       isPerfectRun: false,
       learningCountry: null,
       selectedLearningFeature: null,
+      ...buildFeedbackEvent(state, "give-up"),
     });
   },
   backToRegionSelect: () => {
@@ -371,6 +428,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   setAutoHideCorrectCard: (enabled) => {
     persistAutoHideCorrectCard(enabled);
     set({ autoHideCorrectCard: enabled });
+  },
+  setSoundEffectsEnabled: (enabled) => {
+    persistSoundEffectsEnabled(enabled);
+    set({ soundEffectsEnabled: enabled });
+  },
+  recordFeedbackEvent: (kind, options) => {
+    set({
+      ...buildFeedbackEvent(get(), kind, options),
+    });
   },
   clearCorrectCard: () => set({ lastMatchedCountry: null }),
   selectLearningCountry: (iso) => {
@@ -432,6 +498,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       score: guessedCountryIds.length,
       gameStatus: isComplete ? "completed" : "running",
       smartHint: null,
+      ...buildFeedbackEvent(state, "correct", {
+        countryId: country.iso_a3,
+        completed: isComplete,
+        perfect: isComplete,
+      }),
     });
 
     return true;
@@ -497,6 +568,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           currentInput: "",
           currentTargetHints: [],
           smartHint: null,
+          ...buildFeedbackEvent(state, "missed", {
+            countryId: target.iso_a3,
+            completed: nextState.gameStatus === "completed",
+            perfect: false,
+          }),
         });
 
         return { outcome: "missed", country: target };
@@ -512,6 +588,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         incorrectAttempts,
         currentTargetHints,
         smartHint: currentTargetHints.at(-1) ?? null,
+        ...buildFeedbackEvent(state, "wrong", {
+          countryId: target.iso_a3,
+        }),
       });
 
       return { outcome: "wrong", country: target };
@@ -539,6 +618,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMatchSequence: state.lastMatchSequence + 1,
       currentTargetHints: [],
       smartHint: null,
+      ...buildFeedbackEvent(state, resultStatus, {
+        countryId: target.iso_a3,
+        completed: nextState.gameStatus === "completed",
+        perfect: nextState.isPerfectRun,
+      }),
     });
 
     return { outcome: resultStatus, country: target };
@@ -604,6 +688,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           currentInput: "",
           currentTargetHints: [],
           smartHint: null,
+          ...buildFeedbackEvent(state, "missed", {
+            countryId: target.iso_a3,
+            completed: nextState.gameStatus === "completed",
+            perfect: false,
+          }),
         });
 
         return { outcome: "missed", country: target };
@@ -619,6 +708,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         incorrectAttempts,
         currentTargetHints,
         smartHint: currentTargetHints.at(-1) ?? null,
+        ...buildFeedbackEvent(state, "wrong", {
+          countryId: target.iso_a3,
+        }),
       });
 
       return { outcome: "wrong", country: target };
@@ -646,6 +738,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMatchSequence: state.lastMatchSequence + 1,
       currentTargetHints: [],
       smartHint: null,
+      ...buildFeedbackEvent(state, resultStatus, {
+        countryId: target.iso_a3,
+        completed: nextState.gameStatus === "completed",
+        perfect: nextState.isPerfectRun,
+      }),
     });
 
     return { outcome: resultStatus, country: target };
@@ -727,6 +824,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           currentInput: "",
           currentTargetHints: [],
           smartHint: null,
+          ...buildFeedbackEvent(state, "missed", {
+            countryId: target.iso_a3,
+            completed: nextState.gameStatus === "completed",
+            perfect: false,
+          }),
         });
 
         return { outcome: "missed", country: target, clickedCountry };
@@ -742,6 +844,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         incorrectAttempts,
         currentTargetHints,
         smartHint: currentTargetHints.at(-1) ?? null,
+        ...buildFeedbackEvent(state, "wrong", {
+          countryId: target.iso_a3,
+        }),
       });
 
       return { outcome: "wrong", country: target, clickedCountry };
@@ -769,6 +874,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMatchSequence: state.lastMatchSequence + 1,
       currentTargetHints: [],
       smartHint: null,
+      ...buildFeedbackEvent(state, resultStatus, {
+        countryId: target.iso_a3,
+        completed: nextState.gameStatus === "completed",
+        perfect: nextState.isPerfectRun,
+      }),
     });
 
     return { outcome: resultStatus, country: target, clickedCountry };

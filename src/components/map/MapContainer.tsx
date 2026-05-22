@@ -48,6 +48,7 @@ import {
   useWorldTopology,
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
+import { useSoundEffects } from "@/hooks/useSoundEffects";
 import { useGameStore, type CountryResult } from "@/store/gameStore";
 import { getCountryFunFacts } from "@/utils/countryEducation";
 
@@ -834,6 +835,7 @@ export function MapContainer() {
   const previousTargetIdRef = useRef<string | null>(null);
   const pulseFrameRef = useRef<number | null>(null);
   const remainingPulseFrameRef = useRef<number | null>(null);
+  const feedbackGlowTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
@@ -878,6 +880,7 @@ export function MapContainer() {
   const countryResults = useGameStore((state) => state.countryResults);
   const lastMatchedCountry = useGameStore((state) => state.lastMatchedCountry);
   const lastMatchSequence = useGameStore((state) => state.lastMatchSequence);
+  const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const currentTargetCountry = useGameStore(
     (state) => state.currentTargetCountry,
   );
@@ -917,6 +920,8 @@ export function MapContainer() {
     (state) => state.submitMapClickGuess,
   );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
+
+  useSoundEffects(lastFeedbackEvent, { documentVisible });
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -1286,6 +1291,63 @@ export function MapContainer() {
     },
     [recordFeatureStateDebug],
   );
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const countryId = lastFeedbackEvent?.countryId;
+    const shouldGlow =
+      lastFeedbackEvent?.kind === "correct" ||
+      lastFeedbackEvent?.kind === "assisted";
+
+    if (
+      !mapLoaded ||
+      !map ||
+      !countryId ||
+      !shouldGlow ||
+      !mapAnimationsEnabled
+    ) {
+      return;
+    }
+
+    if (feedbackGlowTimeoutRef.current) {
+      window.clearTimeout(feedbackGlowTimeoutRef.current);
+      feedbackGlowTimeoutRef.current = null;
+    }
+
+    setCountryFeatureState(map, countryId, {
+      target: true,
+      targetPulse: lastFeedbackEvent.kind === "assisted" ? 0.62 : 0.9,
+    });
+
+    feedbackGlowTimeoutRef.current = window.setTimeout(() => {
+      if (mapRef.current === map) {
+        setCountryFeatureState(map, countryId, {
+          target: false,
+          targetPulse: 0,
+        });
+      }
+
+      feedbackGlowTimeoutRef.current = null;
+    }, 650);
+
+    return () => {
+      if (feedbackGlowTimeoutRef.current) {
+        window.clearTimeout(feedbackGlowTimeoutRef.current);
+        feedbackGlowTimeoutRef.current = null;
+      }
+
+      if (mapRef.current === map) {
+        setCountryFeatureState(map, countryId, {
+          target: false,
+          targetPulse: 0,
+        });
+      }
+    };
+  }, [
+    lastFeedbackEvent,
+    mapAnimationsEnabled,
+    mapLoaded,
+  ]);
 
   const addCountryLayers = useCallback(
     (
@@ -2152,6 +2214,11 @@ export function MapContainer() {
       if (remainingPulseFrameRef.current) {
         window.cancelAnimationFrame(remainingPulseFrameRef.current);
         remainingPulseFrameRef.current = null;
+      }
+
+      if (feedbackGlowTimeoutRef.current) {
+        window.clearTimeout(feedbackGlowTimeoutRef.current);
+        feedbackGlowTimeoutRef.current = null;
       }
 
       map.remove();

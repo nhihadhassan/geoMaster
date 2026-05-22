@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect } from "react";
 import { getRegionConfig } from "@/data/countries";
 import { useGameStore, type GameMode } from "@/store/gameStore";
@@ -80,6 +80,34 @@ function GeoMasterBrand({
   );
 }
 
+function HudFeedbackFlash({
+  tone,
+  sequence,
+}: {
+  tone: "correct" | "assisted" | "wrong" | "missed" | "complete";
+  sequence: number;
+}) {
+  const toneClass =
+    tone === "assisted"
+      ? "border-amber-200/34 bg-amber-300/10"
+      : tone === "wrong" || tone === "missed"
+        ? "border-rose-200/34 bg-rose-300/10"
+        : tone === "complete"
+          ? "border-cyan-200/34 bg-cyan-300/10"
+          : "border-emerald-200/34 bg-emerald-300/10";
+
+  return (
+    <motion.span
+      key={sequence}
+      className={`pointer-events-none absolute inset-0 rounded-2xl border ${toneClass}`}
+      initial={{ opacity: 0, scale: 0.985 }}
+      animate={{ opacity: [0, 0.34, 0], scale: [0.985, 1.012, 1] }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
+    />
+  );
+}
+
 export function GameHud({
   onOpenLanding,
   onOpenRegionPanel,
@@ -93,6 +121,7 @@ export function GameHud({
   const total = useGameStore((state) => state.total);
   const remainingSeconds = useGameStore((state) => state.remainingSeconds);
   const gameStatus = useGameStore((state) => state.gameStatus);
+  const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const startQuiz = useGameStore((state) => state.startQuiz);
   const resetQuiz = useGameStore((state) => state.resetQuiz);
   const pauseQuiz = useGameStore((state) => state.pauseQuiz);
@@ -140,6 +169,15 @@ export function GameHud({
         ? "Paused"
         : "Quiz active";
   const contextLabel = `${region.label} · ${modeLabels[selectedMode]}`;
+  const feedbackTone =
+    lastFeedbackEvent?.completed
+      ? "complete"
+      : lastFeedbackEvent?.kind === "correct" ||
+          lastFeedbackEvent?.kind === "assisted" ||
+          lastFeedbackEvent?.kind === "wrong" ||
+          lastFeedbackEvent?.kind === "missed"
+        ? lastFeedbackEvent.kind
+        : null;
 
   useEffect(() => {
     if (gameStatus !== "running") {
@@ -206,8 +244,16 @@ export function GameHud({
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          className="absolute left-2 right-2 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex min-h-14 items-center justify-between gap-2 rounded-2xl border border-white/12 bg-zinc-950/58 px-2.5 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:hidden"
+          className="absolute left-2 right-2 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex min-h-14 items-center justify-between gap-2 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/58 px-2.5 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:hidden"
         >
+          <AnimatePresence>
+            {feedbackTone && lastFeedbackEvent && !prefersReducedMotion ? (
+              <HudFeedbackFlash
+                tone={feedbackTone}
+                sequence={lastFeedbackEvent.sequence}
+              />
+            ) : null}
+          </AnimatePresence>
           <GeoMasterBrand onOpenLanding={onOpenLanding} compact />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/48">
@@ -257,8 +303,16 @@ export function GameHud({
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          className="absolute left-1/2 top-4 z-20 hidden min-h-[3.25rem] w-[min(58rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 rounded-2xl border border-white/12 bg-zinc-950/50 px-3 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:grid"
+          className="absolute left-1/2 top-4 z-20 hidden min-h-[3.25rem] w-[min(58rem,calc(100vw-2rem))] -translate-x-1/2 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/50 px-3 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:grid"
         >
+          <AnimatePresence>
+            {feedbackTone && lastFeedbackEvent && !prefersReducedMotion ? (
+              <HudFeedbackFlash
+                tone={feedbackTone}
+                sequence={lastFeedbackEvent.sequence}
+              />
+            ) : null}
+          </AnimatePresence>
           <div className="min-w-0">
             <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/46">
               {statusLabel}

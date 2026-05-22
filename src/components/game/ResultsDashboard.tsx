@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { CountryEducationCard } from "@/components/game/CountryEducationCard";
 import { getRegionConfig, type Country } from "@/data/countries";
@@ -19,6 +19,7 @@ const toneClasses: Record<ReviewGroup["tone"], string> = {
 };
 
 export function ResultsDashboard() {
+  const prefersReducedMotion = useReducedMotion();
   const gameStatus = useGameStore((state) => state.gameStatus);
   const selectedRegion = useGameStore((state) => state.selectedRegion);
   const selectedMode = useGameStore((state) => state.selectedMode);
@@ -28,6 +29,7 @@ export function ResultsDashboard() {
   const score = useGameStore((state) => state.score);
   const total = useGameStore((state) => state.total);
   const resetQuiz = useGameStore((state) => state.resetQuiz);
+  const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const reviewKey = `${gameStatus}-${selectedRegion}-${selectedMode}`;
   const [drawerState, setDrawerState] = useState<{
     key: string;
@@ -121,6 +123,8 @@ export function ResultsDashboard() {
     (selectedCountryId ? countryById.get(selectedCountryId) : null) ??
     reviewCountries[0] ??
     null;
+  const completionPulse =
+    Boolean(lastFeedbackEvent?.completed) && gameStatus === "completed";
 
   if (
     gameStatus !== "completed" &&
@@ -133,8 +137,25 @@ export function ResultsDashboard() {
   return (
     <motion.section
       initial={{ opacity: 0, y: 26, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 240, damping: 28 }}
+      animate={
+        completionPulse && !prefersReducedMotion
+          ? {
+              opacity: 1,
+              y: 0,
+              scale: [1, 1.01, 1],
+              boxShadow: [
+                "0 18px 48px rgba(0,0,0,0.34)",
+                "0 22px 72px rgba(16,185,129,0.28)",
+                "0 18px 48px rgba(0,0,0,0.34)",
+              ],
+            }
+          : { opacity: 1, y: 0, scale: 1 }
+      }
+      transition={
+        completionPulse && !prefersReducedMotion
+          ? { duration: 0.72, ease: [0.22, 1, 0.36, 1] }
+          : { type: "spring", stiffness: 240, damping: 28 }
+      }
       className={`absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-3xl border border-white/14 bg-zinc-950/72 text-white shadow-xl shadow-black/34 backdrop-blur-2xl sm:left-1/2 sm:bottom-5 sm:w-[min(48rem,calc(100vw-2rem))] sm:-translate-x-1/2 ${
         expanded
           ? "max-h-[82dvh] overflow-y-auto p-4 sm:max-h-[min(72vh,40rem)] sm:p-5"
