@@ -1,4 +1,5 @@
 import type { Country } from "@/data/countries";
+import { featuredCountryImages } from "@/data/featuredCountryImages";
 
 const compactFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
@@ -78,6 +79,7 @@ export const formatCountryEducation = (country: Country) => {
     funFact: funFacts[0] ?? education.funFact,
     funFacts,
     featuredFunFact: funFacts[0] ?? education.funFact,
+    featuredImage: education.featuredImage ?? featuredCountryImages[country.iso_a3],
     sourceYear: education.populationYear ?? education.gdpYear,
   };
 };

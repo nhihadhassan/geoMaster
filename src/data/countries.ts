@@ -22,6 +22,12 @@ export type CountryEducation = {
   nativeName?: string;
   funFact: string;
   funFacts?: string[];
+  featuredImage?: {
+    src: string;
+    alt: string;
+    credit?: string;
+    sourceUrl?: string;
+  };
 };
 
 export type CountryHints = {
