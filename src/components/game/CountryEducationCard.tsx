@@ -207,30 +207,30 @@ export function CountryEducationCard({
         <div
           className={
             isPopup
-              ? "grid grid-cols-[minmax(0,1fr)_5.75rem] gap-3"
-              : "mt-5 grid grid-cols-[minmax(0,1fr)_6.25rem] gap-3 border-t border-white/12 pt-4 sm:grid-cols-[minmax(0,1fr)_8.25rem] sm:gap-5"
+              ? "grid gap-3 md:grid-cols-[minmax(0,1fr)_6.5rem]"
+              : "mt-5 grid gap-4 border-t border-white/12 pt-4 lg:grid-cols-[minmax(0,1fr)_9rem] lg:gap-5 xl:grid-cols-[minmax(0,1fr)_10rem]"
           }
         >
           <dl className="min-w-0 divide-y divide-white/10">
             {countryRows.map((row) => (
               <div
                 key={row.label}
-                className="grid grid-cols-[1.75rem_minmax(0,1fr)] items-center gap-x-3 py-2.5 sm:grid-cols-[2rem_minmax(0,1fr)_auto]"
+                className="grid grid-cols-[1.75rem_minmax(0,1fr)] items-start gap-x-3 py-2.5 lg:grid-cols-[2rem_minmax(0,1fr)_minmax(4.75rem,auto)]"
               >
-                <dt className="flex items-center text-cyan-100/66">
+                <dt className="flex items-center pt-0.5 text-cyan-100/66">
                   <FactIcon name={row.icon} />
                 </dt>
-                <dd className="min-w-0 text-sm font-medium text-white/58">
+                <dd className="min-w-0 text-sm font-medium leading-5 text-white/58">
                   {row.label}
                 </dd>
-                <dd className="col-start-2 mt-0.5 min-w-0 truncate text-sm font-semibold text-white/88 sm:col-start-3 sm:mt-0 sm:text-right">
+                <dd className="col-start-2 mt-1 min-w-0 text-base font-semibold leading-5 text-white/88 lg:col-start-3 lg:mt-0 lg:text-right lg:text-sm xl:text-base">
                   {row.value}
                 </dd>
               </div>
             ))}
           </dl>
 
-          <figure className="relative min-h-36 overflow-hidden rounded-2xl border border-cyan-100/18 bg-white/8 sm:min-h-44">
+          <figure className="relative min-h-40 overflow-hidden rounded-2xl border border-cyan-100/18 bg-white/8 lg:min-h-44">
             <img
               src={education.featuredImage.src}
               alt={education.featuredImage.alt}
