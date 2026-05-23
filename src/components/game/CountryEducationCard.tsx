@@ -167,9 +167,8 @@ export function CountryEducationCard({
     </section>
   ) : null;
 
-  if (education.featuredImage) {
-    return (
-      <article
+  return (
+    <article
         className={
           isPopup
             ? "text-white"
@@ -231,20 +230,61 @@ export function CountryEducationCard({
           </dl>
 
           <figure className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-cyan-100/18 bg-white/8">
-            <img
-              src={education.featuredImage.src}
-              alt={education.featuredImage.alt}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              onError={(event) => {
-                event.currentTarget.style.display = "none";
-              }}
-            />
-            {education.featuredImage.credit ? (
-              <figcaption className="absolute inset-x-0 bottom-0 bg-slate-950/58 px-2 py-1 text-[0.55rem] font-medium text-white/52">
-                {education.featuredImage.credit}
-              </figcaption>
-            ) : null}
+            {education.featuredImage ? (
+              <>
+                <img
+                  src={education.featuredImage.src}
+                  alt={education.featuredImage.alt}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+                {education.featuredImage.credit ? (
+                  <figcaption className="absolute inset-x-0 bottom-0 bg-slate-950/58 px-2 py-1 text-[0.55rem] font-medium text-white/52">
+                    {education.featuredImage.credit}
+                  </figcaption>
+                ) : null}
+              </>
+            ) : (
+              <div className="relative flex h-full flex-col justify-between overflow-hidden bg-[radial-gradient(circle_at_18%_20%,rgba(125,211,252,0.24),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.92),rgba(8,47,73,0.55))] p-4">
+                <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.1)_1px,transparent_1px)] [background-size:32px_32px]" />
+                <div className="relative flex items-center justify-between gap-3">
+                  <span className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-cyan-50/54">
+                    Atlas profile
+                  </span>
+                  <span className="rounded-full border border-cyan-100/14 bg-cyan-100/8 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-cyan-50/58">
+                    {country.iso_a3}
+                  </span>
+                </div>
+                <div className="relative flex items-end justify-between gap-4">
+                  <div className="grid size-16 place-items-center overflow-hidden rounded-full border border-white/18 bg-white/10 text-3xl shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]">
+                    {flag.src ? (
+                      <img
+                        src={flag.src}
+                        alt={`${country.name} flag`}
+                        className="col-start-1 row-start-1 z-10 h-full w-full object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : null}
+                    <span className="col-start-1 row-start-1" aria-hidden="true">
+                      {flag.fallback}
+                    </span>
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <p className="truncate text-lg font-semibold leading-6 text-white/90">
+                      {country.name}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-cyan-50/54">
+                      {regionLabel}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </figure>
         </div>
 
@@ -285,104 +325,6 @@ export function CountryEducationCard({
         ) : null}
 
         {storySection}
-      </article>
-    );
-  }
-
-  return (
-    <article
-      className={
-        isPopup
-          ? "text-white"
-          : "rounded-3xl border border-white/12 bg-white/8 p-4 text-white"
-      }
-    >
-      {!isPopup ? (
-        <div className="flex items-center gap-3">
-          <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/15 bg-white/8 text-2xl">
-            {flag.src ? (
-              <img
-                src={flag.src}
-                alt={`${country.name} flag`}
-                className="col-start-1 row-start-1 z-10 h-full w-full object-cover"
-                onError={(event) => {
-                  event.currentTarget.style.display = "none";
-                }}
-              />
-            ) : null}
-            <span className="col-start-1 row-start-1" aria-hidden="true">
-              {flag.fallback}
-            </span>
-          </div>
-          <div className="min-w-0">
-            <h3 className="truncate text-lg font-semibold">{country.name}</h3>
-            <p className="text-sm text-white/58">Capital: {country.capital}</p>
-          </div>
-        </div>
-      ) : null}
-
-      <dl
-        className={
-          isPopup
-            ? "mt-3 grid grid-cols-2 gap-2"
-            : "mt-4 grid grid-cols-2 gap-2"
-        }
-      >
-        {education.stats.slice(0, isPopup ? 3 : undefined).map((row) => (
-          <div
-            key={row.label}
-            className="rounded-2xl border border-white/10 bg-white/8 px-3 py-2"
-          >
-            <dt className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/42">
-              {row.label}
-            </dt>
-            <dd className="mt-1 truncate text-sm font-semibold text-white/84">
-              {row.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <div
-        className={
-          isPopup
-            ? "mt-3 rounded-2xl border border-emerald-100/14 bg-emerald-300/8 px-3 py-2"
-            : "mt-4 rounded-2xl border border-emerald-100/14 bg-emerald-300/8 px-3 py-3"
-        }
-      >
-        <p className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-emerald-100/58">
-          Did you know?
-        </p>
-        <p className="mt-1 text-sm leading-5 text-white/72">
-          {education.featuredFunFact}
-        </p>
-      </div>
-
-      {!isPopup && quickFacts.length > 0 ? (
-        <section className="mt-3 rounded-2xl border border-white/10 bg-white/7 px-3 py-3">
-          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-white/42">
-            Quick facts
-          </p>
-          <ul className="mt-2 space-y-2">
-            {quickFacts.map((fact) => (
-              <li
-                key={fact}
-                className="rounded-xl border border-white/8 bg-white/[0.055] px-3 py-2 text-sm leading-5 text-white/66"
-              >
-                {fact}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {!isPopup && education.sourceYear ? (
-        <p className="mt-3 text-[0.68rem] font-medium text-white/36">
-          Stats source year: {education.sourceYear}
-        </p>
-      ) : null}
-
-      {storySection}
     </article>
   );
 }
