@@ -1,6 +1,27 @@
 @import "tailwindcss";
 
 :root {
+  --gm-atlas-void: #05080c;
+  --gm-panel-ink: #090f1a;
+  --gm-panel-zinc: #18181b;
+  --gm-slate-map: #f1f5f9;
+  --gm-text-primary: #f8fafc;
+  --gm-text-muted: #cbd5e1;
+  --gm-cyan-atlas: #22d3ee;
+  --gm-cyan-soft: #bae6fd;
+  --gm-emerald-correct: #34d399;
+  --gm-emerald-fill: #22f6a5;
+  --gm-amber-assisted: #fbbf24;
+  --gm-rose-missed: #f7b7b0;
+  --gm-rose-error: #fda4af;
+  --gm-radius-chip: 9999px;
+  --gm-radius-control: 12px;
+  --gm-radius-card: 16px;
+  --gm-radius-sheet: 24px;
+  --gm-shadow-hud: 0 10px 15px -3px rgba(0, 0, 0, 0.24);
+  --gm-shadow-panel: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  --gm-shadow-dossier: 0 24px 80px rgba(8, 18, 32, 0.38);
+  --gm-shadow-success: 0 0 34px rgba(52, 211, 153, 0.18);
   --background: #05080c;
   --foreground: #f8fafc;
 }

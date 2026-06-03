@@ -32,6 +32,8 @@ const CARIBBEAN_BOUNDS: [[number, number], [number, number]] = [
   [-86, 9],
   [-58, 28],
 ];
+const INSET_REMAINING_PULSE_STEP_MS = 180;
+const INSET_TARGET_PULSE_STEP_MS = 140;
 
 export const caribbeanCountryIds = new Set([
   "ATG",
@@ -132,7 +134,10 @@ const buildRemainingFilter = (
     ? [
         "in",
         ["get", "iso_a3"],
-        ["literal", remainingCountryIds.filter((id) => caribbeanCountryIds.has(id))],
+        [
+          "literal",
+          remainingCountryIds.filter((id) => caribbeanCountryIds.has(id)),
+        ],
       ]
     : ["==", ["get", "iso_a3"], "__none__"]) as mapboxgl.FilterSpecification;
 
@@ -245,12 +250,12 @@ export function CaribbeanInsetMap({
       onLabelSourceLoaded?.(false);
 
       if (pulseFrameRef.current) {
-        window.cancelAnimationFrame(pulseFrameRef.current);
+        window.clearInterval(pulseFrameRef.current);
         pulseFrameRef.current = null;
       }
 
       if (targetPulseFrameRef.current) {
-        window.cancelAnimationFrame(targetPulseFrameRef.current);
+        window.clearInterval(targetPulseFrameRef.current);
         targetPulseFrameRef.current = null;
       }
 
@@ -307,7 +312,9 @@ export function CaribbeanInsetMap({
         return;
       }
 
-      const source = map.getSource(INSET_SOURCE_ID) as GeoJSONSource | undefined;
+      const source = map.getSource(INSET_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
       const labelSource = map.getSource(INSET_LABEL_SOURCE_ID) as
         | GeoJSONSource
         | undefined;
@@ -621,8 +628,14 @@ export function CaribbeanInsetMap({
         INSET_PULSE_LINE_LAYER_ID,
         buildRemainingFilter(remainingCountryIds, pulseActive),
       );
-      map.setFilter(INSET_TARGET_FILL_LAYER_ID, buildTargetFilter(targetCountryId));
-      map.setFilter(INSET_TARGET_LINE_LAYER_ID, buildTargetFilter(targetCountryId));
+      map.setFilter(
+        INSET_TARGET_FILL_LAYER_ID,
+        buildTargetFilter(targetCountryId),
+      );
+      map.setFilter(
+        INSET_TARGET_LINE_LAYER_ID,
+        buildTargetFilter(targetCountryId),
+      );
       (
         map.getSource(INSET_LABEL_SOURCE_ID) as GeoJSONSource | undefined
       )?.setData(labelCollections.labels);
@@ -674,7 +687,7 @@ export function CaribbeanInsetMap({
     }
 
     if (pulseFrameRef.current) {
-      window.cancelAnimationFrame(pulseFrameRef.current);
+      window.clearInterval(pulseFrameRef.current);
       pulseFrameRef.current = null;
     }
 
@@ -691,12 +704,14 @@ export function CaribbeanInsetMap({
     }
 
     const startedAt = performance.now();
-    const animate = (now: number) => {
+    const animate = () => {
       if (mapRef.current !== map) {
         return;
       }
 
-      const pulse = (Math.sin(((now - startedAt) / 1900) * Math.PI * 2) + 1) / 2;
+      const now = performance.now();
+      const pulse =
+        (Math.sin(((now - startedAt) / 1900) * Math.PI * 2) + 1) / 2;
       map.setPaintProperty(
         INSET_PULSE_FILL_LAYER_ID,
         "fill-opacity",
@@ -707,14 +722,17 @@ export function CaribbeanInsetMap({
         "line-opacity",
         0.2 + pulse * 0.48,
       );
-      pulseFrameRef.current = window.requestAnimationFrame(animate);
     };
 
-    pulseFrameRef.current = window.requestAnimationFrame(animate);
+    animate();
+    pulseFrameRef.current = window.setInterval(
+      animate,
+      INSET_REMAINING_PULSE_STEP_MS,
+    );
 
     return () => {
       if (pulseFrameRef.current) {
-        window.cancelAnimationFrame(pulseFrameRef.current);
+        window.clearInterval(pulseFrameRef.current);
         pulseFrameRef.current = null;
       }
     };
@@ -735,12 +753,18 @@ export function CaribbeanInsetMap({
     }
 
     if (targetPulseFrameRef.current) {
-      window.cancelAnimationFrame(targetPulseFrameRef.current);
+      window.clearInterval(targetPulseFrameRef.current);
       targetPulseFrameRef.current = null;
     }
 
-    map.setFilter(INSET_TARGET_FILL_LAYER_ID, buildTargetFilter(targetCountryId));
-    map.setFilter(INSET_TARGET_LINE_LAYER_ID, buildTargetFilter(targetCountryId));
+    map.setFilter(
+      INSET_TARGET_FILL_LAYER_ID,
+      buildTargetFilter(targetCountryId),
+    );
+    map.setFilter(
+      INSET_TARGET_LINE_LAYER_ID,
+      buildTargetFilter(targetCountryId),
+    );
 
     if (!targetCountryId || !caribbeanCountryIds.has(targetCountryId)) {
       map.setPaintProperty(INSET_TARGET_FILL_LAYER_ID, "fill-opacity", 0);
@@ -757,11 +781,12 @@ export function CaribbeanInsetMap({
     }
 
     const startedAt = performance.now();
-    const animate = (now: number) => {
+    const animate = () => {
       if (mapRef.current !== map) {
         return;
       }
 
+      const now = performance.now();
       const pulse = (Math.sin((now - startedAt) / 280) + 1) / 2;
       map.setPaintProperty(
         INSET_TARGET_FILL_LAYER_ID,
@@ -778,15 +803,17 @@ export function CaribbeanInsetMap({
         "line-width",
         2 + pulse * 5,
       );
-
-      targetPulseFrameRef.current = window.requestAnimationFrame(animate);
     };
 
-    targetPulseFrameRef.current = window.requestAnimationFrame(animate);
+    animate();
+    targetPulseFrameRef.current = window.setInterval(
+      animate,
+      INSET_TARGET_PULSE_STEP_MS,
+    );
 
     return () => {
       if (targetPulseFrameRef.current) {
-        window.cancelAnimationFrame(targetPulseFrameRef.current);
+        window.clearInterval(targetPulseFrameRef.current);
         targetPulseFrameRef.current = null;
       }
     };
@@ -820,10 +847,12 @@ export function CaribbeanInsetMap({
       exit={{ opacity: 0, x: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
       className="absolute inset-x-3 bottom-[calc(8.85rem+env(safe-area-inset-bottom))] z-20 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/56 p-2 text-white shadow-xl shadow-black/28 backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-36 sm:w-[min(19rem,calc(100vw-2.5rem))] sm:rounded-3xl sm:p-3"
+      role="region"
+      aria-label="Caribbean detail map"
     >
       <div className="mb-2 flex items-center justify-between">
         <div>
-          <p className="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-white/44 sm:text-[0.65rem] sm:tracking-[0.24em]">
+          <p className="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-white/60 sm:text-[0.65rem] sm:tracking-[0.24em]">
             Caribbean Detail
           </p>
           <p className="text-[0.68rem] text-white/58 sm:text-xs">
@@ -840,7 +869,7 @@ export function CaribbeanInsetMap({
             <button
               type="button"
               onClick={() => onMobileExpandedChange?.(false)}
-              className="grid size-9 place-items-center rounded-full border border-white/12 bg-white/8 text-lg leading-none text-white/62 transition hover:bg-white/14 hover:text-white sm:hidden"
+              className="grid size-11 place-items-center rounded-full border border-white/12 bg-white/8 text-lg leading-none text-white/70 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200/70 sm:hidden"
               aria-label="Minimize Caribbean detail map"
             >
               ×

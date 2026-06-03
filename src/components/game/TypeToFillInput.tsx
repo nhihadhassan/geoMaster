@@ -4,10 +4,7 @@ import { motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import type { Country } from "@/data/countries";
 import { useGameStore, type IdentifyGuessResult } from "@/store/gameStore";
-import {
-  findCountryMatch,
-  normalizeCountryText,
-} from "@/utils/countryMatcher";
+import { findCountryMatch, normalizeCountryText } from "@/utils/countryMatcher";
 
 type TypeToFillInputProps = {
   onCountryMatched: (
@@ -32,9 +29,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
   const submitIdentifyGuess = useGameStore(
     (state) => state.submitIdentifyGuess,
   );
-  const submitCapitalGuess = useGameStore(
-    (state) => state.submitCapitalGuess,
-  );
+  const submitCapitalGuess = useGameStore((state) => state.submitCapitalGuess);
   const recordFeedbackEvent = useGameStore(
     (state) => state.recordFeedbackEvent,
   );
@@ -257,9 +252,9 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
                     ? "Identify the glowing country, then press Enter"
                     : selectedMode === "capital-challenge"
                       ? "Name the country from the capital, then press Enter"
-                    : "Type a country..."
+                      : "Type a country..."
         }
-        className="h-12 w-full rounded-xl border border-white/10 bg-white/9 px-4 text-center text-base font-medium text-white outline-none ring-0 transition placeholder:text-white/36 focus:border-emerald-300/40 focus:bg-white/14 focus:shadow-[0_0_34px_rgba(52,211,153,0.16)] disabled:cursor-not-allowed disabled:opacity-70 sm:h-16 sm:rounded-2xl sm:px-6 sm:text-2xl"
+        className="h-12 w-full rounded-xl border border-white/10 bg-white/9 px-4 text-center text-base font-medium text-white outline-none ring-0 transition placeholder:text-white/52 focus:border-emerald-300/40 focus:bg-white/14 focus:shadow-[0_0_34px_rgba(52,211,153,0.16)] disabled:cursor-not-allowed disabled:opacity-70 sm:h-16 sm:rounded-2xl sm:px-6 sm:text-2xl"
       />
       {(selectedMode === "identify-shaded" ||
         selectedMode === "capital-challenge") &&
@@ -267,13 +262,13 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
         <button
           type="button"
           onClick={handleSubmit}
-        className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full border border-cyan-100/20 bg-cyan-100/12 px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-100/20 sm:block"
-      >
+          className="absolute right-3 top-1/2 hidden min-h-11 -translate-y-1/2 rounded-full border border-cyan-100/20 bg-cyan-100/12 px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-100/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200/70 sm:block"
+        >
           Submit
         </button>
       ) : null}
       {localHint || smartHint ? (
-        <p className="pointer-events-none absolute -top-8 left-1/2 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 truncate rounded-full border border-amber-200/20 bg-zinc-950/68 px-3 py-1 text-xs font-semibold text-amber-100 backdrop-blur-xl sm:-top-9">
+        <p className="pointer-events-none absolute -top-10 left-1/2 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-2xl border border-amber-200/20 bg-zinc-950/68 px-3 py-1 text-center text-xs font-semibold leading-4 text-amber-100 backdrop-blur-xl sm:-top-9 sm:max-w-[min(36rem,calc(100vw-2rem))] sm:rounded-full">
           {smartHint ?? localHint}
         </p>
       ) : null}

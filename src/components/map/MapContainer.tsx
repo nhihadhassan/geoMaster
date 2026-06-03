@@ -89,6 +89,9 @@ const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const LANDING_SEEN_KEY = "geomaster-landing-seen";
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
 const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
+const IDLE_ROTATION_STEP_MS = 250;
+const REMAINING_PULSE_STEP_MS = 160;
+const TARGET_PULSE_STEP_MS = 120;
 const IDLE_PROMPT_INITIAL_DELAY_MS = 16_000;
 const IDLE_PROMPT_INTERVAL_MS = 48_000;
 const IDLE_PROMPT_VISIBLE_MS = 6_500;
@@ -741,7 +744,7 @@ function useIdleGlobeRotation({
     }
 
     let timeoutId: number | null = null;
-    let frameId: number | null = null;
+    let intervalId: number | null = null;
     let previousTimestamp = 0;
 
     const stopRotation = () => {
@@ -750,9 +753,9 @@ function useIdleGlobeRotation({
         timeoutId = null;
       }
 
-      if (frameId) {
-        window.cancelAnimationFrame(frameId);
-        frameId = null;
+      if (intervalId) {
+        window.clearInterval(intervalId);
+        intervalId = null;
       }
     };
 
@@ -761,10 +764,12 @@ function useIdleGlobeRotation({
       onInteraction();
     };
 
-    const animate = (timestamp: number) => {
+    const rotateOnce = () => {
       if (mapRef.current !== map) {
         return;
       }
+
+      const timestamp = performance.now();
 
       if (!previousTimestamp) {
         previousTimestamp = timestamp;
@@ -773,12 +778,12 @@ function useIdleGlobeRotation({
       const elapsedSeconds = (timestamp - previousTimestamp) / 1000;
       previousTimestamp = timestamp;
       map.setBearing(map.getBearing() + elapsedSeconds * 0.18);
-      frameId = window.requestAnimationFrame(animate);
     };
 
     timeoutId = window.setTimeout(() => {
       previousTimestamp = 0;
-      frameId = window.requestAnimationFrame(animate);
+      rotateOnce();
+      intervalId = window.setInterval(rotateOnce, IDLE_ROTATION_STEP_MS);
     }, idleDelayMs);
 
     map.on("dragstart", handleInteraction);
@@ -2212,8 +2217,13 @@ export function MapContainer() {
 
     return () => {
       if (remainingPulseFrameRef.current) {
-        window.cancelAnimationFrame(remainingPulseFrameRef.current);
+        window.clearInterval(remainingPulseFrameRef.current);
         remainingPulseFrameRef.current = null;
+      }
+
+      if (pulseFrameRef.current) {
+        window.clearInterval(pulseFrameRef.current);
+        pulseFrameRef.current = null;
       }
 
       if (feedbackGlowTimeoutRef.current) {
@@ -2374,7 +2384,7 @@ export function MapContainer() {
     );
 
     if (remainingPulseFrameRef.current) {
-      window.cancelAnimationFrame(remainingPulseFrameRef.current);
+      window.clearInterval(remainingPulseFrameRef.current);
       remainingPulseFrameRef.current = null;
     }
 
@@ -2391,11 +2401,12 @@ export function MapContainer() {
     }
 
     const startedAt = performance.now();
-    const animate = (now: number) => {
+    const animate = () => {
       if (mapRef.current !== map) {
         return;
       }
 
+      const now = performance.now();
       const pulse = (Math.sin(((now - startedAt) / 1900) * Math.PI * 2) + 1) / 2;
       map.setPaintProperty(
         REMAINING_PULSE_FILL_LAYER_ID,
@@ -2407,14 +2418,17 @@ export function MapContainer() {
         "line-opacity",
         0.18 + pulse * 0.44,
       );
-      remainingPulseFrameRef.current = window.requestAnimationFrame(animate);
     };
 
-    remainingPulseFrameRef.current = window.requestAnimationFrame(animate);
+    animate();
+    remainingPulseFrameRef.current = window.setInterval(
+      animate,
+      REMAINING_PULSE_STEP_MS,
+    );
 
     return () => {
       if (remainingPulseFrameRef.current) {
-        window.cancelAnimationFrame(remainingPulseFrameRef.current);
+        window.clearInterval(remainingPulseFrameRef.current);
         remainingPulseFrameRef.current = null;
       }
     };
@@ -2506,7 +2520,7 @@ export function MapContainer() {
     }
 
     if (pulseFrameRef.current) {
-      window.cancelAnimationFrame(pulseFrameRef.current);
+      window.clearInterval(pulseFrameRef.current);
       pulseFrameRef.current = null;
     }
 
@@ -2542,26 +2556,26 @@ export function MapContainer() {
     }
 
     const startedAt = performance.now();
-    const pulse = (now: number) => {
+    const pulse = () => {
       if (mapRef.current !== map) {
         return;
       }
 
+      const now = performance.now();
       const targetPulse = (Math.sin((now - startedAt) / 280) + 1) / 2;
 
       setCountryFeatureState(map, currentTargetCountry.iso_a3, {
         target: true,
         targetPulse,
       });
-
-      pulseFrameRef.current = window.requestAnimationFrame(pulse);
     };
 
-    pulseFrameRef.current = window.requestAnimationFrame(pulse);
+    pulse();
+    pulseFrameRef.current = window.setInterval(pulse, TARGET_PULSE_STEP_MS);
 
     return () => {
       if (pulseFrameRef.current) {
-        window.cancelAnimationFrame(pulseFrameRef.current);
+        window.clearInterval(pulseFrameRef.current);
         pulseFrameRef.current = null;
       }
     };

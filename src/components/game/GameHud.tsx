@@ -71,7 +71,7 @@ function GeoMasterBrand({
           GeoMaster
         </span>
         {!compact ? (
-          <span className="block text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-cyan-50/42">
+          <span className="block text-[0.6rem] font-semibold uppercase tracking-[0.16em] text-cyan-50/58">
             Explore
           </span>
         ) : null}
@@ -169,15 +169,14 @@ export function GameHud({
         ? "Paused"
         : "Quiz active";
   const contextLabel = `${region.label} · ${modeLabels[selectedMode]}`;
-  const feedbackTone =
-    lastFeedbackEvent?.completed
-      ? "complete"
-      : lastFeedbackEvent?.kind === "correct" ||
-          lastFeedbackEvent?.kind === "assisted" ||
-          lastFeedbackEvent?.kind === "wrong" ||
-          lastFeedbackEvent?.kind === "missed"
-        ? lastFeedbackEvent.kind
-        : null;
+  const feedbackTone = lastFeedbackEvent?.completed
+    ? "complete"
+    : lastFeedbackEvent?.kind === "correct" ||
+        lastFeedbackEvent?.kind === "assisted" ||
+        lastFeedbackEvent?.kind === "wrong" ||
+        lastFeedbackEvent?.kind === "missed"
+      ? lastFeedbackEvent.kind
+      : null;
 
   useEffect(() => {
     if (gameStatus !== "running") {
@@ -196,14 +195,18 @@ export function GameHud({
         ? { label: "Resume", action: resumeQuiz, tone: "emerald" as const }
         : isFinished
           ? { label: "Try Again", action: resetQuiz, tone: "emerald" as const }
-          : { label: "Start Quiz", action: startQuiz, tone: "emerald" as const };
+          : {
+              label: "Start Quiz",
+              action: startQuiz,
+              tone: "emerald" as const,
+            };
 
   const primaryToneClass =
     primaryAction.tone === "emerald"
       ? "border-emerald-100/30 bg-emerald-300/20 text-emerald-50 hover:bg-emerald-300/28"
       : "border-sky-100/24 bg-sky-300/14 text-sky-50 hover:bg-sky-300/22";
   const setupPrimaryClass =
-    "border-emerald-100/48 bg-emerald-300/28 text-emerald-50 shadow-[0_0_34px_rgba(52,211,153,0.18)] hover:bg-emerald-300/36";
+    "border-emerald-100/80 bg-emerald-300 text-slate-950 shadow-[0_0_34px_rgba(52,211,153,0.26),inset_0_1px_0_rgba(255,255,255,0.38)] hover:bg-emerald-200";
   const primaryButtonClass = isSetup ? setupPrimaryClass : primaryToneClass;
   const setupPrimaryMotion =
     isSetup && !prefersReducedMotion
@@ -256,7 +259,7 @@ export function GameHud({
           </AnimatePresence>
           <GeoMasterBrand onOpenLanding={onOpenLanding} compact />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/48">
+            <p className="truncate text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/60">
               {statusLabel}
             </p>
             <p className="truncate text-sm font-semibold text-white/86">
@@ -275,9 +278,17 @@ export function GameHud({
             onClick={primaryAction.action}
             animate={setupPrimaryMotion}
             transition={setupPrimaryTransition}
-            className={`min-h-10 shrink-0 rounded-full border px-3 text-xs font-semibold transition ${primaryButtonClass}`}
+            className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition ${primaryButtonClass}`}
           >
-            {isFinished ? "Again" : primaryAction.label.replace(" Quiz", "")}
+            {isSetup ? (
+              <span
+                className="h-0 w-0 border-y-[4px] border-l-[7px] border-y-transparent border-l-current"
+                aria-hidden="true"
+              />
+            ) : null}
+            <span>
+              {isFinished ? "Again" : primaryAction.label.replace(" Quiz", "")}
+            </span>
           </motion.button>
         </motion.header>
       )}
@@ -314,7 +325,7 @@ export function GameHud({
             ) : null}
           </AnimatePresence>
           <div className="min-w-0">
-            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/46">
+            <p className="text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-white/60">
               {statusLabel}
             </p>
             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2">
@@ -331,7 +342,7 @@ export function GameHud({
               ) : null}
             </div>
             {isTargetQueueMode && modeBResults.length > 0 && !isIdle ? (
-              <p className="mt-1 text-[0.68rem] font-medium text-white/48">
+              <p className="mt-1 text-[0.68rem] font-medium text-white/60">
                 Perfect {perfectCount} · Hints {assistedCount} · Missed{" "}
                 {missedCount}
               </p>
@@ -366,7 +377,7 @@ export function GameHud({
             ) : null}
             {showTimer ? (
               <div className="min-w-16 text-right">
-                <p className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-white/42">
+                <p className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-white/58">
                   Timer
                 </p>
                 <p className="font-mono text-base font-semibold tabular-nums text-white">
@@ -379,9 +390,15 @@ export function GameHud({
               onClick={primaryAction.action}
               animate={setupPrimaryMotion}
               transition={setupPrimaryTransition}
-              className={`min-h-11 rounded-full border px-4 text-sm font-semibold transition ${primaryButtonClass}`}
+              className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-semibold transition ${primaryButtonClass}`}
             >
-              {primaryAction.label}
+              {isSetup ? (
+                <span
+                  className="h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-current"
+                  aria-hidden="true"
+                />
+              ) : null}
+              <span>{primaryAction.label}</span>
             </motion.button>
           </div>
         </motion.header>

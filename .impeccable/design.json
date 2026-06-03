@@ -1,0 +1,266 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-03T03:03:55Z",
+  "title": "Design System: GeoMaster",
+  "extensions": {
+    "colorMeta": {
+      "atlas-void": {
+        "role": "neutral",
+        "displayName": "Atlas Void",
+        "canonical": "#05080c",
+        "tonalRamp": [
+          "#020305",
+          "#05080c",
+          "#090f1a",
+          "#111827",
+          "#1f2937",
+          "#475569",
+          "#94a3b8",
+          "#e2e8f0"
+        ]
+      },
+      "panel-ink": {
+        "role": "neutral",
+        "displayName": "Panel Ink",
+        "canonical": "#090f1a",
+        "tonalRamp": [
+          "#020617",
+          "#090f1a",
+          "#0f172a",
+          "#172033",
+          "#263449",
+          "#475569",
+          "#94a3b8",
+          "#f1f5f9"
+        ]
+      },
+      "cyan-atlas": {
+        "role": "primary",
+        "displayName": "Atlas Cyan",
+        "canonical": "#22d3ee",
+        "tonalRamp": [
+          "#083344",
+          "#155e75",
+          "#0e7490",
+          "#0891b2",
+          "#06b6d4",
+          "#22d3ee",
+          "#67e8f9",
+          "#cffafe"
+        ]
+      },
+      "emerald-correct": {
+        "role": "primary",
+        "displayName": "Correct Emerald",
+        "canonical": "#34d399",
+        "tonalRamp": [
+          "#022c22",
+          "#064e3b",
+          "#047857",
+          "#059669",
+          "#10b981",
+          "#34d399",
+          "#6ee7b7",
+          "#d1fae5"
+        ]
+      },
+      "amber-assisted": {
+        "role": "secondary",
+        "displayName": "Assisted Amber",
+        "canonical": "#fbbf24",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#f59e0b",
+          "#fbbf24",
+          "#fef3c7"
+        ]
+      },
+      "rose-missed": {
+        "role": "secondary",
+        "displayName": "Missed Rose",
+        "canonical": "#f7b7b0",
+        "tonalRamp": [
+          "#4c0519",
+          "#881337",
+          "#be123c",
+          "#e11d48",
+          "#fb7185",
+          "#fda4af",
+          "#f7b7b0",
+          "#ffe4e6"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Landing and celebration moments only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Results, country profiles, and rich drawers."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "HUD context, country names, and sheet headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Readable app copy and country facts."
+      },
+      "label": {
+        "displayName": "Atlas Label",
+        "purpose": "Short uppercase metadata only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hud-lift",
+        "value": "0 10px 15px -3px rgba(0,0,0,0.24)",
+        "purpose": "Compact HUDs and floating chips."
+      },
+      {
+        "name": "panel-lift",
+        "value": "0 20px 25px -5px rgba(0,0,0,0.30)",
+        "purpose": "Drawers, input docks, and map insets."
+      },
+      {
+        "name": "dossier-lift",
+        "value": "0 24px 80px rgba(8,18,32,0.38)",
+        "purpose": "Country education profile cards."
+      },
+      {
+        "name": "success-glow",
+        "value": "0 0 34px rgba(52,211,153,0.18)",
+        "purpose": "Start Quiz emphasis and short-lived success feedback."
+      }
+    ],
+    "motion": [
+      {
+        "name": "spring-standard",
+        "value": "stiffness 260, damping 28",
+        "purpose": "Default reveal and sheet motion."
+      },
+      {
+        "name": "feedback-pulse",
+        "value": "580ms cubic-bezier(0.22,1,0.36,1)",
+        "purpose": "One-shot correct, assisted, missed, or complete feedback."
+      },
+      {
+        "name": "map-pulse-cadence",
+        "value": "120ms to 180ms stepped Mapbox updates",
+        "purpose": "Preserve target motion without continuous repaint loops."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "0-639px"
+      },
+      {
+        "name": "desktop-overlay",
+        "value": "640px and above"
+      },
+      {
+        "name": "wide-review",
+        "value": "1024px and above"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Quiz Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The action that starts or resumes a quiz. It is the strongest control in setup state.",
+      "html": "<button class=\"ds-btn-primary\">Start Quiz</button>",
+      "css": ".ds-btn-primary { min-height: 44px; border-radius: 9999px; border: 1px solid rgba(209,250,229,0.48); background: rgba(52,211,153,0.28); color: #f8fafc; padding: 0 24px; font: 600 14px/1 Geist, system-ui, sans-serif; box-shadow: 0 0 34px rgba(52,211,153,0.18); transition: background 180ms ease, transform 180ms ease, box-shadow 180ms ease; } .ds-btn-primary:hover { background: rgba(52,211,153,0.36); } .ds-btn-primary:focus-visible { outline: 2px solid rgba(167,243,208,0.7); outline-offset: 2px; }"
+    },
+    {
+      "name": "Glass Chip",
+      "kind": "chip",
+      "refersTo": "chip-glass",
+      "description": "Compact map overlay chip for region, quiz, and contextual actions.",
+      "html": "<button class=\"ds-chip-glass\">Choose Quiz</button>",
+      "css": ".ds-chip-glass { min-height: 44px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(24,24,27,0.58); color: rgba(248,250,252,0.76); padding: 8px 16px; font: 600 14px/1.2 Geist, system-ui, sans-serif; box-shadow: 0 10px 18px rgba(0,0,0,0.25); backdrop-filter: blur(16px); transition: background 180ms ease, color 180ms ease; } .ds-chip-glass:hover { background: rgba(24,24,27,0.68); color: #f8fafc; } .ds-chip-glass:focus-visible { outline: 2px solid rgba(186,230,253,0.7); outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiz Input Dock",
+      "kind": "input",
+      "refersTo": "input-quiz",
+      "description": "Safe-area-aware bottom input for type, identify, and capital modes.",
+      "html": "<label class=\"ds-input-label\" for=\"ds-country-input\">Type a country name</label><input id=\"ds-country-input\" class=\"ds-input-quiz\" placeholder=\"Type a country...\" />",
+      "css": ".ds-input-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); } .ds-input-quiz { width: 100%; height: 48px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.09); color: #f8fafc; padding: 0 16px; text-align: center; font: 500 16px/1 Geist, system-ui, sans-serif; outline: none; transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease; } .ds-input-quiz::placeholder { color: rgba(248,250,252,0.36); } .ds-input-quiz:focus { border-color: rgba(52,211,153,0.40); background: rgba(255,255,255,0.14); box-shadow: 0 0 34px rgba(52,211,153,0.16); }"
+    },
+    {
+      "name": "Glass Sheet",
+      "kind": "card",
+      "refersTo": "sheet-glass",
+      "description": "Bottom sheet or drawer container for setup, learning cards, and review details.",
+      "html": "<section class=\"ds-sheet\"><p class=\"ds-sheet-label\">Setup</p><h2 class=\"ds-sheet-title\">South America · Type</h2></section>",
+      "css": ".ds-sheet { border-radius: 24px; border: 1px solid rgba(255,255,255,0.12); background: rgba(9,15,26,0.72); color: #f8fafc; padding: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.36); backdrop-filter: blur(24px); } .ds-sheet-label { margin: 0; color: rgba(248,250,252,0.44); font: 600 10px/1 Geist, system-ui, sans-serif; letter-spacing: 0.24em; text-transform: uppercase; } .ds-sheet-title { margin: 8px 0 0; color: rgba(248,250,252,0.86); font: 600 18px/1.25 Geist, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Country Dossier",
+      "kind": "card",
+      "refersTo": "sheet-glass",
+      "description": "Rich country education card with flag, facts, featured image, and concise narrative.",
+      "html": "<article class=\"ds-dossier\"><div class=\"ds-dossier-header\"><span class=\"ds-flag\">FR</span><div><h3>France</h3><p>Europe</p></div></div><dl><div><dt>Capital</dt><dd>Paris</dd></div><div><dt>Language</dt><dd>French</dd></div></dl></article>",
+      "css": ".ds-dossier { border-radius: 24px; border: 1px solid rgba(186,230,253,0.16); background: rgba(15,23,42,0.55); color: #f8fafc; padding: 16px; box-shadow: 0 24px 80px rgba(8,18,32,0.38); } .ds-dossier-header { display: flex; align-items: center; gap: 16px; } .ds-flag { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.10); font: 700 14px/1 Geist, system-ui, sans-serif; } .ds-dossier h3 { margin: 0; font: 600 24px/1.15 Geist, system-ui, sans-serif; letter-spacing: -0.01em; } .ds-dossier p { margin: 4px 0 0; color: rgba(207,250,254,0.54); font: 500 14px/1.4 Geist, system-ui, sans-serif; } .ds-dossier dl { margin: 16px 0 0; border-top: 1px solid rgba(255,255,255,0.12); } .ds-dossier dl div { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.10); } .ds-dossier dt { color: rgba(248,250,252,0.58); font: 500 14px/1.4 Geist, system-ui, sans-serif; } .ds-dossier dd { margin: 4px 0 0; color: rgba(248,250,252,0.88); font: 600 16px/1.25 Geist, system-ui, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Living Atlas Console",
+    "overview": "GeoMaster is a premium atlas that becomes a game without losing the calm authority of the map. The interface should feel like a focused command layer floating over a beautiful globe: dark, precise, compact, and deferential to Mapbox. Every visible control must earn its place because the map is the product surface.",
+    "keyCharacteristics": [
+      "Map-first: overlays stay compact by default and expand only when the user asks.",
+      "Premium dark atlas: deep zinc surfaces, cyan geography accents, emerald success feedback.",
+      "Game clarity: correct is green, assisted is amber, missed is rose, and those meanings never drift.",
+      "Mobile discipline: one large surface at a time, 44px touch targets, safe-area-aware controls."
+    ],
+    "rules": [
+      {
+        "name": "The Feedback Color Rule",
+        "body": "Green means correct, amber means assisted, rose means missed or wrong. These colors are semantic, not decorative.",
+        "section": "colors"
+      },
+      {
+        "name": "The Cyan Geography Rule",
+        "body": "Cyan belongs to map targets, learning affordances, focus states, and brand atmosphere. Do not use it for destructive or completion states.",
+        "section": "colors"
+      },
+      {
+        "name": "The Label Restraint Rule",
+        "body": "Uppercase tracking is for metadata only. Never use spaced uppercase for body text or country stories.",
+        "section": "typography"
+      },
+      {
+        "name": "The Map Glass Rule",
+        "body": "Use blur only for overlays that sit directly on the map. Do not use glass for ordinary nested content inside an already-glass panel.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep the map as the visual majority on every viewport.",
+      "Do use the blue GeoMaster globe icon as the canonical brand mark.",
+      "Do keep Start Quiz visually stronger than Choose Quiz when setup is open.",
+      "Do preserve 44px minimum touch targets on mobile controls.",
+      "Do use bottom sheets for mobile setup, learning details, and review.",
+      "Do keep feedback colors semantic: green correct, amber assisted, rose missed.",
+      "Do cap motion and Mapbox animation cadence. Feedback should be short, purposeful, and quiet."
+    ],
+    "donts": [
+      "Don't turn Learning Mode into quiz setup. It should feel like calm atlas exploration.",
+      "Don't show every label at world zoom or force tiny-country labels to overlap.",
+      "Don't stack the correct toast and Caribbean inset on mobile.",
+      "Don't use generic SaaS card grids, hero metrics, gradient text, or decorative side stripes.",
+      "Don't use glassmorphism as default content styling. Glass exists because there is a map behind it.",
+      "Don't add background audio or ambient soundscapes. Only short feedback sounds are allowed.",
+      "Don't make desktop worse to solve mobile. Preserve the desktop atlas HUD quality."
+    ]
+  }
+}

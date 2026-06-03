@@ -40,8 +40,7 @@ export function ResultsDashboard() {
     expanded: false,
     selectedCountryId: null,
   });
-  const expanded =
-    drawerState.key === reviewKey ? drawerState.expanded : false;
+  const expanded = drawerState.key === reviewKey ? drawerState.expanded : false;
   const selectedCountryId =
     drawerState.key === reviewKey ? drawerState.selectedCountryId : null;
   const region = getRegionConfig(selectedRegion);
@@ -98,7 +97,9 @@ export function ResultsDashboard() {
     }
 
     const guessed = new Set(guessedCountryIds);
-    const correct = quizCountries.filter((country) => guessed.has(country.iso_a3));
+    const correct = quizCountries.filter((country) =>
+      guessed.has(country.iso_a3),
+    );
     const missed =
       gameStatus === "failed" || gameStatus === "gave-up"
         ? quizCountries.filter((country) => !guessed.has(country.iso_a3))
@@ -173,10 +174,22 @@ export function ResultsDashboard() {
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-100/60">
             {statusLabel}
           </p>
-          <h2 className={expanded ? "mt-2 text-2xl font-semibold" : "mt-1 truncate text-lg font-semibold"}>
+          <h2
+            className={
+              expanded
+                ? "mt-2 text-2xl font-semibold"
+                : "mt-1 truncate text-lg font-semibold"
+            }
+          >
             {region.label}
           </h2>
-          <p className={expanded ? "mt-2 text-sm text-white/64" : "mt-1 text-sm text-white/64"}>
+          <p
+            className={
+              expanded
+                ? "mt-2 text-sm text-white/64"
+                : "mt-1 text-sm text-white/64"
+            }
+          >
             You found {score} of {total} countries.
           </p>
           {isTargetQueueMode ? (
@@ -225,10 +238,10 @@ export function ResultsDashboard() {
               group.countries.length > 0 ? (
                 <section key={group.label}>
                   <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-white/48">
+                    <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-white/60">
                       {group.label}
                     </h3>
-                    <span className="text-xs font-semibold text-white/44">
+                    <span className="text-xs font-semibold text-white/58">
                       {group.countries.length}
                     </span>
                   </div>

@@ -91,7 +91,8 @@ export function TargetHintCard({
                       : true,
                 }))
               }
-              className="min-h-10 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+              className="min-h-11 shrink-0 rounded-full border border-white/12 bg-white/8 px-4 text-xs font-semibold text-white/74 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200/70"
+              aria-expanded={mobileExpanded}
             >
               {mobileExpanded ? "Close" : "Hints"}
             </button>
@@ -122,7 +123,7 @@ export function TargetHintCard({
                     <span className="block text-sm font-semibold text-white/84">
                       Show capital hint
                     </span>
-                    <span className="block text-xs text-white/46">
+                    <span className="block text-xs text-white/58">
                       Optional helper
                     </span>
                   </span>
@@ -201,13 +202,13 @@ export function TargetHintCard({
             role="switch"
             aria-checked={capitalHintEnabled}
             onClick={() => onCapitalHintChange(!capitalHintEnabled)}
-            className="mt-4 flex w-full items-center justify-between rounded-2xl border border-white/12 bg-white/8 px-3 py-2 text-left transition hover:bg-white/12"
+            className="mt-4 flex min-h-11 w-full items-center justify-between rounded-2xl border border-white/12 bg-white/8 px-3 py-2 text-left transition hover:bg-white/12 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200/70"
           >
             <span>
               <span className="block text-sm font-semibold text-white/84">
                 Show capital hint
               </span>
-              <span className="block text-xs text-white/46">
+              <span className="block text-xs text-white/58">
                 Optional helper, not the answer
               </span>
             </span>
