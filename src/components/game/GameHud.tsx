@@ -239,7 +239,7 @@ export function GameHud({
             onClick={onOpenRegionPanel}
             className="min-h-10 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
-            Quiz
+            Choose Quiz
           </button>
         </motion.header>
       ) : (
@@ -372,7 +372,7 @@ export function GameHud({
                 onClick={onOpenRegionPanel}
                 className="min-h-11 rounded-full border border-white/12 bg-white/7 px-4 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
               >
-                Regions
+                Choose Quiz
               </button>
             ) : null}
             {showTimer ? (

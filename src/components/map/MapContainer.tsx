@@ -896,6 +896,8 @@ export function MapContainer() {
     (state) => state.capitalHintEnabled,
   );
   const gameStatus = useGameStore((state) => state.gameStatus);
+  const pauseQuiz = useGameStore((state) => state.pauseQuiz);
+  const resumeQuiz = useGameStore((state) => state.resumeQuiz);
   const remainingSeconds = useGameStore((state) => state.remainingSeconds);
   const setCapitalHintEnabled = useGameStore(
     (state) => state.setCapitalHintEnabled,
@@ -2811,8 +2813,21 @@ export function MapContainer() {
   }, []);
 
   const reopenLanding = useCallback(() => {
+    if (gameStatus === "running") {
+      pauseQuiz();
+    }
+
     setLandingOpen(true);
-  }, []);
+  }, [gameStatus, pauseQuiz]);
+
+  const resumeActiveQuiz = useCallback(() => {
+    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
+    setLandingOpen(false);
+
+    if (useGameStore.getState().gameStatus === "paused") {
+      resumeQuiz();
+    }
+  }, [resumeQuiz]);
 
   if (!mapboxToken) {
     return (
@@ -2972,6 +2987,8 @@ export function MapContainer() {
         {landingOpen ? (
           <LandingPage
             key="landing"
+            hasActiveQuiz={gameStatus === "running" || gameStatus === "paused"}
+            onResumeQuiz={resumeActiveQuiz}
             onStartQuiz={closeLandingForQuiz}
             onExploreMap={closeLandingForExplore}
           />

@@ -53,6 +53,7 @@ export function PremiumControls({
     (state) => state.selectSpecialRegion,
   );
   const selectMode = useGameStore((state) => state.selectMode);
+  const startQuiz = useGameStore((state) => state.startQuiz);
   const setAutoHideCorrectCard = useGameStore(
     (state) => state.setAutoHideCorrectCard,
   );
@@ -71,6 +72,15 @@ export function PremiumControls({
   const closePanel = useCallback(() => {
     onPanelOpenChange(false);
   }, [onPanelOpenChange]);
+
+  const handleStartQuiz = useCallback(() => {
+    if (isQuizLocked || selectedSpecialRegion) {
+      return;
+    }
+
+    startQuiz();
+    onPanelOpenChange(false);
+  }, [isQuizLocked, onPanelOpenChange, selectedSpecialRegion, startQuiz]);
 
   useOverlayFocus(panelOpen, panelRootRef, closePanel);
 
@@ -251,6 +261,21 @@ export function PremiumControls({
     </button>
   );
 
+  const startButton =
+    !isQuizLocked && !selectedSpecialRegion ? (
+      <button
+        type="button"
+        onClick={handleStartQuiz}
+        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-100/80 bg-emerald-300 px-4 text-sm font-semibold text-slate-950 shadow-[0_0_28px_rgba(52,211,153,0.26),inset_0_1px_0_rgba(255,255,255,0.38)] transition hover:bg-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
+      >
+        <span
+          className="h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-current"
+          aria-hidden="true"
+        />
+        <span>Start Quiz · {selectedLabel}</span>
+      </button>
+    ) : null;
+
   if (!panelOpen) {
     if (gameStatus === "idle") {
       return null;
@@ -330,13 +355,18 @@ export function PremiumControls({
             ))}
           </div>
         </div>
-        <div className="max-h-[calc(55dvh-7.75rem)] overflow-y-auto px-3 py-3">
+        <div className="max-h-[calc(55dvh-12rem)] overflow-y-auto px-3 py-3">
           {activeMobileTab === "region" ? regionOptions : modeOptions}
           <div className="mt-3 border-t border-white/10 pt-3">
             {autoHideToggle}
             {soundEffectsToggle}
           </div>
         </div>
+        {startButton ? (
+          <div className="sticky bottom-0 z-10 border-t border-white/10 bg-zinc-950/82 px-3 py-3 backdrop-blur-2xl">
+            {startButton}
+          </div>
+        ) : null}
       </motion.aside>
 
       <motion.aside
@@ -355,9 +385,10 @@ export function PremiumControls({
               onClick={closePanel}
               className="min-h-11 rounded-full border border-white/10 bg-white/7 px-4 py-1 text-xs font-semibold text-white/66 transition hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
             >
-              Minimize
+              Done
             </button>
           </div>
+          {startButton ? <div className="mt-3">{startButton}</div> : null}
           <div className="mt-2">{regionOptions}</div>
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">

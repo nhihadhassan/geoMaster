@@ -5,6 +5,8 @@ import { motion, useReducedMotion } from "framer-motion";
 type LandingPageProps = {
   onStartQuiz: () => void;
   onExploreMap: () => void;
+  hasActiveQuiz?: boolean;
+  onResumeQuiz?: () => void;
 };
 
 const modeCards = [
@@ -26,7 +28,12 @@ const modeCards = [
   },
 ];
 
-export function LandingPage({ onStartQuiz, onExploreMap }: LandingPageProps) {
+export function LandingPage({
+  onStartQuiz,
+  onExploreMap,
+  hasActiveQuiz = false,
+  onResumeQuiz,
+}: LandingPageProps) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
@@ -55,12 +62,25 @@ export function LandingPage({ onStartQuiz, onExploreMap }: LandingPageProps) {
             flags, languages, population, GDP, landmarks, and local details.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            {hasActiveQuiz && onResumeQuiz ? (
+              <button
+                type="button"
+                onClick={onResumeQuiz}
+                className="rounded-full border border-emerald-100/80 bg-emerald-300 px-6 py-3 text-base font-semibold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:bg-emerald-200"
+              >
+                Resume Quiz
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onStartQuiz}
-              className="rounded-full border border-emerald-100/32 bg-emerald-300/20 px-6 py-3 text-base font-semibold text-emerald-50 shadow-xl shadow-emerald-950/30 transition hover:bg-emerald-300/28"
+              className={`rounded-full border px-6 py-3 text-base font-semibold shadow-xl transition ${
+                hasActiveQuiz && onResumeQuiz
+                  ? "border-white/16 bg-white/10 text-white/78 shadow-black/25 hover:bg-white/16 hover:text-white"
+                  : "border-emerald-100/32 bg-emerald-300/20 text-emerald-50 shadow-emerald-950/30 hover:bg-emerald-300/28"
+              }`}
             >
-              Start Quiz
+              {hasActiveQuiz && onResumeQuiz ? "New Quiz" : "Choose a Quiz"}
             </button>
             <button
               type="button"
