@@ -261,28 +261,19 @@ export function GameHud({
               tone: "emerald" as const,
             };
 
+  // During setup the panel's own "Start Quiz" button is the strong CTA, so the
+  // HUD primary stays a quiet secondary to avoid two competing green buttons.
   const primaryToneClass =
     primaryAction.tone === "emerald"
       ? "border-emerald-100/30 bg-emerald-300/20 text-emerald-50 hover:bg-emerald-300/28"
       : "border-sky-100/24 bg-sky-300/14 text-sky-50 hover:bg-sky-300/22";
-  const setupPrimaryClass =
-    "border-emerald-100/80 bg-emerald-300 text-slate-950 shadow-[0_0_34px_rgba(52,211,153,0.26),inset_0_1px_0_rgba(255,255,255,0.38)] hover:bg-emerald-200";
-  const primaryButtonClass = isSetup ? setupPrimaryClass : primaryToneClass;
-  const setupPrimaryMotion =
-    isSetup && !prefersReducedMotion
-      ? {
-          scale: [1, 1.015, 1],
-          boxShadow: [
-            "0 0 22px rgba(52,211,153,0.12)",
-            "0 0 38px rgba(52,211,153,0.24)",
-            "0 0 22px rgba(52,211,153,0.12)",
-          ],
-        }
-      : { scale: 1 };
-  const setupPrimaryTransition =
-    isSetup && !prefersReducedMotion
-      ? { duration: 2.8, repeat: Infinity, ease: "easeInOut" as const }
-      : { type: "spring" as const, stiffness: 260, damping: 28 };
+  const primaryButtonClass = primaryToneClass;
+  const setupPrimaryMotion = { scale: 1 };
+  const setupPrimaryTransition = {
+    type: "spring" as const,
+    stiffness: 260,
+    damping: 28,
+  };
 
   return (
     <>

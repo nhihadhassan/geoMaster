@@ -79,7 +79,7 @@ export function PauseOverlay() {
               onClick={giveUp}
               className="min-h-11 rounded-full border border-rose-200/24 bg-rose-300/14 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-300/22"
             >
-              Give Up
+              End Quiz
             </button>
             <button
               type="button"

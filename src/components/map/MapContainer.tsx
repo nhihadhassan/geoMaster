@@ -2833,12 +2833,24 @@ export function MapContainer() {
 
   const resumeActiveQuiz = useCallback(() => {
     window.localStorage.setItem(LANDING_SEEN_KEY, "1");
-    setLandingOpen(false);
 
-    if (useGameStore.getState().gameStatus === "paused") {
-      resumeQuiz();
+    const status = useGameStore.getState().gameStatus;
+
+    if (status === "running" || status === "paused") {
+      setLandingOpen(false);
+
+      if (status === "paused") {
+        resumeQuiz();
+      }
+
+      return;
     }
-  }, [resumeQuiz]);
+
+    // No live quiz in memory but a saved one exists on disk: restore it.
+    resumeSavedQuiz();
+    setResumableQuiz(null);
+    setLandingOpen(false);
+  }, [resumeQuiz, resumeSavedQuiz]);
 
   const handleResumeSavedQuiz = useCallback(() => {
     resumeSavedQuiz();
@@ -3021,7 +3033,11 @@ export function MapContainer() {
         {landingOpen ? (
           <LandingPage
             key="landing"
-            hasActiveQuiz={gameStatus === "running" || gameStatus === "paused"}
+            hasActiveQuiz={
+              gameStatus === "running" ||
+              gameStatus === "paused" ||
+              Boolean(resumableQuiz)
+            }
             onResumeQuiz={resumeActiveQuiz}
             onStartQuiz={closeLandingForQuiz}
             onExploreMap={closeLandingForExplore}
