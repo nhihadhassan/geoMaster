@@ -19,6 +19,7 @@ import { PauseOverlay } from "@/components/game/PauseOverlay";
 import { PerfectRunCelebration } from "@/components/game/PerfectRunCelebration";
 import { PremiumControls } from "@/components/game/PremiumControls";
 import { ResultsDashboard } from "@/components/game/ResultsDashboard";
+import { ResumePrompt } from "@/components/game/ResumePrompt";
 import { TargetHintCard } from "@/components/game/TargetHintCard";
 import { TypeToFillInput } from "@/components/game/TypeToFillInput";
 import {
@@ -49,7 +50,12 @@ import {
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
 import { useSoundEffects } from "@/hooks/useSoundEffects";
-import { useGameStore, type CountryResult } from "@/store/gameStore";
+import {
+  readQuizProgress,
+  useGameStore,
+  type CountryResult,
+  type QuizProgressSnapshot,
+} from "@/store/gameStore";
 import { getCountryFunFacts } from "@/utils/countryEducation";
 
 const SOURCE_ID = "geomaster-countries";
@@ -847,6 +853,8 @@ export function MapContainer() {
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
   const [landingOpen, setLandingOpen] = useState(false);
+  const [resumableQuiz, setResumableQuiz] =
+    useState<QuizProgressSnapshot | null>(null);
   const [regionPanelOpen, setRegionPanelOpen] = useState(false);
   const [regionPanelTab, setRegionPanelTab] = useState<"region" | "mode">(
     "region",
@@ -898,6 +906,8 @@ export function MapContainer() {
   const gameStatus = useGameStore((state) => state.gameStatus);
   const pauseQuiz = useGameStore((state) => state.pauseQuiz);
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
+  const resumeSavedQuiz = useGameStore((state) => state.resumeSavedQuiz);
+  const discardSavedQuiz = useGameStore((state) => state.discardSavedQuiz);
   const remainingSeconds = useGameStore((state) => state.remainingSeconds);
   const setCapitalHintEnabled = useGameStore(
     (state) => state.setCapitalHintEnabled,
@@ -933,6 +943,7 @@ export function MapContainer() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setLandingOpen(window.localStorage.getItem(LANDING_SEEN_KEY) !== "1");
+      setResumableQuiz(readQuizProgress());
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -2829,6 +2840,16 @@ export function MapContainer() {
     }
   }, [resumeQuiz]);
 
+  const handleResumeSavedQuiz = useCallback(() => {
+    resumeSavedQuiz();
+    setResumableQuiz(null);
+  }, [resumeSavedQuiz]);
+
+  const handleDiscardSavedQuiz = useCallback(() => {
+    discardSavedQuiz();
+    setResumableQuiz(null);
+  }, [discardSavedQuiz]);
+
   if (!mapboxToken) {
     return (
       <main className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,#15423c,transparent_34rem),#05080c] px-6 text-white">
@@ -2878,6 +2899,19 @@ export function MapContainer() {
           regionPanelOpen={regionPanelOpen}
         />
       ) : null}
+      <AnimatePresence>
+        {resumableQuiz &&
+        gameStatus === "idle" &&
+        !landingOpen &&
+        !selectedSpecialRegion ? (
+          <ResumePrompt
+            key="resume-prompt"
+            snapshot={resumableQuiz}
+            onResume={handleResumeSavedQuiz}
+            onDiscard={handleDiscardSavedQuiz}
+          />
+        ) : null}
+      </AnimatePresence>
       <AnimatePresence>
         {idlePromptEnabled && idlePrompt ? (
           <IdlePromptToast key={idlePrompt} prompt={idlePrompt} />
