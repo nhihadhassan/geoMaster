@@ -322,7 +322,7 @@ export function PremiumControls({
         <div className="sticky top-0 z-10 border-b border-white/10 bg-zinc-950/82 px-3 pb-3 pt-2 backdrop-blur-2xl">
           <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/22" />
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
                 Setup
               </p>
@@ -330,12 +330,38 @@ export function PremiumControls({
                 {selectedLabel} · {modeLabels[selectedMode]}
               </p>
             </div>
+            {!isQuizLocked && !selectedSpecialRegion ? (
+              <button
+                type="button"
+                onClick={handleStartQuiz}
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-emerald-100/80 bg-emerald-300 px-4 text-sm font-semibold text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.24),inset_0_1px_0_rgba(255,255,255,0.38)] transition hover:bg-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
+              >
+                <span
+                  className="h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-current"
+                  aria-hidden="true"
+                />
+                <span>Start Quiz</span>
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={closePanel}
-              className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+              aria-label="Minimize quiz setup"
+              title="Minimize quiz setup"
+              className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/8 text-white/70 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
             >
-              Done
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4"
+                aria-hidden="true"
+              >
+                <path d="M5 8l5 5 5-5" />
+              </svg>
             </button>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 rounded-full border border-white/10 bg-white/6 p-1">
@@ -355,18 +381,13 @@ export function PremiumControls({
             ))}
           </div>
         </div>
-        <div className="max-h-[calc(55dvh-12rem)] overflow-y-auto px-3 py-3">
+        <div className="max-h-[calc(55dvh-9rem)] overflow-y-auto px-3 py-3">
           {activeMobileTab === "region" ? regionOptions : modeOptions}
           <div className="mt-3 border-t border-white/10 pt-3">
             {autoHideToggle}
             {soundEffectsToggle}
           </div>
         </div>
-        {startButton ? (
-          <div className="sticky bottom-0 z-10 border-t border-white/10 bg-zinc-950/82 px-3 py-3 backdrop-blur-2xl">
-            {startButton}
-          </div>
-        ) : null}
       </motion.aside>
 
       <motion.aside
