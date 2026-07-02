@@ -2,11 +2,70 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getRegionConfig } from "@/data/countries";
 import { useGameStore, type GameMode } from "@/store/gameStore";
 
 const brandIconSrc = "/brand/geomaster-icon-192.png";
+
+const END_CONFIRM_TIMEOUT_MS = 3200;
+
+function EndQuizButton({
+  onEnd,
+  compact = false,
+}: {
+  onEnd: () => void;
+  compact?: boolean;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const timeoutRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const handleClick = () => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (confirming) {
+      setConfirming(false);
+      onEnd();
+
+      return;
+    }
+
+    setConfirming(true);
+    timeoutRef.current = window.setTimeout(() => {
+      setConfirming(false);
+      timeoutRef.current = null;
+    }, END_CONFIRM_TIMEOUT_MS);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      aria-label={confirming ? "Confirm end quiz" : "End quiz"}
+      className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border font-semibold transition ${
+        compact ? "px-3 text-xs" : "px-4 text-sm"
+      } ${
+        confirming
+          ? "border-rose-200/44 bg-rose-300/20 text-rose-50"
+          : "border-white/12 bg-white/8 text-white/64 hover:bg-white/14 hover:text-white"
+      }`}
+    >
+      {confirming ? "End?" : "End"}
+    </button>
+  );
+}
 
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60)
@@ -126,6 +185,7 @@ export function GameHud({
   const resetQuiz = useGameStore((state) => state.resetQuiz);
   const pauseQuiz = useGameStore((state) => state.pauseQuiz);
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
+  const giveUp = useGameStore((state) => state.giveUp);
   const tick = useGameStore((state) => state.tick);
   const region = getRegionConfig(selectedRegion);
   const modeBResults = Object.values(countryResults);
@@ -201,28 +261,19 @@ export function GameHud({
               tone: "emerald" as const,
             };
 
+  // During setup the panel's own "Start Quiz" button is the strong CTA, so the
+  // HUD primary stays a quiet secondary to avoid two competing green buttons.
   const primaryToneClass =
     primaryAction.tone === "emerald"
       ? "border-emerald-100/30 bg-emerald-300/20 text-emerald-50 hover:bg-emerald-300/28"
       : "border-sky-100/24 bg-sky-300/14 text-sky-50 hover:bg-sky-300/22";
-  const setupPrimaryClass =
-    "border-emerald-100/80 bg-emerald-300 text-slate-950 shadow-[0_0_34px_rgba(52,211,153,0.26),inset_0_1px_0_rgba(255,255,255,0.38)] hover:bg-emerald-200";
-  const primaryButtonClass = isSetup ? setupPrimaryClass : primaryToneClass;
-  const setupPrimaryMotion =
-    isSetup && !prefersReducedMotion
-      ? {
-          scale: [1, 1.015, 1],
-          boxShadow: [
-            "0 0 22px rgba(52,211,153,0.12)",
-            "0 0 38px rgba(52,211,153,0.24)",
-            "0 0 22px rgba(52,211,153,0.12)",
-          ],
-        }
-      : { scale: 1 };
-  const setupPrimaryTransition =
-    isSetup && !prefersReducedMotion
-      ? { duration: 2.8, repeat: Infinity, ease: "easeInOut" as const }
-      : { type: "spring" as const, stiffness: 260, damping: 28 };
+  const primaryButtonClass = primaryToneClass;
+  const setupPrimaryMotion = { scale: 1 };
+  const setupPrimaryTransition = {
+    type: "spring" as const,
+    stiffness: 260,
+    damping: 28,
+  };
 
   return (
     <>
@@ -239,7 +290,7 @@ export function GameHud({
             onClick={onOpenRegionPanel}
             className="min-h-10 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
-            Quiz
+            Choose Quiz
           </button>
         </motion.header>
       ) : (
@@ -272,6 +323,9 @@ export function GameHud({
                 {formatTime(remainingSeconds)}
               </p>
             </div>
+          ) : null}
+          {gameStatus === "running" ? (
+            <EndQuizButton onEnd={giveUp} compact />
           ) : null}
           <motion.button
             type="button"
@@ -372,7 +426,7 @@ export function GameHud({
                 onClick={onOpenRegionPanel}
                 className="min-h-11 rounded-full border border-white/12 bg-white/7 px-4 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
               >
-                Regions
+                Choose Quiz
               </button>
             ) : null}
             {showTimer ? (
@@ -384,6 +438,9 @@ export function GameHud({
                   {formatTime(remainingSeconds)}
                 </p>
               </div>
+            ) : null}
+            {gameStatus === "running" ? (
+              <EndQuizButton onEnd={giveUp} />
             ) : null}
             <motion.button
               type="button"

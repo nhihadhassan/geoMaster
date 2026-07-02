@@ -127,6 +127,8 @@ type GameState = {
   giveUp: () => void;
   resetQuiz: () => void;
   backToRegionSelect: () => void;
+  resumeSavedQuiz: () => void;
+  discardSavedQuiz: () => void;
   setCurrentInput: (value: string) => void;
   setCapitalHintEnabled: (enabled: boolean) => void;
   setAutoHideCorrectCard: (enabled: boolean) => void;
@@ -175,6 +177,111 @@ const isPerfectCountryResultSet = (
 
 const AUTO_HIDE_CORRECT_CARD_KEY = "geomaster-auto-hide-correct-card";
 const SOUND_EFFECTS_ENABLED_KEY = "geomaster-sound-effects-enabled";
+const QUIZ_PROGRESS_KEY = "geomaster-quiz-progress";
+const QUIZ_PROGRESS_VERSION = 1;
+
+export type QuizProgressSnapshot = {
+  v: number;
+  region: QuizRegion;
+  mode: GameMode;
+  status: "running" | "paused";
+  guessedCountryIds: string[];
+  countryResults: Record<string, CountryResult>;
+  incorrectAttempts: Record<string, number>;
+  score: number;
+  total: number;
+  remainingSeconds: number;
+  targetQueue: string[];
+  currentTargetIso: string | null;
+  savedAt: number;
+};
+
+const isResumableStatus = (
+  status: GameStatus,
+): status is "running" | "paused" =>
+  status === "running" || status === "paused";
+
+const buildQuizProgressSnapshot = (
+  state: GameState,
+): QuizProgressSnapshot | null => {
+  if (!isResumableStatus(state.gameStatus)) {
+    return null;
+  }
+
+  return {
+    v: QUIZ_PROGRESS_VERSION,
+    region: state.selectedRegion,
+    mode: state.selectedMode,
+    status: state.gameStatus,
+    guessedCountryIds: state.guessedCountryIds,
+    countryResults: state.countryResults,
+    incorrectAttempts: state.incorrectAttempts,
+    score: state.score,
+    total: state.total,
+    remainingSeconds: state.remainingSeconds,
+    targetQueue: state.targetQueue,
+    currentTargetIso: state.currentTargetCountry?.iso_a3 ?? null,
+    savedAt: Date.now(),
+  };
+};
+
+// Dedup key ignores savedAt so non-quiz state changes (e.g. map debug) while a
+// quiz is in progress do not trigger redundant localStorage writes.
+let lastPersistedProgressKey: string | null = null;
+
+const writeQuizProgress = (snapshot: QuizProgressSnapshot) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const key = JSON.stringify({ ...snapshot, savedAt: 0 });
+
+  if (key === lastPersistedProgressKey) {
+    return;
+  }
+
+  lastPersistedProgressKey = key;
+  window.localStorage.setItem(QUIZ_PROGRESS_KEY, JSON.stringify(snapshot));
+};
+
+const clearQuizProgress = () => {
+  lastPersistedProgressKey = null;
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(QUIZ_PROGRESS_KEY);
+};
+
+export const readQuizProgress = (): QuizProgressSnapshot | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(QUIZ_PROGRESS_KEY);
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as QuizProgressSnapshot;
+
+    if (
+      !parsed ||
+      parsed.v !== QUIZ_PROGRESS_VERSION ||
+      (parsed.status !== "running" && parsed.status !== "paused") ||
+      getCountriesForRegion(parsed.region).length === 0
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+};
 
 const readInitialAutoHideCorrectCard = () => {
   if (typeof window === "undefined") {
@@ -422,6 +529,41 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { selectedRegion, selectedMode } = get();
 
     set(createResetState(selectedRegion, selectedMode));
+  },
+  resumeSavedQuiz: () => {
+    const snapshot = readQuizProgress();
+
+    if (!snapshot) {
+      return;
+    }
+
+    const quizCountries = getCountriesForRegion(snapshot.region);
+
+    if (quizCountries.length === 0) {
+      clearQuizProgress();
+
+      return;
+    }
+
+    const currentTargetCountry = getCountryById(
+      quizCountries,
+      snapshot.currentTargetIso ?? undefined,
+    );
+
+    set({
+      ...createResetState(snapshot.region, snapshot.mode),
+      guessedCountryIds: snapshot.guessedCountryIds,
+      countryResults: snapshot.countryResults,
+      incorrectAttempts: snapshot.incorrectAttempts,
+      score: snapshot.score,
+      remainingSeconds: snapshot.remainingSeconds,
+      targetQueue: snapshot.targetQueue,
+      currentTargetCountry,
+      gameStatus: snapshot.status,
+    });
+  },
+  discardSavedQuiz: () => {
+    clearQuizProgress();
   },
   setCurrentInput: (value) => set({ currentInput: value }),
   setCapitalHintEnabled: (enabled) => set({ capitalHintEnabled: enabled }),
@@ -919,3 +1061,29 @@ export const useGameStore = create<GameState>((set, get) => ({
       },
     })),
 }));
+
+// Persist in-progress quizzes so a reload can offer to resume them. A fresh,
+// never-started session stays idle on load, so we leave any saved quiz intact
+// (idle → idle) and only clear once a quiz actually ends or is abandoned.
+if (typeof window !== "undefined") {
+  useGameStore.subscribe((state, previousState) => {
+    if (isResumableStatus(state.gameStatus)) {
+      const snapshot = buildQuizProgressSnapshot(state);
+
+      if (snapshot) {
+        writeQuizProgress(snapshot);
+      }
+
+      return;
+    }
+
+    if (
+      state.gameStatus === "idle" &&
+      previousState.gameStatus === "idle"
+    ) {
+      return;
+    }
+
+    clearQuizProgress();
+  });
+}

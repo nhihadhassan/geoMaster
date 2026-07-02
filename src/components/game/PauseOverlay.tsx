@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { useGameStore } from "@/store/gameStore";
 
 export function PauseOverlay() {
@@ -8,6 +9,7 @@ export function PauseOverlay() {
   const resetQuiz = useGameStore((state) => state.resetQuiz);
   const giveUp = useGameStore((state) => state.giveUp);
   const backToRegionSelect = useGameStore((state) => state.backToRegionSelect);
+  const [confirmingExit, setConfirmingExit] = useState(false);
 
   return (
     <motion.div
@@ -33,36 +35,61 @@ export function PauseOverlay() {
         <p className="mt-2 text-sm leading-5 text-white/58">
           The timer is stopped and answers are disabled until you resume.
         </p>
-        <div className="mt-5 grid gap-2 sm:grid-cols-4">
-          <button
-            type="button"
-            onClick={resumeQuiz}
-            className="min-h-11 rounded-full border border-emerald-100/30 bg-emerald-300/20 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-300/28"
-          >
-            Resume
-          </button>
-          <button
-            type="button"
-            onClick={resetQuiz}
-            className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
-          >
-            Try Again
-          </button>
-          <button
-            type="button"
-            onClick={giveUp}
-            className="min-h-11 rounded-full border border-rose-200/24 bg-rose-300/14 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-300/22"
-          >
-            Give Up
-          </button>
-          <button
-            type="button"
-            onClick={backToRegionSelect}
-            className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
-          >
-            Regions
-          </button>
-        </div>
+        {confirmingExit ? (
+          <div className="mt-5">
+            <p className="text-sm font-medium leading-5 text-white/74">
+              Leave this quiz and choose another? Your current progress will be
+              lost.
+            </p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setConfirmingExit(false)}
+                className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+              >
+                Keep Playing
+              </button>
+              <button
+                type="button"
+                onClick={backToRegionSelect}
+                className="min-h-11 rounded-full border border-rose-200/24 bg-rose-300/14 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-300/22"
+              >
+                Discard &amp; Exit
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 grid gap-2 sm:grid-cols-4">
+            <button
+              type="button"
+              onClick={resumeQuiz}
+              className="min-h-11 rounded-full border border-emerald-100/30 bg-emerald-300/20 px-4 py-3 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-300/28"
+            >
+              Resume
+            </button>
+            <button
+              type="button"
+              onClick={resetQuiz}
+              className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+            >
+              Restart
+            </button>
+            <button
+              type="button"
+              onClick={giveUp}
+              className="min-h-11 rounded-full border border-rose-200/24 bg-rose-300/14 px-4 py-3 text-sm font-semibold text-rose-50 transition hover:bg-rose-300/22"
+            >
+              End Quiz
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingExit(true)}
+              className="min-h-11 rounded-full border border-white/12 bg-white/8 px-4 py-3 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+            >
+              Exit Quiz
+            </button>
+          </div>
+        )}
       </motion.section>
     </motion.div>
   );

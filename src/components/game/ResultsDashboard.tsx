@@ -48,7 +48,7 @@ export function ResultsDashboard() {
     gameStatus === "completed"
       ? "Quiz complete"
       : gameStatus === "gave-up"
-        ? "You gave up"
+        ? "Quiz ended"
         : "Time expired";
   const modeBResults = Object.values(countryResults);
   const isTargetQueueMode =
