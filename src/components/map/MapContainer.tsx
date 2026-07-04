@@ -908,6 +908,7 @@ export function MapContainer() {
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
   const resumeSavedQuiz = useGameStore((state) => state.resumeSavedQuiz);
   const discardSavedQuiz = useGameStore((state) => state.discardSavedQuiz);
+  const backToRegionSelect = useGameStore((state) => state.backToRegionSelect);
   const remainingSeconds = useGameStore((state) => state.remainingSeconds);
   const setCapitalHintEnabled = useGameStore(
     (state) => state.setCapitalHintEnabled,
@@ -948,6 +949,19 @@ export function MapContainer() {
 
     return () => window.clearTimeout(timeoutId);
   }, []);
+
+  useEffect(() => {
+    // Once any quiz starts, the snapshot read at mount is dead — the store
+    // subscriber has overwritten or cleared it — so drop it rather than let
+    // the resume prompt reappear with a stale save after that quiz ends.
+    if (gameStatus === "idle") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setResumableQuiz(null), 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [gameStatus]);
 
   const quizCountryIdList = useMemo(
     () => quizCountries.map((country) => country.iso_a3),
@@ -2812,10 +2826,22 @@ export function MapContainer() {
 
   const closeLandingForQuiz = useCallback(() => {
     window.localStorage.setItem(LANDING_SEEN_KEY, "1");
+
+    // The landing offers "Resume Quiz" right next to this action, so choosing
+    // a new quiz while one is live is an explicit decision to abandon it.
+    // Without the reset, the setup panel would immediately close itself
+    // (selection is locked during a live quiz) and strand the user on the
+    // pause overlay instead of quiz setup.
+    const status = useGameStore.getState().gameStatus;
+
+    if (status === "running" || status === "paused") {
+      backToRegionSelect();
+    }
+
     setRegionPanelTab("region");
     setRegionPanelOpen(true);
     setLandingOpen(false);
-  }, []);
+  }, [backToRegionSelect]);
 
   const closeLandingForExplore = useCallback(() => {
     window.localStorage.setItem(LANDING_SEEN_KEY, "1");
@@ -2831,36 +2857,29 @@ export function MapContainer() {
     setLandingOpen(true);
   }, [gameStatus, pauseQuiz]);
 
-  const resumeActiveQuiz = useCallback(() => {
-    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
-
-    const status = useGameStore.getState().gameStatus;
-
-    if (status === "running" || status === "paused") {
-      setLandingOpen(false);
-
-      if (status === "paused") {
-        resumeQuiz();
-      }
-
-      return;
-    }
-
-    // No live quiz in memory but a saved one exists on disk: restore it.
-    resumeSavedQuiz();
-    setResumableQuiz(null);
-    setLandingOpen(false);
-  }, [resumeQuiz, resumeSavedQuiz]);
-
   const handleResumeSavedQuiz = useCallback(() => {
-    resumeSavedQuiz();
+    resumeSavedQuiz(resumableQuiz ?? undefined);
     setResumableQuiz(null);
-  }, [resumeSavedQuiz]);
+  }, [resumableQuiz, resumeSavedQuiz]);
 
   const handleDiscardSavedQuiz = useCallback(() => {
     discardSavedQuiz();
     setResumableQuiz(null);
   }, [discardSavedQuiz]);
+
+  const resumeActiveQuiz = useCallback(() => {
+    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
+    setLandingOpen(false);
+
+    const status = useGameStore.getState().gameStatus;
+
+    if (status === "paused") {
+      resumeQuiz();
+    } else if (status !== "running") {
+      // No live quiz in memory but a saved one exists on disk: restore it.
+      handleResumeSavedQuiz();
+    }
+  }, [handleResumeSavedQuiz, resumeQuiz]);
 
   if (!mapboxToken) {
     return (

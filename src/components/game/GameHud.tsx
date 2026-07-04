@@ -3,8 +3,11 @@
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { PlayTriangle } from "@/components/game/QuizCta";
 import { getRegionConfig } from "@/data/countries";
-import { useGameStore, type GameMode } from "@/store/gameStore";
+import { modeLabels } from "@/data/gameModes";
+import { useGameStore } from "@/store/gameStore";
+import { formatTime } from "@/utils/formatTime";
 
 const brandIconSrc = "/brand/geomaster-icon-192.png";
 
@@ -66,22 +69,6 @@ function EndQuizButton({
     </button>
   );
 }
-
-const formatTime = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, "0");
-  const remainingSeconds = (seconds % 60).toString().padStart(2, "0");
-
-  return `${minutes}:${remainingSeconds}`;
-};
-
-const modeLabels: Record<GameMode, string> = {
-  "type-to-fill": "Type",
-  "identify-shaded": "Identify",
-  "click-country": "Map Click",
-  "capital-challenge": "Capital",
-};
 
 type GameHudProps = {
   onOpenLanding: () => void;
@@ -267,13 +254,6 @@ export function GameHud({
     primaryAction.tone === "emerald"
       ? "border-emerald-100/30 bg-emerald-300/20 text-emerald-50 hover:bg-emerald-300/28"
       : "border-sky-100/24 bg-sky-300/14 text-sky-50 hover:bg-sky-300/22";
-  const primaryButtonClass = primaryToneClass;
-  const setupPrimaryMotion = { scale: 1 };
-  const setupPrimaryTransition = {
-    type: "spring" as const,
-    stiffness: 260,
-    damping: 28,
-  };
 
   return (
     <>
@@ -327,23 +307,16 @@ export function GameHud({
           {gameStatus === "running" ? (
             <EndQuizButton onEnd={giveUp} compact />
           ) : null}
-          <motion.button
+          <button
             type="button"
             onClick={primaryAction.action}
-            animate={setupPrimaryMotion}
-            transition={setupPrimaryTransition}
-            className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition ${primaryButtonClass}`}
+            className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition ${primaryToneClass}`}
           >
-            {isSetup ? (
-              <span
-                className="h-0 w-0 border-y-[4px] border-l-[7px] border-y-transparent border-l-current"
-                aria-hidden="true"
-              />
-            ) : null}
+            {isSetup ? <PlayTriangle size="sm" /> : null}
             <span>
               {isFinished ? "Again" : primaryAction.label.replace(" Quiz", "")}
             </span>
-          </motion.button>
+          </button>
         </motion.header>
       )}
 
@@ -442,21 +415,14 @@ export function GameHud({
             {gameStatus === "running" ? (
               <EndQuizButton onEnd={giveUp} />
             ) : null}
-            <motion.button
+            <button
               type="button"
               onClick={primaryAction.action}
-              animate={setupPrimaryMotion}
-              transition={setupPrimaryTransition}
-              className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-semibold transition ${primaryButtonClass}`}
+              className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-5 text-sm font-semibold transition ${primaryToneClass}`}
             >
-              {isSetup ? (
-                <span
-                  className="h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-current"
-                  aria-hidden="true"
-                />
-              ) : null}
+              {isSetup ? <PlayTriangle /> : null}
               <span>{primaryAction.label}</span>
-            </motion.button>
+            </button>
           </div>
         </motion.header>
       )}
