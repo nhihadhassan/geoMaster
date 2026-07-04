@@ -114,6 +114,7 @@ type GameState = {
   capitalHintEnabled: boolean;
   autoHideCorrectCard: boolean;
   soundEffectsEnabled: boolean;
+  timerMultiplier: number;
   learningCountry: Country | null;
   selectedLearningFeature: LearningFeature | null;
   debug: DebugState;
@@ -133,6 +134,7 @@ type GameState = {
   setCapitalHintEnabled: (enabled: boolean) => void;
   setAutoHideCorrectCard: (enabled: boolean) => void;
   setSoundEffectsEnabled: (enabled: boolean) => void;
+  setTimerMultiplier: (multiplier: number) => void;
   recordFeedbackEvent: (
     kind: GeoSoundEvent,
     options?: Omit<QuizFeedbackEvent, "kind" | "sequence">,
@@ -179,6 +181,7 @@ const AUTO_HIDE_CORRECT_CARD_KEY = "geomaster-auto-hide-correct-card";
 const SOUND_EFFECTS_ENABLED_KEY = "geomaster-sound-effects-enabled";
 const QUIZ_PROGRESS_KEY = "geomaster-quiz-progress";
 const QUIZ_PROGRESS_VERSION = 1;
+const TIMER_MULTIPLIER_KEY = "geomaster-timer-multiplier";
 
 export type QuizProgressSnapshot = {
   v: number;
@@ -311,6 +314,41 @@ const persistSoundEffectsEnabled = (enabled: boolean) => {
   window.localStorage.setItem(SOUND_EFFECTS_ENABLED_KEY, String(enabled));
 };
 
+// Timer multiplier lets players give themselves more time before starting.
+// 1 = the region's standard timer; larger values scale it up.
+export const TIMER_MULTIPLIER_OPTIONS = [1, 1.5, 2, 3] as const;
+
+const DEFAULT_TIMER_MULTIPLIER = 1;
+
+const normalizeTimerMultiplier = (value: number) =>
+  (TIMER_MULTIPLIER_OPTIONS as readonly number[]).includes(value)
+    ? value
+    : DEFAULT_TIMER_MULTIPLIER;
+
+const readInitialTimerMultiplier = () => {
+  if (typeof window === "undefined") {
+    return DEFAULT_TIMER_MULTIPLIER;
+  }
+
+  return normalizeTimerMultiplier(
+    Number(window.localStorage.getItem(TIMER_MULTIPLIER_KEY)),
+  );
+};
+
+const persistTimerMultiplier = (multiplier: number) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(TIMER_MULTIPLIER_KEY, String(multiplier));
+};
+
+export const getScaledTimerSeconds = (
+  region: QuizRegion,
+  mode: GameMode,
+  timerMultiplier: number,
+) => Math.round(getTimerSeconds(region, mode) * timerMultiplier);
+
 const buildFeedbackEvent = (
   state: Pick<GameState, "feedbackSequence">,
   kind: GeoSoundEvent,
@@ -331,6 +369,7 @@ const buildFeedbackEvent = (
 const createResetState = (
   selectedRegion: QuizRegion,
   selectedMode: GameMode,
+  timerMultiplier: number,
 ) => {
   const quizCountries = getCountriesForRegion(selectedRegion);
 
@@ -346,7 +385,11 @@ const createResetState = (
     targetQueue: [],
     score: 0,
     total: quizCountries.length,
-    remainingSeconds: getTimerSeconds(selectedRegion, selectedMode),
+    remainingSeconds: getScaledTimerSeconds(
+      selectedRegion,
+      selectedMode,
+      timerMultiplier,
+    ),
     gameStatus: "idle" as GameStatus,
     incorrectAttempts: {},
     lastMatchedCountry: null,
@@ -364,9 +407,14 @@ const createResetState = (
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
-  ...createResetState("south-america", "type-to-fill"),
+  ...createResetState(
+    "south-america",
+    "type-to-fill",
+    readInitialTimerMultiplier(),
+  ),
   autoHideCorrectCard: readInitialAutoHideCorrectCard(),
   soundEffectsEnabled: readInitialSoundEffectsEnabled(),
+  timerMultiplier: readInitialTimerMultiplier(),
   debug: {
     mapLoaded: false,
     countrySourceLoaded: false,
@@ -399,15 +447,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     insetMissedCount: 0,
   },
   selectRegion: (selectedRegion) => {
-    const { selectedMode } = get();
+    const { selectedMode, timerMultiplier } = get();
 
-    set(createResetState(selectedRegion, selectedMode));
+    set(createResetState(selectedRegion, selectedMode, timerMultiplier));
   },
   selectSpecialRegion: (selectedSpecialRegion) => {
-    const { selectedRegion, selectedMode } = get();
+    const { selectedRegion, selectedMode, timerMultiplier } = get();
 
     set({
-      ...createResetState(selectedRegion, selectedMode),
+      ...createResetState(selectedRegion, selectedMode, timerMultiplier),
       selectedSpecialRegion,
       lastMatchedCountry: null,
       learningCountry: null,
@@ -415,14 +463,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
   clearSpecialRegion: () => {
-    const { selectedRegion, selectedMode } = get();
+    const { selectedRegion, selectedMode, timerMultiplier } = get();
 
-    set(createResetState(selectedRegion, selectedMode));
+    set(createResetState(selectedRegion, selectedMode, timerMultiplier));
   },
   selectMode: (selectedMode) => {
-    const { selectedRegion } = get();
+    const { selectedRegion, timerMultiplier } = get();
 
-    set(createResetState(selectedRegion, selectedMode));
+    set(createResetState(selectedRegion, selectedMode, timerMultiplier));
   },
   startQuiz: () => {
     const state = get();
@@ -496,9 +544,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ gameStatus: "running" });
   },
   resetQuiz: () => {
-    const { selectedRegion, selectedMode } = get();
+    const { selectedRegion, selectedMode, timerMultiplier } = get();
 
-    set(createResetState(selectedRegion, selectedMode));
+    set(createResetState(selectedRegion, selectedMode, timerMultiplier));
   },
   giveUp: () => {
     const state = get();
@@ -522,9 +570,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
   backToRegionSelect: () => {
-    const { selectedRegion, selectedMode } = get();
+    const { selectedRegion, selectedMode, timerMultiplier } = get();
 
-    set(createResetState(selectedRegion, selectedMode));
+    set(createResetState(selectedRegion, selectedMode, timerMultiplier));
   },
   resumeSavedQuiz: (providedSnapshot) => {
     const snapshot = providedSnapshot ?? readQuizProgress();
@@ -547,7 +595,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     );
 
     set({
-      ...createResetState(snapshot.region, snapshot.mode),
+      // remainingSeconds is overridden below with the saved value; the
+      // multiplier here only feeds createResetState's default computation.
+      ...createResetState(snapshot.region, snapshot.mode, get().timerMultiplier),
       guessedCountryIds: snapshot.guessedCountryIds,
       countryResults: snapshot.countryResults,
       incorrectAttempts: snapshot.incorrectAttempts,
@@ -570,6 +620,28 @@ export const useGameStore = create<GameState>((set, get) => ({
   setSoundEffectsEnabled: (enabled) => {
     persistSoundEffectsEnabled(enabled);
     set({ soundEffectsEnabled: enabled });
+  },
+  setTimerMultiplier: (multiplier) => {
+    const timerMultiplier = normalizeTimerMultiplier(multiplier);
+
+    persistTimerMultiplier(timerMultiplier);
+
+    const state = get();
+
+    // While setting up (idle), reflect the new timer in the starting clock
+    // immediately. Never change an in-progress quiz's remaining time.
+    set({
+      timerMultiplier,
+      ...(state.gameStatus === "idle"
+        ? {
+            remainingSeconds: getScaledTimerSeconds(
+              state.selectedRegion,
+              state.selectedMode,
+              timerMultiplier,
+            ),
+          }
+        : {}),
+    });
   },
   recordFeedbackEvent: (kind, options) => {
     set({
