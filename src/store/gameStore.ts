@@ -127,7 +127,7 @@ type GameState = {
   giveUp: () => void;
   resetQuiz: () => void;
   backToRegionSelect: () => void;
-  resumeSavedQuiz: () => void;
+  resumeSavedQuiz: (snapshot?: QuizProgressSnapshot) => void;
   discardSavedQuiz: () => void;
   setCurrentInput: (value: string) => void;
   setCapitalHintEnabled: (enabled: boolean) => void;
@@ -225,33 +225,29 @@ const buildQuizProgressSnapshot = (
   };
 };
 
-// Dedup key ignores savedAt so non-quiz state changes (e.g. map debug) while a
-// quiz is in progress do not trigger redundant localStorage writes.
-let lastPersistedProgressKey: string | null = null;
-
 const writeQuizProgress = (snapshot: QuizProgressSnapshot) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  const key = JSON.stringify({ ...snapshot, savedAt: 0 });
-
-  if (key === lastPersistedProgressKey) {
-    return;
+  try {
+    window.localStorage.setItem(QUIZ_PROGRESS_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Storage can be unavailable (private mode, quota). The quiz keeps
+    // running; it just won't survive a reload.
   }
-
-  lastPersistedProgressKey = key;
-  window.localStorage.setItem(QUIZ_PROGRESS_KEY, JSON.stringify(snapshot));
 };
 
 const clearQuizProgress = () => {
-  lastPersistedProgressKey = null;
-
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.removeItem(QUIZ_PROGRESS_KEY);
+  try {
+    window.localStorage.removeItem(QUIZ_PROGRESS_KEY);
+  } catch {
+    // Same storage caveat as writeQuizProgress.
+  }
 };
 
 export const readQuizProgress = (): QuizProgressSnapshot | null => {
@@ -530,8 +526,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set(createResetState(selectedRegion, selectedMode));
   },
-  resumeSavedQuiz: () => {
-    const snapshot = readQuizProgress();
+  resumeSavedQuiz: (providedSnapshot) => {
+    const snapshot = providedSnapshot ?? readQuizProgress();
 
     if (!snapshot) {
       return;
@@ -1065,9 +1061,27 @@ export const useGameStore = create<GameState>((set, get) => ({
 // Persist in-progress quizzes so a reload can offer to resume them. A fresh,
 // never-started session stays idle on load, so we leave any saved quiz intact
 // (idle → idle) and only clear once a quiz actually ends or is abandoned.
+const persistedSlicesEqual = (state: GameState, previousState: GameState) =>
+  state.gameStatus === previousState.gameStatus &&
+  state.selectedRegion === previousState.selectedRegion &&
+  state.selectedMode === previousState.selectedMode &&
+  state.guessedCountryIds === previousState.guessedCountryIds &&
+  state.countryResults === previousState.countryResults &&
+  state.incorrectAttempts === previousState.incorrectAttempts &&
+  state.score === previousState.score &&
+  state.remainingSeconds === previousState.remainingSeconds &&
+  state.targetQueue === previousState.targetQueue &&
+  state.currentTargetCountry === previousState.currentTargetCountry;
+
 if (typeof window !== "undefined") {
   useGameStore.subscribe((state, previousState) => {
     if (isResumableStatus(state.gameStatus)) {
+      // The subscriber fires on every set() (keystrokes, map debug updates);
+      // only serialize and write when a persisted slice actually changed.
+      if (persistedSlicesEqual(state, previousState)) {
+        return;
+      }
+
       const snapshot = buildQuizProgressSnapshot(state);
 
       if (snapshot) {

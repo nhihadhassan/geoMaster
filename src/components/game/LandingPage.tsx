@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { emeraldCtaClass } from "@/components/game/QuizCta";
 
 type LandingPageProps = {
   onStartQuiz: () => void;
@@ -66,7 +67,7 @@ export function LandingPage({
               <button
                 type="button"
                 onClick={onResumeQuiz}
-                className="rounded-full border border-emerald-100/80 bg-emerald-300 px-6 py-3 text-base font-semibold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:bg-emerald-200"
+                className={`rounded-full px-6 py-3 text-base font-semibold shadow-xl shadow-emerald-950/30 ${emeraldCtaClass}`}
               >
                 Resume Quiz
               </button>

@@ -1,24 +1,14 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import {
+  emeraldCtaClass,
+  emeraldCtaGlowClass,
+} from "@/components/game/QuizCta";
 import { getRegionConfig } from "@/data/countries";
-import type { GameMode, QuizProgressSnapshot } from "@/store/gameStore";
-
-const modeLabels: Record<GameMode, string> = {
-  "type-to-fill": "Type",
-  "identify-shaded": "Identify",
-  "click-country": "Map Click",
-  "capital-challenge": "Capital",
-};
-
-const formatTime = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, "0");
-  const remainingSeconds = (seconds % 60).toString().padStart(2, "0");
-
-  return `${minutes}:${remainingSeconds}`;
-};
+import { modeLabels } from "@/data/gameModes";
+import type { QuizProgressSnapshot } from "@/store/gameStore";
+import { formatTime } from "@/utils/formatTime";
 
 type ResumePromptProps = {
   snapshot: QuizProgressSnapshot;
@@ -59,7 +49,7 @@ export function ResumePrompt({
         <button
           type="button"
           onClick={onResume}
-          className="min-h-11 flex-1 rounded-full border border-emerald-100/80 bg-emerald-300 px-4 text-sm font-semibold text-slate-950 shadow-[0_0_28px_rgba(52,211,153,0.26),inset_0_1px_0_rgba(255,255,255,0.38)] transition hover:bg-emerald-200"
+          className={`min-h-11 flex-1 rounded-full px-4 text-sm font-semibold ${emeraldCtaClass} ${emeraldCtaGlowClass}`}
         >
           Resume Quiz
         </button>

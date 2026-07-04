@@ -3,20 +3,19 @@
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  emeraldCtaClass,
+  emeraldCtaGlowClass,
+  PlayTriangle,
+} from "@/components/game/QuizCta";
+import {
   getRegionConfig,
   regionSelectorConfigs,
   type QuizRegion,
 } from "@/data/countries";
+import { modeLabels } from "@/data/gameModes";
 import { useGameStore, type GameMode } from "@/store/gameStore";
 import { useOverlayFocus } from "@/hooks/useOverlayFocus";
 import { unlockGeoAudio } from "@/utils/soundEffects";
-
-const modeLabels: Record<GameMode, string> = {
-  "type-to-fill": "Type",
-  "identify-shaded": "Identify",
-  "click-country": "Map Click",
-  "capital-challenge": "Capital",
-};
 
 const modeDescriptions: Record<GameMode, string> = {
   "type-to-fill": "Name countries to fill the map.",
@@ -74,13 +73,9 @@ export function PremiumControls({
   }, [onPanelOpenChange]);
 
   const handleStartQuiz = useCallback(() => {
-    if (isQuizLocked || selectedSpecialRegion) {
-      return;
-    }
-
     startQuiz();
     onPanelOpenChange(false);
-  }, [isQuizLocked, onPanelOpenChange, selectedSpecialRegion, startQuiz]);
+  }, [onPanelOpenChange, startQuiz]);
 
   useOverlayFocus(panelOpen, panelRootRef, closePanel);
 
@@ -261,18 +256,23 @@ export function PremiumControls({
     </button>
   );
 
-  const startButton =
-    !isQuizLocked && !selectedSpecialRegion ? (
+  const canStartQuiz = !isQuizLocked && !selectedSpecialRegion;
+
+  const renderStartButton = (variant: "panel" | "header") =>
+    canStartQuiz ? (
       <button
         type="button"
         onClick={handleStartQuiz}
-        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-100/80 bg-emerald-300 px-4 text-sm font-semibold text-slate-950 shadow-[0_0_28px_rgba(52,211,153,0.26),inset_0_1px_0_rgba(255,255,255,0.38)] transition hover:bg-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
+        className={`items-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70 ${emeraldCtaClass} ${emeraldCtaGlowClass} ${
+          variant === "panel"
+            ? "flex min-h-12 w-full justify-center gap-2 rounded-2xl px-4"
+            : "inline-flex min-h-11 shrink-0 gap-1.5 rounded-full px-4"
+        }`}
       >
-        <span
-          className="h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-current"
-          aria-hidden="true"
-        />
-        <span>Start Quiz · {selectedLabel}</span>
+        <PlayTriangle />
+        <span>
+          {variant === "panel" ? `Start Quiz · ${selectedLabel}` : "Start Quiz"}
+        </span>
       </button>
     ) : null;
 
@@ -330,19 +330,7 @@ export function PremiumControls({
                 {selectedLabel} · {modeLabels[selectedMode]}
               </p>
             </div>
-            {!isQuizLocked && !selectedSpecialRegion ? (
-              <button
-                type="button"
-                onClick={handleStartQuiz}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-emerald-100/80 bg-emerald-300 px-4 text-sm font-semibold text-slate-950 shadow-[0_0_24px_rgba(52,211,153,0.24),inset_0_1px_0_rgba(255,255,255,0.38)] transition hover:bg-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
-              >
-                <span
-                  className="h-0 w-0 border-y-[5px] border-l-[8px] border-y-transparent border-l-current"
-                  aria-hidden="true"
-                />
-                <span>Start Quiz</span>
-              </button>
-            ) : null}
+            {renderStartButton("header")}
             <button
               type="button"
               onClick={closePanel}
@@ -409,7 +397,9 @@ export function PremiumControls({
               Done
             </button>
           </div>
-          {startButton ? <div className="mt-3">{startButton}</div> : null}
+          {canStartQuiz ? (
+            <div className="mt-3">{renderStartButton("panel")}</div>
+          ) : null}
           <div className="mt-2">{regionOptions}</div>
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">
