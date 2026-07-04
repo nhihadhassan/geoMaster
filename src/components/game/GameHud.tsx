@@ -56,16 +56,16 @@ function EndQuizButton({
     <button
       type="button"
       onClick={handleClick}
-      aria-label={confirming ? "Confirm end quiz" : "End quiz"}
+      aria-label={confirming ? "Confirm give up" : "Give up quiz"}
       className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border font-semibold transition ${
         compact ? "px-3 text-xs" : "px-4 text-sm"
       } ${
         confirming
-          ? "border-rose-200/44 bg-rose-300/20 text-rose-50"
-          : "border-white/12 bg-white/8 text-white/64 hover:bg-white/14 hover:text-white"
+          ? "border-rose-300/70 bg-rose-500/40 text-white hover:bg-rose-500/50"
+          : "border-rose-300/40 bg-rose-500/24 text-rose-50 hover:bg-rose-500/34"
       }`}
     >
-      {confirming ? "End?" : "End"}
+      {confirming ? "Give up?" : "Give Up"}
     </button>
   );
 }
@@ -237,7 +237,7 @@ export function GameHud({
 
   const primaryAction =
     gameStatus === "running"
-      ? { label: "Pause", action: pauseQuiz, tone: "sky" as const }
+      ? { label: "Pause", action: pauseQuiz, tone: "amber" as const }
       : gameStatus === "paused"
         ? { label: "Resume", action: resumeQuiz, tone: "emerald" as const }
         : isFinished
@@ -253,7 +253,9 @@ export function GameHud({
   const primaryToneClass =
     primaryAction.tone === "emerald"
       ? "border-emerald-100/30 bg-emerald-300/20 text-emerald-50 hover:bg-emerald-300/28"
-      : "border-sky-100/24 bg-sky-300/14 text-sky-50 hover:bg-sky-300/22";
+      : primaryAction.tone === "amber"
+        ? "border-amber-200/50 bg-amber-300/30 text-amber-50 hover:bg-amber-300/40"
+        : "border-sky-100/24 bg-sky-300/14 text-sky-50 hover:bg-sky-300/22";
 
   return (
     <>
@@ -357,7 +359,7 @@ export function GameHud({
             </p>
             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2">
               <p className="truncate text-sm font-semibold text-white/84">
-                {isSetup ? region.label : `${identifiedCount}/${total}`}
+                {region.label}
               </p>
               <span className="rounded-full border border-white/10 bg-white/7 px-2.5 py-1 text-xs font-semibold text-white/58">
                 {modeLabels[selectedMode]}

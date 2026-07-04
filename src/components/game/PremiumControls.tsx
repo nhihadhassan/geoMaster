@@ -448,9 +448,22 @@ export function PremiumControls({
             <button
               type="button"
               onClick={closePanel}
-              className="min-h-11 rounded-full border border-white/10 bg-white/7 px-4 py-1 text-xs font-semibold text-white/66 transition hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
+              aria-label="Minimize quiz setup"
+              title="Minimize quiz setup"
+              className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full border border-white/10 bg-white/7 text-white/66 transition hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
             >
-              Done
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4"
+                aria-hidden="true"
+              >
+                <path d="M5 8l5 5 5-5" />
+              </svg>
             </button>
           </div>
           {canStartQuiz ? (
