@@ -11,9 +11,13 @@ type TypeToFillInputProps = {
     country: Country,
     outcome?: Extract<IdentifyGuessResult["outcome"], "correct" | "assisted">,
   ) => void;
+  keyboardInset?: number;
 };
 
-export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
+export function TypeToFillInput({
+  onCountryMatched,
+  keyboardInset = 0,
+}: TypeToFillInputProps) {
   const quizCountries = useGameStore((state) => state.quizCountries);
   const selectedMode = useGameStore((state) => state.selectedMode);
   const currentInput = useGameStore((state) => state.currentInput);
@@ -45,6 +49,13 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
   const feedbackControls = useAnimationControls();
   const prefersReducedMotion = useReducedMotion();
   const inputDisabled = gameStatus !== "running";
+  // Ride above the on-screen keyboard on mobile. Uses `bottom` (not transform)
+  // so it doesn't clash with the framer-motion feedback animation.
+  const keyboardLiftStyle = keyboardInset
+    ? {
+        bottom: `calc(0.75rem + env(safe-area-inset-bottom) + ${keyboardInset}px)`,
+      }
+    : undefined;
 
   useEffect(() => {
     void feedbackControls.start({
@@ -94,6 +105,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
         initial={{ opacity: 0, y: 28, scale: 0.98 }}
         animate={feedbackControls}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
+        style={keyboardLiftStyle}
         className="pointer-events-none absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl transition-colors sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
       >
         <div className="grid min-h-12 place-items-center rounded-xl border border-white/10 bg-white/9 px-4 text-center text-sm font-semibold text-white/76 sm:h-16 sm:rounded-2xl sm:px-6 sm:text-base">
@@ -222,6 +234,7 @@ export function TypeToFillInput({ onCountryMatched }: TypeToFillInputProps) {
       initial={{ opacity: 0, y: 28, scale: 0.98 }}
       animate={feedbackControls}
       transition={{ type: "spring", stiffness: 280, damping: 30 }}
+      style={keyboardLiftStyle}
       className="absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl transition-colors sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
     >
       <label className="sr-only" htmlFor="country-guess">

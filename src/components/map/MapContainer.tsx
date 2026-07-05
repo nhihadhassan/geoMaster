@@ -49,6 +49,7 @@ import {
   useWorldTopology,
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { useSoundEffects } from "@/hooks/useSoundEffects";
 import {
   readQuizProgress,
@@ -846,6 +847,7 @@ export function MapContainer() {
   const previousTargetIdRef = useRef<string | null>(null);
   const pulseFrameRef = useRef<number | null>(null);
   const remainingPulseFrameRef = useRef<number | null>(null);
+  const framingKeyboardInsetRef = useRef(0);
   const feedbackGlowTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -867,6 +869,7 @@ export function MapContainer() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const documentVisible = useDocumentVisible();
   const mobilePerformanceMode = useMobilePerformanceMode(prefersReducedMotion);
+  const keyboardInset = useKeyboardInset();
   const initialMapPerformanceModeRef = useRef(mobilePerformanceMode);
   const mapAnimationsEnabled =
     documentVisible && !prefersReducedMotion && !mobilePerformanceMode;
@@ -2478,12 +2481,21 @@ export function MapContainer() {
       gameStatus !== "idle" &&
       !isAntarctica;
     const shouldFrameIdleRegion = gameStatus === "idle" && regionPanelOpen;
-    const regionPadding =
-      typeof window !== "undefined" && window.innerWidth < 768
-        ? { top: 104, right: 24, bottom: 142, left: 24 }
-        : gameStatus === "running" || gameStatus === "paused"
-          ? { top: 112, right: 96, bottom: 148, left: 96 }
-          : { top: 118, right: 240, bottom: 154, left: 240 };
+    // Lift the framed region above the on-screen keyboard so it stays visible
+    // while typing on mobile.
+    const isNarrowViewport =
+      typeof window !== "undefined" && window.innerWidth < 768;
+    const regionPadding = isNarrowViewport
+      ? { top: 104, right: 24, bottom: 142 + keyboardInset, left: 24 }
+      : gameStatus === "running" || gameStatus === "paused"
+        ? { top: 112, right: 96, bottom: 148, left: 96 }
+        : { top: 118, right: 240, bottom: 154, left: 240 };
+    // A keyboard open/close should re-frame quickly rather than run the full
+    // 1.3s intro flight.
+    const keyboardInsetChanged =
+      keyboardInset !== framingKeyboardInsetRef.current;
+    framingKeyboardInsetRef.current = keyboardInset;
+    const framingDuration = keyboardInsetChanged ? 450 : 1300;
 
     try {
       map.setProjection(gameStatus === "idle" ? "globe" : "mercator");
@@ -2505,7 +2517,7 @@ export function MapContainer() {
         padding: regionPadding,
         pitch: region.pitch,
         bearing: region.bearing,
-        duration: 1300,
+        duration: framingDuration,
         essential: true,
       });
     } else if (shouldFrameIdleRegion) {
@@ -2531,6 +2543,7 @@ export function MapContainer() {
     setMapDebug(getMapDebugSnapshot(map));
   }, [
     gameStatus,
+    keyboardInset,
     mapLoaded,
     regionPanelOpen,
     selectedMode,
@@ -3038,7 +3051,10 @@ export function MapContainer() {
             ) : null}
           </AnimatePresence>
           {gameStatus === "running" ? (
-            <TypeToFillInput onCountryMatched={handleCountryMatched} />
+            <TypeToFillInput
+              onCountryMatched={handleCountryMatched}
+              keyboardInset={keyboardInset}
+            />
           ) : null}
           <ResultsDashboard />
         </>
