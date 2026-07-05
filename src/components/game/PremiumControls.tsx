@@ -33,7 +33,7 @@ const modeDescriptions: Record<GameMode, string> = {
 type PremiumControlsProps = {
   panelOpen: boolean;
   onPanelOpenChange: (open: boolean) => void;
-  defaultMobileTab?: "region" | "mode";
+  defaultMobileTab?: "region" | "mode" | "timer";
 };
 
 export function PremiumControls({
@@ -67,9 +67,9 @@ export function PremiumControls({
     (state) => state.setSoundEffectsEnabled,
   );
   const setTimerMultiplier = useGameStore((state) => state.setTimerMultiplier);
-  const [activeMobileTab, setActiveMobileTab] = useState<"region" | "mode">(
-    defaultMobileTab,
-  );
+  const [activeMobileTab, setActiveMobileTab] = useState<
+    "region" | "mode" | "timer"
+  >(defaultMobileTab);
   const panelRootRef = useRef<HTMLDivElement | null>(null);
   const isQuizLocked = gameStatus === "running" || gameStatus === "paused";
   const selectedLabel = selectedSpecialRegion
@@ -303,13 +303,10 @@ export function PremiumControls({
     </div>
   );
 
-  const settingsSection = (
+  const togglesSection = (
     <>
-      {timerOptions}
-      <div className="mt-3 border-t border-white/10 pt-3">
-        {autoHideToggle}
-        {soundEffectsToggle}
-      </div>
+      {autoHideToggle}
+      {soundEffectsToggle}
     </>
   );
 
@@ -409,8 +406,8 @@ export function PremiumControls({
               </svg>
             </button>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 rounded-full border border-white/10 bg-white/6 p-1">
-            {(["region", "mode"] as const).map((tab) => (
+          <div className="mt-3 grid grid-cols-3 gap-2 rounded-full border border-white/10 bg-white/6 p-1">
+            {(["region", "mode", "timer"] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -427,9 +424,13 @@ export function PremiumControls({
           </div>
         </div>
         <div className="max-h-[calc(55dvh-9rem)] overflow-y-auto px-3 py-3">
-          {activeMobileTab === "region" ? regionOptions : modeOptions}
+          {activeMobileTab === "region"
+            ? regionOptions
+            : activeMobileTab === "mode"
+              ? modeOptions
+              : timerOptions}
           <div className="mt-3 border-t border-white/10 pt-3">
-            {settingsSection}
+            {togglesSection}
           </div>
         </div>
       </motion.aside>
@@ -478,7 +479,10 @@ export function PremiumControls({
           {modeOptions}
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">
-          {settingsSection}
+          {timerOptions}
+        </div>
+        <div className="mt-3 border-t border-white/10 pt-3">
+          {togglesSection}
         </div>
       </motion.aside>
     </div>
