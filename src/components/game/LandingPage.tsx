@@ -19,13 +19,13 @@ const HERO_GLOBE_CONFIG: GlobeConfig = {
   devicePixelRatio: 2,
   phi: -0.18,
   theta: 0.3,
-  dark: 0,
-  diffuse: 0.4,
+  dark: 1,
+  diffuse: 0.85,
   mapSamples: 20000,
-  mapBrightness: 1.25,
-  baseColor: [1, 1, 1],
-  markerColor: [251 / 255, 100 / 255, 21 / 255],
-  glowColor: [1, 1, 1],
+  mapBrightness: 5.6,
+  baseColor: [0.06, 0.2, 0.34],
+  markerColor: [0.2, 0.83, 0.68],
+  glowColor: [0.08, 0.58, 0.76],
   markers: [
     { location: [14.5995, 120.9842], size: 0.035 },
     { location: [19.076, 72.8777], size: 0.075 },
@@ -50,14 +50,14 @@ export function LandingPage({
 
   return (
     <motion.section
-      className="absolute inset-0 z-50 overflow-hidden bg-[#030406] text-white"
+      className="absolute inset-0 z-50 overflow-hidden bg-[#05080c] text-white"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: prefersReducedMotion ? 0.1 : 0.28 }}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(255,255,255,0.13),transparent_24rem),linear-gradient(180deg,#06070a_0%,#030406_46%,#030406_100%)]" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-24 bg-[linear-gradient(0deg,rgba(3,4,6,0.96),rgba(3,4,6,0))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_75%,rgba(34,211,238,0.2),transparent_27rem),radial-gradient(circle_at_50%_92%,rgba(52,211,153,0.12),transparent_18rem),linear-gradient(180deg,#071018_0%,#05080c_48%,#05080c_100%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-28 bg-[linear-gradient(0deg,rgba(5,8,12,0.96),rgba(5,8,12,0))]" />
 
       <Globe
         className="bottom-[-47vh] left-1/2 right-auto top-auto z-0 max-w-none w-[150vw] -translate-x-1/2 opacity-100 sm:bottom-[-58vh] sm:w-[120vw] lg:bottom-[-76vh] lg:w-[96vw] xl:bottom-[-70vh] xl:w-[88vw]"
@@ -72,7 +72,7 @@ export function LandingPage({
             transition={{ duration: 0.56, ease: [0.16, 1, 0.3, 1] }}
             className="flex w-full flex-col items-center pt-[8vh] sm:pt-[7vh]"
           >
-            <h1 className="bg-[linear-gradient(180deg,#dadbdd_0%,#9a9b9e_44%,#3f4146_76%,#17191d_100%)] bg-clip-text text-[clamp(3.55rem,14.5vw,9rem)] font-bold leading-[0.84] text-transparent drop-shadow-[0_24px_32px_rgba(0,0,0,0.82)] sm:leading-[0.82]">
+            <h1 className="bg-[linear-gradient(180deg,#e7fbff_0%,#8ddfed_36%,#246275_72%,#101922_100%)] bg-clip-text text-[clamp(3.55rem,14.5vw,9rem)] font-bold leading-[0.84] text-transparent drop-shadow-[0_24px_32px_rgba(0,0,0,0.82)] sm:leading-[0.82]">
               GeoMaster
             </h1>
           </motion.div>
@@ -91,7 +91,7 @@ export function LandingPage({
                 <button
                   type="button"
                   onClick={onResumeQuiz}
-                  className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_0_34px_rgba(52,211,153,0.18)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${emeraldCtaClass}`}
+                  className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_0_34px_rgba(52,211,153,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${emeraldCtaClass}`}
                 >
                   Resume Quiz
                 </button>
@@ -102,7 +102,7 @@ export function LandingPage({
                 className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_20px_25px_-5px_rgba(0,0,0,0.30)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${
                   hasActiveQuiz && onResumeQuiz
                     ? "border border-emerald-100/36 bg-emerald-300/18 text-emerald-50 transition hover:bg-emerald-300/28"
-                    : emeraldCtaClass
+                    : "border border-emerald-100/70 bg-emerald-300/88 text-slate-950 transition hover:bg-emerald-200"
                 }`}
               >
                 {hasActiveQuiz && onResumeQuiz ? "New Quiz" : "Choose a Quiz"}
@@ -110,7 +110,7 @@ export function LandingPage({
               <button
                 type="button"
                 onClick={onExploreMap}
-                className="min-h-11 rounded-full border border-white/24 bg-[#14161b]/95 px-6 py-3 text-base font-semibold text-slate-50 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.45)] transition hover:bg-[#1f2228] focus:outline-none focus:ring-2 focus:ring-zinc-100/70 focus:ring-offset-2 focus:ring-offset-[#05080c]"
+                className="min-h-11 rounded-full border border-cyan-100/24 bg-[#071018]/92 px-6 py-3 text-base font-semibold text-cyan-50 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(186,230,253,0.16)] transition hover:border-cyan-100/36 hover:bg-[#0b1822] focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c]"
               >
                 Explore Map
               </button>
