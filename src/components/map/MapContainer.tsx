@@ -93,7 +93,6 @@ const DEBUG_LABEL_LAYER_ID = "geomaster-debug-country-label-layer";
 const DEBUG_LEADER_LAYER_ID = "geomaster-debug-country-leader-layer";
 const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
-const LANDING_SEEN_KEY = "geomaster-landing-seen";
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
 const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
 const IDLE_ROTATION_STEP_MS = 250;
@@ -854,7 +853,7 @@ export function MapContainer() {
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
-  const [landingOpen, setLandingOpen] = useState(false);
+  const [landingOpen, setLandingOpen] = useState(true);
   const [resumableQuiz, setResumableQuiz] =
     useState<QuizProgressSnapshot | null>(null);
   const [regionPanelOpen, setRegionPanelOpen] = useState(false);
@@ -946,7 +945,6 @@ export function MapContainer() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setLandingOpen(window.localStorage.getItem(LANDING_SEEN_KEY) !== "1");
       setResumableQuiz(readQuizProgress());
     }, 0);
 
@@ -2838,8 +2836,6 @@ export function MapContainer() {
   }, [setMapDebug]);
 
   const closeLandingForQuiz = useCallback(() => {
-    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
-
     // The landing offers "Resume Quiz" right next to this action, so choosing
     // a new quiz while one is live is an explicit decision to abandon it.
     // Without the reset, the setup panel would immediately close itself
@@ -2857,7 +2853,6 @@ export function MapContainer() {
   }, [backToRegionSelect]);
 
   const closeLandingForExplore = useCallback(() => {
-    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
     setRegionPanelOpen(false);
     setLandingOpen(false);
   }, []);
@@ -2881,7 +2876,6 @@ export function MapContainer() {
   }, [discardSavedQuiz]);
 
   const resumeActiveQuiz = useCallback(() => {
-    window.localStorage.setItem(LANDING_SEEN_KEY, "1");
     setLandingOpen(false);
 
     const status = useGameStore.getState().gameStatus;
@@ -2921,7 +2915,11 @@ export function MapContainer() {
   }
 
   return (
-    <main className="relative h-dvh min-h-dvh w-full overflow-hidden bg-slate-100 text-white">
+    <main
+      className={`relative h-dvh min-h-dvh w-full overflow-hidden bg-slate-100 text-white ${
+        landingOpen ? "[&_.mapboxgl-control-container]:hidden" : ""
+      }`}
+    >
       <div ref={mapNodeRef} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_18%,rgba(34,211,238,0.08),transparent_32rem),linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.18))]" />
 
