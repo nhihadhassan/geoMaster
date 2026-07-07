@@ -3,7 +3,11 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { emeraldCtaClass } from "@/components/game/QuizCta";
 
-import { Globe, type GlobeConfig } from "@/components/ui/globe";
+import {
+  Globe,
+  type GlobeCityLabel,
+  type GlobeConfig,
+} from "@/components/ui/globe";
 
 type LandingPageProps = {
   onStartQuiz: () => void;
@@ -27,18 +31,29 @@ const HERO_GLOBE_CONFIG: GlobeConfig = {
   markerColor: [0.2, 0.83, 0.68],
   glowColor: [0.08, 0.58, 0.76],
   markers: [
-    { location: [14.5995, 120.9842], size: 0.035 },
-    { location: [19.076, 72.8777], size: 0.075 },
-    { location: [23.8103, 90.4125], size: 0.045 },
+    { location: [43.6532, -79.3832], size: 0.055 },
+    { location: [40.7128, -74.006], size: 0.065 },
+    { location: [19.4326, -99.1332], size: 0.065 },
+    { location: [-23.5505, -46.6333], size: 0.075 },
+    { location: [51.5072, -0.1276], size: 0.06 },
     { location: [30.0444, 31.2357], size: 0.055 },
-    { location: [39.9042, 116.4074], size: 0.065 },
-    { location: [-23.5505, -46.6333], size: 0.085 },
-    { location: [19.4326, -99.1332], size: 0.075 },
-    { location: [40.7128, -74.006], size: 0.075 },
-    { location: [34.6937, 135.5022], size: 0.045 },
-    { location: [41.0082, 28.9784], size: 0.05 },
+    { location: [19.076, 72.8777], size: 0.07 },
+    { location: [35.6762, 139.6503], size: 0.06 },
+    { location: [-33.8688, 151.2093], size: 0.055 },
   ],
 };
+
+const HERO_CITY_LABELS: GlobeCityLabel[] = [
+  { id: "toronto", name: "Toronto", location: [43.6532, -79.3832] },
+  { id: "new-york", name: "New York", location: [40.7128, -74.006] },
+  { id: "mexico-city", name: "Mexico City", location: [19.4326, -99.1332] },
+  { id: "sao-paulo", name: "Sao Paulo", location: [-23.5505, -46.6333] },
+  { id: "london", name: "London", location: [51.5072, -0.1276] },
+  { id: "cairo", name: "Cairo", location: [30.0444, 31.2357] },
+  { id: "mumbai", name: "Mumbai", location: [19.076, 72.8777] },
+  { id: "tokyo", name: "Tokyo", location: [35.6762, 139.6503] },
+  { id: "sydney", name: "Sydney", location: [-33.8688, 151.2093] },
+];
 
 export function LandingPage({
   onStartQuiz,
@@ -60,8 +75,10 @@ export function LandingPage({
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-28 bg-[linear-gradient(0deg,rgba(5,8,12,0.96),rgba(5,8,12,0))]" />
 
       <Globe
-        className="bottom-[-47vh] left-1/2 right-auto top-auto z-0 max-w-none w-[150vw] -translate-x-1/2 opacity-100 sm:bottom-[-58vh] sm:w-[120vw] lg:bottom-[-76vh] lg:w-[96vw] xl:bottom-[-70vh] xl:w-[88vw]"
+        className="bottom-[-20vh] left-1/2 right-auto top-auto z-0 max-w-none w-[150vw] -translate-x-1/2 opacity-100 sm:bottom-[-58vh] sm:w-[120vw] lg:bottom-[-76vh] lg:w-[96vw] xl:bottom-[-70vh] xl:w-[88vw]"
         config={HERO_GLOBE_CONFIG}
+        cityLabels={HERO_CITY_LABELS}
+        maxVisibleLabels={3}
       />
 
       <div className="relative z-10 flex h-full min-h-dvh px-4 py-6 sm:px-6 sm:py-8">

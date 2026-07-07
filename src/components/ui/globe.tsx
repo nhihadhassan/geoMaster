@@ -1,12 +1,24 @@
 "use client";
 
 import createGlobe, { type COBEOptions } from "cobe";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
 export type GlobeConfig = COBEOptions & {
   onRender?: (state: Partial<COBEOptions>) => void;
+};
+
+export type GlobeCityLabel = {
+  id: string;
+  name: string;
+  location: [number, number];
+};
+
+type ProjectedCityLabel = GlobeCityLabel & {
+  x: number;
+  y: number;
+  visible: boolean;
 };
 
 const GLOBE_CONFIG: GlobeConfig = {
@@ -37,19 +49,96 @@ const GLOBE_CONFIG: GlobeConfig = {
   ],
 };
 
+const AUTO_ROTATION_STEP = 0.008;
+
+const toGlobeVector = ([latitude, longitude]: [number, number]) => {
+  const lat = (latitude * Math.PI) / 180;
+  const lng = (longitude * Math.PI) / 180 - Math.PI;
+  const radius = Math.cos(lat);
+
+  return [-radius * Math.cos(lng), Math.sin(lat), radius * Math.sin(lng)];
+};
+
+const projectCityLabels = ({
+  labels,
+  maxVisibleLabels,
+  phi,
+  theta,
+  scale,
+}: {
+  labels: GlobeCityLabel[];
+  maxVisibleLabels: number;
+  phi: number;
+  theta: number;
+  scale: number;
+}) => {
+  const cosTheta = Math.cos(theta);
+  const sinTheta = Math.sin(theta);
+  const cosPhi = Math.cos(phi);
+  const sinPhi = Math.sin(phi);
+
+  let visibleCount = 0;
+
+  return labels
+    .map((label) => {
+      const [x, y, z] = toGlobeVector(label.location);
+      const projectedX = cosPhi * x + sinPhi * z;
+      const projectedY =
+        sinPhi * sinTheta * x + cosTheta * y - cosPhi * sinTheta * z;
+      const depth =
+        -sinPhi * cosTheta * x + sinTheta * y + cosPhi * cosTheta * z;
+
+      const labelX = (projectedX * scale + 1) / 2;
+      const labelY = (-projectedY * scale + 1) / 2;
+
+      return {
+        ...label,
+        x: labelX,
+        y: labelY,
+        depth,
+        visible:
+          depth > 0.16 &&
+          projectedX ** 2 + projectedY ** 2 < 0.58 &&
+          labelY < 0.42,
+      };
+    })
+    .sort((first, second) => second.depth - first.depth)
+    .map((label) => {
+      const visible = label.visible && visibleCount < maxVisibleLabels;
+
+      if (visible) {
+        visibleCount += 1;
+      }
+
+      return {
+        ...label,
+        visible,
+      };
+    });
+};
+
 export function Globe({
   className,
   config = GLOBE_CONFIG,
+  cityLabels = [],
+  maxVisibleLabels = 3,
 }: {
   className?: string;
   config?: GlobeConfig;
+  cityLabels?: GlobeCityLabel[];
+  maxVisibleLabels?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const phiRef = useRef(0);
+  const phiRef = useRef(config.phi ?? 0);
   const widthRef = useRef(0);
   const pointerInteracting = useRef<number | null>(null);
   const pointerInteractionMovement = useRef(0);
   const rotationRef = useRef(0);
+  const frameCountRef = useRef(0);
+  const lastFrameTimeRef = useRef<number | null>(null);
+  const [projectedCityLabels, setProjectedCityLabels] = useState<
+    ProjectedCityLabel[]
+  >([]);
 
   const updatePointerInteraction = (value: number | null) => {
     pointerInteracting.current = value;
@@ -94,9 +183,13 @@ export function Globe({
 
     let frameId = 0;
 
-    const render = () => {
+    const render = (timestamp: number) => {
+      const previousFrameTime = lastFrameTimeRef.current ?? timestamp;
+      const frameScale = Math.min((timestamp - previousFrameTime) / 16.67, 60);
+      lastFrameTimeRef.current = timestamp;
+
       if (pointerInteracting.current === null) {
-        phiRef.current += 0.005;
+        phiRef.current += AUTO_ROTATION_STEP * frameScale;
       }
 
       globe.update({
@@ -105,6 +198,19 @@ export function Globe({
         height: widthRef.current * 2,
       });
 
+      if (cityLabels.length > 0 && frameCountRef.current % 3 === 0) {
+        setProjectedCityLabels(
+          projectCityLabels({
+            labels: cityLabels,
+            maxVisibleLabels,
+            phi: phiRef.current + rotationRef.current,
+            theta: globeConfig.theta,
+            scale: globeConfig.scale ?? 1,
+          }),
+        );
+      }
+
+      frameCountRef.current += 1;
       frameId = window.requestAnimationFrame(render);
     };
 
@@ -120,7 +226,7 @@ export function Globe({
       window.removeEventListener("resize", updateSize);
       globe.destroy();
     };
-  }, [config]);
+  }, [cityLabels, config, maxVisibleLabels]);
 
   return (
     <div
@@ -149,6 +255,49 @@ export function Globe({
           }
         }}
       />
+      {projectedCityLabels.length > 0 ? (
+        <div className="pointer-events-none absolute inset-0 z-10">
+          {projectedCityLabels.map((city) => (
+            <div
+              key={city.id}
+              data-globe-city-label={city.name}
+              data-visible={city.visible}
+              className={cn(
+                "absolute flex -translate-y-1/2 items-center gap-2 transition-[opacity,transform] duration-500 ease-out",
+                city.visible
+                  ? "opacity-100"
+                  : "translate-y-1 opacity-0",
+              )}
+              style={{
+                left: `${city.x * 100}%`,
+                top: `${city.y * 100}%`,
+                transform:
+                  city.x > 0.58
+                    ? "translate(-100%, -50%)"
+                    : "translate(0, -50%)",
+              }}
+            >
+              {city.x > 0.58 ? (
+                <>
+                  <span className="rounded-full border border-cyan-100/18 bg-[#071018]/86 px-2.5 py-1 text-[0.62rem] font-semibold uppercase leading-none tracking-[0.18em] text-cyan-50 shadow-[0_10px_22px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(186,230,253,0.14)] backdrop-blur-md">
+                    {city.name}
+                  </span>
+                  <span className="h-px w-7 bg-cyan-100/42" />
+                  <span className="size-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.72)]" />
+                </>
+              ) : (
+                <>
+                  <span className="size-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(52,211,153,0.72)]" />
+                  <span className="h-px w-7 bg-cyan-100/42" />
+                  <span className="rounded-full border border-cyan-100/18 bg-[#071018]/86 px-2.5 py-1 text-[0.62rem] font-semibold uppercase leading-none tracking-[0.18em] text-cyan-50 shadow-[0_10px_22px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(186,230,253,0.14)] backdrop-blur-md">
+                    {city.name}
+                  </span>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
