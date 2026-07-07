@@ -1,7 +1,7 @@
 "use client";
 
 import createGlobe, { type COBEOptions } from "cobe";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -69,19 +69,6 @@ export function Globe({
     rotationRef.current = delta / 200;
   };
 
-  const onRender = useCallback(
-    (state: Record<string, number>) => {
-      if (pointerInteracting.current === null) {
-        phiRef.current += 0.0045;
-      }
-
-      state.phi = phiRef.current + rotationRef.current;
-      state.width = widthRef.current * 2;
-      state.height = widthRef.current * 2;
-    },
-    [],
-  );
-
   useEffect(() => {
     const canvas = canvasRef.current;
 
@@ -96,23 +83,44 @@ export function Globe({
     updateSize();
     window.addEventListener("resize", updateSize);
 
+    const globeConfig: GlobeConfig = { ...config };
+    delete globeConfig.onRender;
+
     const globe = createGlobe(canvas, {
-      ...config,
+      ...globeConfig,
       width: widthRef.current * 2,
       height: widthRef.current * 2,
-      onRender,
-    } as GlobeConfig);
+    });
+
+    let frameId = 0;
+
+    const render = () => {
+      if (pointerInteracting.current === null) {
+        phiRef.current += 0.005;
+      }
+
+      globe.update({
+        phi: phiRef.current + rotationRef.current,
+        width: widthRef.current * 2,
+        height: widthRef.current * 2,
+      });
+
+      frameId = window.requestAnimationFrame(render);
+    };
+
+    frameId = window.requestAnimationFrame(render);
 
     const fadeTimeout = window.setTimeout(() => {
       canvas.style.opacity = "1";
     }, 100);
 
     return () => {
+      window.cancelAnimationFrame(frameId);
       window.clearTimeout(fadeTimeout);
       window.removeEventListener("resize", updateSize);
       globe.destroy();
     };
-  }, [config, onRender]);
+  }, [config]);
 
   return (
     <div
