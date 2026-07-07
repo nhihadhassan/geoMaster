@@ -17,34 +17,28 @@ const HERO_GLOBE_CONFIG: GlobeConfig = {
   height: 1000,
   onRender: () => {},
   devicePixelRatio: 2,
-  phi: 0.16,
-  theta: 0.24,
-  dark: 1,
-  diffuse: 0.9,
+  phi: -0.18,
+  theta: 0.3,
+  dark: 0,
+  diffuse: 0.4,
   mapSamples: 20000,
-  mapBrightness: 5.8,
-  baseColor: [0.1, 0.24, 0.38],
-  markerColor: [0.2, 0.83, 0.68],
-  glowColor: [0.08, 0.56, 0.68],
+  mapBrightness: 1.25,
+  baseColor: [1, 1, 1],
+  markerColor: [251 / 255, 100 / 255, 21 / 255],
+  glowColor: [1, 1, 1],
   markers: [
-    { location: [43.6532, -79.3832], size: 0.08 },
-    { location: [40.7128, -74.006], size: 0.09 },
-    { location: [19.4326, -99.1332], size: 0.07 },
-    { location: [-23.5505, -46.6333], size: 0.09 },
-    { location: [51.5072, -0.1276], size: 0.08 },
-    { location: [30.0444, 31.2357], size: 0.07 },
-    { location: [28.6139, 77.209], size: 0.08 },
-    { location: [35.6762, 139.6503], size: 0.08 },
-    { location: [-33.8688, 151.2093], size: 0.07 },
-    { location: [1.3521, 103.8198], size: 0.06 },
+    { location: [14.5995, 120.9842], size: 0.035 },
+    { location: [19.076, 72.8777], size: 0.075 },
+    { location: [23.8103, 90.4125], size: 0.045 },
+    { location: [30.0444, 31.2357], size: 0.055 },
+    { location: [39.9042, 116.4074], size: 0.065 },
+    { location: [-23.5505, -46.6333], size: 0.085 },
+    { location: [19.4326, -99.1332], size: 0.075 },
+    { location: [40.7128, -74.006], size: 0.075 },
+    { location: [34.6937, 135.5022], size: 0.045 },
+    { location: [41.0082, 28.9784], size: 0.05 },
   ],
 };
-
-const heroStats = [
-  "196 countries",
-  "4 quiz modes",
-  "Atlas exploration",
-];
 
 export function LandingPage({
   onStartQuiz,
@@ -56,52 +50,35 @@ export function LandingPage({
 
   return (
     <motion.section
-      className="absolute inset-0 z-50 overflow-hidden bg-[#05080c] text-white"
+      className="absolute inset-0 z-50 overflow-hidden bg-[#030406] text-white"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: prefersReducedMotion ? 0.1 : 0.28 }}
     >
-      <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(5,8,12,0.98)_0%,rgba(5,8,12,0.8)_36%,rgba(5,8,12,0.36)_63%,rgba(5,8,12,0.82)_100%)]" />
-      <div className="absolute inset-x-0 top-0 h-px bg-cyan-200/28" />
-      <div className="absolute inset-x-0 bottom-0 h-32 bg-[linear-gradient(0deg,rgba(5,8,12,0.96),rgba(5,8,12,0))]" />
-
-      <motion.div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-70"
-        initial={prefersReducedMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 0.7 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <div className="absolute left-1/2 top-1/2 h-[min(84vh,860px)] w-[min(84vh,860px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-100/10" />
-        <div className="absolute left-1/2 top-1/2 h-[min(62vh,640px)] w-[min(62vh,640px)] -translate-x-1/2 -translate-y-1/2 rounded-full border border-emerald-100/10" />
-      </motion.div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_78%,rgba(255,255,255,0.13),transparent_24rem),linear-gradient(180deg,#06070a_0%,#030406_46%,#030406_100%)]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-24 bg-[linear-gradient(0deg,rgba(3,4,6,0.96),rgba(3,4,6,0))]" />
 
       <Globe
-        className="bottom-auto left-auto right-[-32vw] top-[6vh] z-0 max-w-none opacity-90 sm:right-[-18vw] sm:top-[-4vh] sm:w-[86vw] lg:right-[-10vw] lg:top-[-11vh] lg:w-[72vw] xl:right-[-6vw] xl:w-[68vw]"
+        className="bottom-[-47vh] left-1/2 right-auto top-auto z-0 max-w-none w-[150vw] -translate-x-1/2 opacity-100 sm:bottom-[-58vh] sm:w-[120vw] lg:bottom-[-76vh] lg:w-[96vw] xl:bottom-[-70vh] xl:w-[88vw]"
         config={HERO_GLOBE_CONFIG}
       />
 
-      <div className="relative z-10 flex h-full min-h-dvh overflow-y-auto px-4 py-5 sm:px-6 sm:py-8">
-        <div className="mx-auto grid min-h-full w-full max-w-7xl items-end gap-8 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-24 sm:items-center sm:pb-10 sm:pt-10 lg:grid-cols-[minmax(0,0.92fr)_minmax(20rem,0.78fr)]">
+      <div className="relative z-10 flex h-full min-h-dvh overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col items-center pt-[8vh] text-center sm:pt-[7vh]">
           <motion.div
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.56, ease: [0.16, 1, 0.3, 1] }}
-            className="max-w-3xl"
+            className="flex w-full flex-col items-center"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100/72">
-              Living atlas console
-            </p>
-            <h1 className="mt-5 text-6xl font-semibold leading-none text-slate-50 sm:text-8xl lg:text-9xl">
+            <h1 className="text-[clamp(3.55rem,14.5vw,9rem)] font-bold leading-[0.84] text-[#8f9092] drop-shadow-[0_24px_32px_rgba(0,0,0,0.82)] sm:leading-[0.82]">
               GeoMaster
             </h1>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-slate-200/72 sm:text-lg">
-              Spin the world, learn its patterns, then turn the atlas into a
-              geography challenge with countries, capitals, landmarks, and
-              local stories.
+            <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-zinc-300/72 sm:text-base">
+              Spin the world, then turn the atlas into a geography challenge.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-4 flex w-full max-w-md flex-col justify-center gap-3 sm:w-auto sm:max-w-none sm:flex-row">
               {hasActiveQuiz && onResumeQuiz ? (
                 <button
                   type="button"
@@ -131,32 +108,12 @@ export function LandingPage({
               </button>
             </div>
           </motion.div>
-
-          <motion.div
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              delay: prefersReducedMotion ? 0 : 0.12,
-              duration: 0.56,
-              ease: [0.16, 1, 0.3, 1],
-            }}
-            className="mb-2 flex flex-wrap gap-2 self-end justify-self-start text-xs font-semibold text-slate-100/70 sm:mb-0 lg:justify-self-end"
-          >
-            {heroStats.map((stat) => (
-              <span
-                key={stat}
-                className="rounded-full border border-white/12 bg-[#090f1a]/68 px-4 py-2 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.24)] backdrop-blur-md"
-              >
-                {stat}
-              </span>
-            ))}
-          </motion.div>
         </div>
       </div>
 
       <motion.div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-5 right-5 hidden max-w-xs text-right text-xs font-medium leading-5 text-cyan-50/48 sm:block"
+        className="pointer-events-none absolute bottom-5 right-5 z-10 hidden max-w-xs text-right text-xs font-medium leading-5 text-zinc-200/42 sm:block"
         initial={prefersReducedMotion ? false : { opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{
