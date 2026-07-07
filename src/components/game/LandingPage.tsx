@@ -64,21 +64,29 @@ export function LandingPage({
         config={HERO_GLOBE_CONFIG}
       />
 
-      <div className="relative z-10 flex h-full min-h-dvh overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
-        <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col items-center pt-[8vh] text-center sm:pt-[7vh]">
+      <div className="relative z-10 flex h-full min-h-dvh px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col items-center text-center">
           <motion.div
             initial={prefersReducedMotion ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.56, ease: [0.16, 1, 0.3, 1] }}
-            className="flex w-full flex-col items-center"
+            className="flex w-full flex-col items-center pt-[8vh] sm:pt-[7vh]"
           >
-            <h1 className="text-[clamp(3.55rem,14.5vw,9rem)] font-bold leading-[0.84] text-[#8f9092] drop-shadow-[0_24px_32px_rgba(0,0,0,0.82)] sm:leading-[0.82]">
+            <h1 className="bg-[linear-gradient(180deg,#dadbdd_0%,#9a9b9e_44%,#3f4146_76%,#17191d_100%)] bg-clip-text text-[clamp(3.55rem,14.5vw,9rem)] font-bold leading-[0.84] text-transparent drop-shadow-[0_24px_32px_rgba(0,0,0,0.82)] sm:leading-[0.82]">
               GeoMaster
             </h1>
-            <p className="mt-4 max-w-xl text-sm font-medium leading-6 text-zinc-300/72 sm:text-base">
-              Spin the world, then turn the atlas into a geography challenge.
-            </p>
-            <div className="mt-4 flex w-full max-w-md flex-col justify-center gap-3 sm:w-auto sm:max-w-none sm:flex-row">
+          </motion.div>
+
+          <motion.div
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: prefersReducedMotion ? 0 : 0.12,
+              duration: 0.56,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            className="relative z-20 mt-auto flex w-full max-w-md flex-col justify-center gap-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:flex-row sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+          >
               {hasActiveQuiz && onResumeQuiz ? (
                 <button
                   type="button"
@@ -102,28 +110,13 @@ export function LandingPage({
               <button
                 type="button"
                 onClick={onExploreMap}
-                className="min-h-11 rounded-full border border-white/16 bg-white/8 px-6 py-3 text-base font-semibold text-slate-100/80 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.24)] transition hover:bg-white/14 hover:text-white focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c]"
+                className="min-h-11 rounded-full border border-white/24 bg-[#14161b]/95 px-6 py-3 text-base font-semibold text-slate-50 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.45)] transition hover:bg-[#1f2228] focus:outline-none focus:ring-2 focus:ring-zinc-100/70 focus:ring-offset-2 focus:ring-offset-[#05080c]"
               >
                 Explore Map
               </button>
-            </div>
           </motion.div>
         </div>
       </div>
-
-      <motion.div
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-5 right-5 z-10 hidden max-w-xs text-right text-xs font-medium leading-5 text-zinc-200/42 sm:block"
-        initial={prefersReducedMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{
-          delay: prefersReducedMotion ? 0 : 0.55,
-          duration: 0.5,
-          ease: [0.16, 1, 0.3, 1],
-        }}
-      >
-        Drag the globe, then enter the map.
-      </motion.div>
     </motion.section>
   );
 }
