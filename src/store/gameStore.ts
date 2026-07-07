@@ -406,15 +406,13 @@ const createResetState = (
   };
 };
 
+const initialTimerMultiplier = readInitialTimerMultiplier();
+
 export const useGameStore = create<GameState>((set, get) => ({
-  ...createResetState(
-    "south-america",
-    "type-to-fill",
-    readInitialTimerMultiplier(),
-  ),
+  ...createResetState("south-america", "type-to-fill", initialTimerMultiplier),
   autoHideCorrectCard: readInitialAutoHideCorrectCard(),
   soundEffectsEnabled: readInitialSoundEffectsEnabled(),
-  timerMultiplier: readInitialTimerMultiplier(),
+  timerMultiplier: initialTimerMultiplier,
   debug: {
     mapLoaded: false,
     countrySourceLoaded: false,

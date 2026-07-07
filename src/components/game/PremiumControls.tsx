@@ -9,12 +9,12 @@ import {
 } from "@/components/game/QuizCta";
 import {
   getRegionConfig,
-  getTimerSeconds,
   regionSelectorConfigs,
   type QuizRegion,
 } from "@/data/countries";
 import { modeLabels } from "@/data/gameModes";
 import {
+  getScaledTimerSeconds,
   TIMER_MULTIPLIER_OPTIONS,
   useGameStore,
   type GameMode,
@@ -29,6 +29,31 @@ const modeDescriptions: Record<GameMode, string> = {
   "click-country": "Tap the prompted country.",
   "capital-challenge": "Answer from the capital.",
 };
+
+function MinimizeButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Minimize quiz setup"
+      title="Minimize quiz setup"
+      className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/8 text-white/70 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="size-4"
+        aria-hidden="true"
+      >
+        <path d="M5 8l5 5 5-5" />
+      </svg>
+    </button>
+  );
+}
 
 type PremiumControlsProps = {
   panelOpen: boolean;
@@ -264,15 +289,16 @@ export function PremiumControls({
     </button>
   );
 
-  const baseTimerSeconds = getTimerSeconds(selectedRegion, selectedMode);
   const timerOptions = (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <span className="block text-sm font-semibold text-white/72">
+        <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
           Timer
         </span>
         <span className="font-mono text-xs font-semibold tabular-nums text-white/60">
-          {formatTime(Math.round(baseTimerSeconds * timerMultiplier))}
+          {formatTime(
+            getScaledTimerSeconds(selectedRegion, selectedMode, timerMultiplier),
+          )}
         </span>
       </div>
       <span className="mt-0.5 block text-xs text-white/56">
@@ -385,26 +411,7 @@ export function PremiumControls({
               </p>
             </div>
             {renderStartButton("header")}
-            <button
-              type="button"
-              onClick={closePanel}
-              aria-label="Minimize quiz setup"
-              title="Minimize quiz setup"
-              className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full border border-white/12 bg-white/8 text-white/70 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
-            >
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="size-4"
-                aria-hidden="true"
-              >
-                <path d="M5 8l5 5 5-5" />
-              </svg>
-            </button>
+            <MinimizeButton onClick={closePanel} />
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2 rounded-full border border-white/10 bg-white/6 p-1">
             {(["region", "mode", "timer"] as const).map((tab) => (
@@ -446,26 +453,7 @@ export function PremiumControls({
             <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
               Region
             </p>
-            <button
-              type="button"
-              onClick={closePanel}
-              aria-label="Minimize quiz setup"
-              title="Minimize quiz setup"
-              className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full border border-white/10 bg-white/7 text-white/66 transition hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
-            >
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="size-4"
-                aria-hidden="true"
-              >
-                <path d="M5 8l5 5 5-5" />
-              </svg>
-            </button>
+            <MinimizeButton onClick={closePanel} />
           </div>
           {canStartQuiz ? (
             <div className="mt-3">{renderStartButton("panel")}</div>

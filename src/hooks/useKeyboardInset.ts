@@ -13,6 +13,13 @@ const readKeyboardInset = () => {
   }
 
   const viewport = window.visualViewport;
+
+  // Pinch-zoom also shrinks the visual viewport; only a ~1:1 scale means the
+  // height loss is actually a keyboard.
+  if (viewport.scale > 1.05) {
+    return 0;
+  }
+
   const inset = Math.max(
     0,
     window.innerHeight - viewport.height - viewport.offsetTop,
