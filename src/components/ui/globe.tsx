@@ -49,7 +49,7 @@ const GLOBE_CONFIG: GlobeConfig = {
   ],
 };
 
-const AUTO_ROTATION_STEP = 0.008;
+const AUTO_ROTATION_STEP = 0.003;
 
 const toGlobeVector = ([latitude, longitude]: [number, number]) => {
   const lat = (latitude * Math.PI) / 180;
@@ -134,7 +134,6 @@ export function Globe({
   const pointerInteracting = useRef<number | null>(null);
   const pointerInteractionMovement = useRef(0);
   const rotationRef = useRef(0);
-  const frameCountRef = useRef(0);
   const lastFrameTimeRef = useRef<number | null>(null);
   const [projectedCityLabels, setProjectedCityLabels] = useState<
     ProjectedCityLabel[]
@@ -198,7 +197,7 @@ export function Globe({
         height: widthRef.current * 2,
       });
 
-      if (cityLabels.length > 0 && frameCountRef.current % 3 === 0) {
+      if (cityLabels.length > 0) {
         setProjectedCityLabels(
           projectCityLabels({
             labels: cityLabels,
@@ -210,7 +209,6 @@ export function Globe({
         );
       }
 
-      frameCountRef.current += 1;
       frameId = window.requestAnimationFrame(render);
     };
 
