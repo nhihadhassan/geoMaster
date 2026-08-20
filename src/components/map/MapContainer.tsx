@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type MutableRefObject,
 } from "react";
 import type { FeatureCollection, Geometry } from "geojson";
 import { AntarcticaEducationCard } from "@/components/game/AntarcticaEducationCard";
