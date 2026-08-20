@@ -13,39 +13,41 @@ import {
 } from "@/utils/countryHints";
 import type { LearningFeature } from "@/data/learningFeatures";
 import type { GeoSoundEvent } from "@/utils/soundEffects";
+import {
+  persistAutoHideCorrectCard,
+  persistSoundEffectsEnabled,
+  persistTimerMultiplier,
+  readInitialAutoHideCorrectCard,
+  readInitialSoundEffectsEnabled,
+  readInitialTimerMultiplier,
+  normalizeTimerMultiplier,
+} from "@/store/preferences";
+import {
+  clearQuizProgress,
+  QUIZ_PROGRESS_VERSION,
+  readQuizProgress,
+  writeQuizProgress,
+  type QuizProgressSnapshot,
+} from "@/store/quizPersistence";
+import type {
+  CountryResult,
+  CountryResultStatus,
+  GameMode,
+  GameStatus,
+  IdentifyGuessResult,
+  QuizFeedbackEvent,
+} from "@/store/gameTypes";
 
-export type GameStatus =
-  | "idle"
-  | "running"
-  | "paused"
-  | "completed"
-  | "failed"
-  | "gave-up";
-export type GameMode =
-  | "type-to-fill"
-  | "identify-shaded"
-  | "click-country"
-  | "capital-challenge";
-export type CountryResultStatus = "correct" | "assisted" | "missed";
-
-export type CountryResult = {
-  status: CountryResultStatus;
-  attemptsUsed: number;
-};
-
-export type IdentifyGuessResult = {
-  outcome: "correct" | "assisted" | "wrong" | "missed" | "ignored";
-  country?: Country;
-  clickedCountry?: Country | null;
-};
-
-export type QuizFeedbackEvent = {
-  kind: GeoSoundEvent;
-  sequence: number;
-  countryId?: string;
-  completed?: boolean;
-  perfect?: boolean;
-};
+export type {
+  CountryResult,
+  CountryResultStatus,
+  GameMode,
+  GameStatus,
+  IdentifyGuessResult,
+  QuizFeedbackEvent,
+} from "@/store/gameTypes";
+export { readQuizProgress, type QuizProgressSnapshot } from "@/store/quizPersistence";
+export { TIMER_MULTIPLIER_OPTIONS } from "@/store/preferences";
 
 type FeatureStateDebug = {
   source: string;
@@ -177,28 +179,6 @@ const isPerfectCountryResultSet = (
   Object.values(countryResults).length === total &&
   Object.values(countryResults).every((result) => result.status === "correct");
 
-const AUTO_HIDE_CORRECT_CARD_KEY = "geomaster-auto-hide-correct-card";
-const SOUND_EFFECTS_ENABLED_KEY = "geomaster-sound-effects-enabled";
-const QUIZ_PROGRESS_KEY = "geomaster-quiz-progress";
-const QUIZ_PROGRESS_VERSION = 1;
-const TIMER_MULTIPLIER_KEY = "geomaster-timer-multiplier";
-
-export type QuizProgressSnapshot = {
-  v: number;
-  region: QuizRegion;
-  mode: GameMode;
-  status: "running" | "paused";
-  guessedCountryIds: string[];
-  countryResults: Record<string, CountryResult>;
-  incorrectAttempts: Record<string, number>;
-  score: number;
-  total: number;
-  remainingSeconds: number;
-  targetQueue: string[];
-  currentTargetIso: string | null;
-  savedAt: number;
-};
-
 const isResumableStatus = (
   status: GameStatus,
 ): status is "running" | "paused" =>
@@ -226,121 +206,6 @@ const buildQuizProgressSnapshot = (
     currentTargetIso: state.currentTargetCountry?.iso_a3 ?? null,
     savedAt: Date.now(),
   };
-};
-
-const writeQuizProgress = (snapshot: QuizProgressSnapshot) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(QUIZ_PROGRESS_KEY, JSON.stringify(snapshot));
-  } catch {
-    // Storage can be unavailable (private mode, quota). The quiz keeps
-    // running; it just won't survive a reload.
-  }
-};
-
-const clearQuizProgress = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(QUIZ_PROGRESS_KEY);
-  } catch {
-    // Same storage caveat as writeQuizProgress.
-  }
-};
-
-export const readQuizProgress = (): QuizProgressSnapshot | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const raw = window.localStorage.getItem(QUIZ_PROGRESS_KEY);
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as QuizProgressSnapshot;
-
-    if (
-      !parsed ||
-      parsed.v !== QUIZ_PROGRESS_VERSION ||
-      (parsed.status !== "running" && parsed.status !== "paused") ||
-      getCountriesForRegion(parsed.region).length === 0
-    ) {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
-const readInitialAutoHideCorrectCard = () => {
-  if (typeof window === "undefined") {
-    return true;
-  }
-
-  return window.localStorage.getItem(AUTO_HIDE_CORRECT_CARD_KEY) !== "false";
-};
-
-const persistAutoHideCorrectCard = (enabled: boolean) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(AUTO_HIDE_CORRECT_CARD_KEY, String(enabled));
-};
-
-const readInitialSoundEffectsEnabled = () => {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  return window.localStorage.getItem(SOUND_EFFECTS_ENABLED_KEY) === "true";
-};
-
-const persistSoundEffectsEnabled = (enabled: boolean) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(SOUND_EFFECTS_ENABLED_KEY, String(enabled));
-};
-
-// Timer multiplier lets players give themselves more time before starting.
-// 1 = the region's standard timer; larger values scale it up.
-export const TIMER_MULTIPLIER_OPTIONS = [1, 1.5, 2, 3] as const;
-
-const DEFAULT_TIMER_MULTIPLIER = 1;
-
-const normalizeTimerMultiplier = (value: number) =>
-  (TIMER_MULTIPLIER_OPTIONS as readonly number[]).includes(value)
-    ? value
-    : DEFAULT_TIMER_MULTIPLIER;
-
-const readInitialTimerMultiplier = () => {
-  if (typeof window === "undefined") {
-    return DEFAULT_TIMER_MULTIPLIER;
-  }
-
-  return normalizeTimerMultiplier(
-    Number(window.localStorage.getItem(TIMER_MULTIPLIER_KEY)),
-  );
-};
-
-const persistTimerMultiplier = (multiplier: number) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(TIMER_MULTIPLIER_KEY, String(multiplier));
 };
 
 export const getScaledTimerSeconds = (
