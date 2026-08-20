@@ -11,11 +11,16 @@ in an "atlas HUD" interface with quiz feedback, hints, and end-of-round stats.
 ## Features
 
 - 🗺️ **Interactive Mapbox map** — full-screen, flies to each country as you guess it
-- ⌨️ **Type-to-fill matching** — fuzzy country matching with [Fuse.js] (handles typos and
-  alternate names)
-- 🎓 **Learning mode** — country education cards with stories, hints, and physical-feature data
-- 💡 **Hints & target cards** — progressive assistance when you're stuck
-- 📊 **Results dashboard** — per-round scoring, accuracy, and a perfect-run celebration
+- ⌨️ **Type-to-fill matching** — forgiving country matching (handles typos and alternate names)
+- 🎓 **Explore mode** — country, city, landmark, subdivision, and physical-feature cards,
+  with search and zoom/recenter controls
+- 💡 **Hints & target cards** — progressive assistance when you're stuck, and a wrong map pick
+  is shown against the right answer once it's revealed
+- 📈 **Local mastery tracking** — remembers what you keep missing, and can quiz you on exactly
+  those countries
+- 📊 **Results dashboard** — scoring, review, a shareable card, and next actions
+  (Practice, Try Again, Change Region, Explore)
+- 🗓️ **Daily Challenge** — a date-seeded set of 12, the same for everyone, with a local streak
 - 🌴 **Detail touches** — Caribbean inset map, country popups, Antarctica handling, sound effects
 - 🎞️ **Polished motion** — Framer Motion animations and a dark "atlas" design system
 - 🗃️ **Generated, validated country dataset** — TopoJSON world geometry plus scripted data
@@ -28,7 +33,7 @@ in an "atlas HUD" interface with quiz feedback, hints, and end-of-round stats.
 | Framework | Next.js (App Router) · React · TypeScript |
 | Mapping | Mapbox GL · topojson-client |
 | State | Zustand |
-| Matching | Fuse.js |
+| Matching | Hand-rolled Damerau-Levenshtein matcher |
 | Styling / motion | Tailwind CSS · Framer Motion |
 
 ## Getting started
@@ -65,9 +70,14 @@ npm run dev                  # start dev server
 npm run build                # production build
 npm run start                # serve production build
 npm run lint                 # lint
+npm test                     # dataset validation + all test suites
 npm run generate:countries   # regenerate the country dataset
 npm run validate:countries   # validate the generated dataset
-npm run test:matcher         # test the country-name matcher
+npm run test:matcher         # country-name matcher
+npm run test:store           # quiz engine, timer, persistence
+npm run test:progress        # mastery model
+npm run test:search          # explore search
+npm run test:daily           # daily challenge
 ```
 
 ## Project structure
@@ -77,17 +87,20 @@ src/
 ├── app/                # App Router entry (renders the full-screen map game)
 ├── components/
 │   ├── game/           # HUD, type-to-fill input, education & results cards, celebrations
-│   └── map/            # Mapbox container, Caribbean inset, country popups
-├── hooks/              # world topology, country matcher, sound effects, overlay focus
+│   └── map/            # Mapbox container, layers, search, controls, inset, popups
+├── config/             # feature flags
+├── hooks/              # world topology, matcher, sound, focus, environment, progress
 ├── data/               # generated countries, subdivisions, cities, stories, features
-├── store/              # Zustand game state
-└── utils/              # matching, hints, education, flags, sound helpers
+├── store/              # Zustand game state, persistence, preferences, progress
+└── utils/              # matching, hints, education, mastery, search, daily challenge
 ```
+
+Features added in the August 2026 round are individually switchable in
+[`src/config/features.ts`](src/config/features.ts) — see
+[`docs/product-round-2026-08.md`](docs/product-round-2026-08.md).
 
 See [`DESIGN.md`](DESIGN.md) for the design system (colors, typography, layout tokens).
 
 ## License
 
 Released under the [MIT License](LICENSE).
-
-[Fuse.js]: https://www.fusejs.io/
