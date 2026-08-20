@@ -113,6 +113,7 @@ import {
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import { useRecordQuizProgress } from "@/hooks/useRecordQuizProgress";
 import {
   useDocumentVisible,
   useMobilePerformanceMode,
@@ -268,6 +269,7 @@ export function MapContainer() {
   const setMapDebug = useGameStore((state) => state.setMapDebug);
 
   useSoundEffects(lastFeedbackEvent, { documentVisible });
+  useRecordQuizProgress();
 
   useEffect(() => {
     if (mapInitAllowed) {
