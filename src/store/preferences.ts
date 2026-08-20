@@ -65,3 +65,27 @@ export const persistTimerMultiplier = (multiplier: number) => {
 
   window.localStorage.setItem(TIMER_MULTIPLIER_KEY, String(multiplier));
 };
+
+// Untimed practice: the clock is hidden and never runs out, so a player can
+// work through a region without pressure. Persisted alongside the multiplier.
+const TIMER_MODE_KEY = "geomaster-timer-mode";
+
+export type TimerMode = "timed" | "untimed";
+
+export const readInitialTimerMode = (): TimerMode => {
+  if (typeof window === "undefined") {
+    return "timed";
+  }
+
+  return window.localStorage.getItem(TIMER_MODE_KEY) === "untimed"
+    ? "untimed"
+    : "timed";
+};
+
+export const persistTimerMode = (mode: TimerMode) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(TIMER_MODE_KEY, mode);
+};

@@ -13,6 +13,7 @@ import {
   type QuizRegion,
 } from "@/data/countries";
 import { modeLabels } from "@/data/gameModes";
+import { features } from "@/config/features";
 import {
   getScaledTimerSeconds,
   TIMER_MULTIPLIER_OPTIONS,
@@ -92,6 +93,8 @@ export function PremiumControls({
     (state) => state.setSoundEffectsEnabled,
   );
   const setTimerMultiplier = useGameStore((state) => state.setTimerMultiplier);
+  const timerMode = useGameStore((state) => state.timerMode);
+  const setTimerMode = useGameStore((state) => state.setTimerMode);
   const [activeMobileTab, setActiveMobileTab] = useState<
     "region" | "mode" | "timer"
   >(defaultMobileTab);
@@ -289,6 +292,8 @@ export function PremiumControls({
     </button>
   );
 
+  const untimedEnabled = features.untimedMode && timerMode === "untimed";
+
   const timerOptions = (
     <div>
       <div className="flex items-center justify-between gap-2">
@@ -296,23 +301,41 @@ export function PremiumControls({
           Timer
         </span>
         <span className="font-mono text-xs font-semibold tabular-nums text-white/60">
-          {formatTime(
-            getScaledTimerSeconds(selectedRegion, selectedMode, timerMultiplier),
-          )}
+          {untimedEnabled
+            ? "No limit"
+            : formatTime(
+                getScaledTimerSeconds(
+                  selectedRegion,
+                  selectedMode,
+                  timerMultiplier,
+                ),
+              )}
         </span>
       </div>
       <span className="mt-0.5 block text-xs text-white/56">
-        Give yourself more time to finish
+        {untimedEnabled
+          ? "Practise without a countdown"
+          : "Give yourself more time to finish"}
       </span>
-      <div className="mt-2 grid grid-cols-4 gap-2">
+      <div
+        className={`mt-2 grid gap-2 ${
+          features.untimedMode ? "grid-cols-5" : "grid-cols-4"
+        }`}
+      >
         {TIMER_MULTIPLIER_OPTIONS.map((value) => {
-          const selected = timerMultiplier === value;
+          const selected = !untimedEnabled && timerMultiplier === value;
 
           return (
             <button
               key={value}
               type="button"
-              onClick={() => setTimerMultiplier(value)}
+              onClick={() => {
+                if (features.untimedMode) {
+                  setTimerMode("timed");
+                }
+
+                setTimerMultiplier(value);
+              }}
               disabled={isQuizLocked}
               aria-pressed={selected}
               className={`min-h-11 rounded-2xl border px-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70 ${
@@ -325,6 +348,22 @@ export function PremiumControls({
             </button>
           );
         })}
+        {features.untimedMode ? (
+          <button
+            type="button"
+            onClick={() => setTimerMode(untimedEnabled ? "timed" : "untimed")}
+            disabled={isQuizLocked}
+            aria-pressed={untimedEnabled}
+            title="Practice without a timer"
+            className={`min-h-11 rounded-2xl border px-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70 ${
+              untimedEnabled
+                ? "border-cyan-100/34 bg-cyan-300/16 text-cyan-50"
+                : "border-white/10 bg-white/[0.055] text-white/66 hover:bg-white/10 hover:text-white"
+            } disabled:cursor-not-allowed disabled:opacity-70`}
+          >
+            ∞
+          </button>
+        ) : null}
       </div>
     </div>
   );

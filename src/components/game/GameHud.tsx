@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { PlayTriangle } from "@/components/game/QuizCta";
 import { getRegionConfig } from "@/data/countries";
 import { modeLabels } from "@/data/gameModes";
+import { features } from "@/config/features";
 import { useGameStore } from "@/store/gameStore";
 import { formatTime } from "@/utils/formatTime";
 
@@ -174,6 +175,7 @@ export function GameHud({
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
   const giveUp = useGameStore((state) => state.giveUp);
   const tick = useGameStore((state) => state.tick);
+  const timerMode = useGameStore((state) => state.timerMode);
   const region = getRegionConfig(selectedRegion);
   const modeBResults = Object.values(countryResults);
   const perfectCount = modeBResults.filter(
@@ -203,7 +205,8 @@ export function GameHud({
     gameStatus === "completed" ||
     gameStatus === "failed" ||
     gameStatus === "gave-up";
-  const showTimer = gameStatus !== "idle";
+  const isUntimed = features.untimedMode && timerMode === "untimed";
+  const showTimer = gameStatus !== "idle" && !isUntimed;
   const statusLabel = isSetup
     ? "Quiz setup"
     : isFinished
@@ -231,8 +234,20 @@ export function GameHud({
     }
 
     const intervalId = window.setInterval(tick, 1000);
+    // Browsers throttle background intervals, so re-derive the clock the moment
+    // the tab (or a woken phone) comes back rather than waiting for a tick.
+    const syncOnVisible = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+      }
+    };
 
-    return () => window.clearInterval(intervalId);
+    document.addEventListener("visibilitychange", syncOnVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", syncOnVisible);
+    };
   }, [gameStatus, tick]);
 
   const primaryAction =

@@ -21,6 +21,9 @@ import {
   readInitialSoundEffectsEnabled,
   readInitialTimerMultiplier,
   normalizeTimerMultiplier,
+  persistTimerMode,
+  readInitialTimerMode,
+  type TimerMode,
 } from "@/store/preferences";
 import {
   clearQuizProgress,
@@ -103,6 +106,11 @@ type GameState = {
   score: number;
   total: number;
   remainingSeconds: number;
+  // Wall-clock instant the running quiz expires. The timer is derived from this
+  // rather than decremented, so a backgrounded tab or a sleeping phone cannot
+  // silently freeze or slow the clock. Null while idle, paused, or untimed.
+  deadlineAt: number | null;
+  timerMode: TimerMode;
   gameStatus: GameStatus;
   incorrectAttempts: Record<string, number>;
   lastMatchedCountry: Country | null;
@@ -137,6 +145,7 @@ type GameState = {
   setAutoHideCorrectCard: (enabled: boolean) => void;
   setSoundEffectsEnabled: (enabled: boolean) => void;
   setTimerMultiplier: (multiplier: number) => void;
+  setTimerMode: (mode: TimerMode) => void;
   recordFeedbackEvent: (
     kind: GeoSoundEvent,
     options?: Omit<QuizFeedbackEvent, "kind" | "sequence">,
@@ -255,6 +264,7 @@ const createResetState = (
       selectedMode,
       timerMultiplier,
     ),
+    deadlineAt: null,
     gameStatus: "idle" as GameStatus,
     incorrectAttempts: {},
     lastMatchedCountry: null,
@@ -272,12 +282,22 @@ const createResetState = (
 };
 
 const initialTimerMultiplier = readInitialTimerMultiplier();
+const initialTimerMode = readInitialTimerMode();
+
+// A running quiz expires at a wall-clock instant; `remainingSeconds` is a
+// derived view of it that each tick refreshes.
+const deadlineFor = (remainingSeconds: number, timerMode: TimerMode) =>
+  timerMode === "untimed" ? null : Date.now() + remainingSeconds * 1000;
+
+const remainingSecondsFrom = (deadlineAt: number | null) =>
+  deadlineAt === null ? null : Math.max(Math.ceil((deadlineAt - Date.now()) / 1000), 0);
 
 export const useGameStore = create<GameState>((set, get) => ({
   ...createResetState("south-america", "type-to-fill", initialTimerMultiplier),
   autoHideCorrectCard: readInitialAutoHideCorrectCard(),
   soundEffectsEnabled: readInitialSoundEffectsEnabled(),
   timerMultiplier: initialTimerMultiplier,
+  timerMode: initialTimerMode,
   debug: {
     mapLoaded: false,
     countrySourceLoaded: false,
@@ -342,11 +362,22 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
+    // Start from a full clock even if the previous run ended on an expired
+    // timer, then arm the wall-clock deadline the tick derives from.
+    const remainingSeconds = getScaledTimerSeconds(
+      state.selectedRegion,
+      state.selectedMode,
+      state.timerMultiplier,
+    );
+    const deadlineAt = deadlineFor(remainingSeconds, state.timerMode);
+
     if (isTargetQueueMode(state.selectedMode)) {
       const [firstTargetId, ...targetQueue] = shuffleIds(state.quizCountries);
 
       set({
         gameStatus: "running",
+        remainingSeconds,
+        deadlineAt,
         currentInput: "",
         guessedCountryIds: [],
         countryResults: {},
@@ -368,6 +399,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       gameStatus: "running",
+      remainingSeconds,
+      deadlineAt,
       currentInput: "",
       guessedCountryIds: [],
       countryResults: {},
@@ -393,6 +426,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       gameStatus: "paused",
+      remainingSeconds:
+        remainingSecondsFrom(state.deadlineAt) ?? state.remainingSeconds,
+      deadlineAt: null,
       currentInput: "",
       smartHint: null,
     });
@@ -404,7 +440,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    set({ gameStatus: "running" });
+    set({
+      gameStatus: "running",
+      deadlineAt: deadlineFor(state.remainingSeconds, state.timerMode),
+    });
   },
   resetQuiz: () => {
     const { selectedRegion, selectedMode, timerMultiplier } = get();
@@ -420,6 +459,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       gameStatus: "gave-up",
+      deadlineAt: null,
       currentInput: "",
       currentTargetCountry: null,
       targetQueue: [],
@@ -466,6 +506,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       incorrectAttempts: snapshot.incorrectAttempts,
       score: snapshot.score,
       remainingSeconds: snapshot.remainingSeconds,
+      deadlineAt:
+        snapshot.status === "running"
+          ? deadlineFor(snapshot.remainingSeconds, get().timerMode)
+          : null,
       targetQueue: snapshot.targetQueue,
       currentTargetCountry,
       gameStatus: snapshot.status,
@@ -504,6 +548,24 @@ export const useGameStore = create<GameState>((set, get) => ({
             ),
           }
         : {}),
+    });
+  },
+  setTimerMode: (mode) => {
+    persistTimerMode(mode);
+
+    const state = get();
+
+    // Switching while a quiz is live re-arms (or disarms) the clock in place
+    // rather than restarting the run.
+    set({
+      timerMode: mode,
+      deadlineAt:
+        state.gameStatus === "running"
+          ? deadlineFor(
+              remainingSecondsFrom(state.deadlineAt) ?? state.remainingSeconds,
+              mode,
+            )
+          : null,
     });
   },
   recordFeedbackEvent: (kind, options) => {
@@ -963,12 +1025,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const remainingSeconds = Math.max(state.remainingSeconds - 1, 0);
+    // Untimed runs have no deadline; there is nothing to count down.
+    const remainingSeconds = remainingSecondsFrom(state.deadlineAt);
+
+    if (remainingSeconds === null || remainingSeconds === state.remainingSeconds) {
+      return;
+    }
 
     set(
       remainingSeconds === 0
         ? {
             remainingSeconds,
+            deadlineAt: null,
             gameStatus: "failed",
             isPerfectRun: false,
             currentInput: "",
