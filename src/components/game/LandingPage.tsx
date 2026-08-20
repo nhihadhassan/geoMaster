@@ -14,6 +14,20 @@ type LandingPageProps = {
   onExploreMap: () => void;
   hasActiveQuiz?: boolean;
   onResumeQuiz?: () => void;
+  /** One line of orientation: what GeoMaster is for a newcomer, or where the
+   *  returning player stands. Kept to a single line on purpose - this is a
+   *  globe-first landing, not a marketing page. */
+  contextLine?: string | null;
+  /** Starts the player's last region and mode without opening quiz setup. */
+  onQuickStart?: () => void;
+  quickStartLabel?: string;
+  /** Drills the countries this player keeps getting wrong. */
+  onPracticeWeakSpots?: () => void;
+  weakSpotCount?: number;
+  /** Today's fixed 12-country set. Omitted when the feature is off. */
+  onStartDailyChallenge?: () => void;
+  dailyDoneToday?: boolean;
+  dailyStreak?: number;
 };
 
 const HERO_GLOBE_CONFIG: GlobeConfig = {
@@ -60,8 +74,30 @@ export function LandingPage({
   onExploreMap,
   hasActiveQuiz = false,
   onResumeQuiz,
+  contextLine,
+  onQuickStart,
+  quickStartLabel,
+  onPracticeWeakSpots,
+  weakSpotCount = 0,
+  onStartDailyChallenge,
+  dailyDoneToday = false,
+  dailyStreak = 0,
 }: LandingPageProps) {
   const prefersReducedMotion = useReducedMotion();
+  // Exactly one strong action, chosen by where the player actually is:
+  // mid-quiz, carrying known weak spots, or ready to start something.
+  const primaryAction = hasActiveQuiz && onResumeQuiz
+    ? { label: "Resume Quiz", action: onResumeQuiz }
+    : onPracticeWeakSpots && weakSpotCount > 0
+      ? {
+          label: `Practice ${weakSpotCount} weak spot${
+            weakSpotCount === 1 ? "" : "s"
+          }`,
+          action: onPracticeWeakSpots,
+        }
+      : onQuickStart
+        ? { label: quickStartLabel ?? "Start Learning", action: onQuickStart }
+        : null;
 
   return (
     <motion.section
@@ -92,6 +128,11 @@ export function LandingPage({
             <h1 className="bg-[linear-gradient(180deg,#e7fbff_0%,#8ddfed_36%,#246275_72%,#101922_100%)] bg-clip-text text-[clamp(3.55rem,14.5vw,9rem)] font-bold leading-[0.84] text-transparent drop-shadow-[0_24px_32px_rgba(0,0,0,0.82)] sm:leading-[0.82]">
               GeoMaster
             </h1>
+            {contextLine ? (
+              <p className="mt-3 max-w-md text-balance text-sm font-medium leading-5 text-cyan-50/62 drop-shadow-[0_2px_10px_rgba(0,0,0,0.75)] sm:mt-4 sm:text-base sm:leading-6">
+                {contextLine}
+              </p>
+            ) : null}
           </motion.div>
 
           <motion.div
@@ -102,22 +143,44 @@ export function LandingPage({
               duration: 0.56,
               ease: [0.16, 1, 0.3, 1],
             }}
-            className="relative z-20 mt-auto flex w-full max-w-md flex-col justify-center gap-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:flex-row sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            className="relative z-20 mt-auto flex w-full max-w-md flex-col items-center justify-center gap-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:flex-row sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
           >
-              {hasActiveQuiz && onResumeQuiz ? (
+              {onStartDailyChallenge ? (
                 <button
                   type="button"
-                  onClick={onResumeQuiz}
+                  onClick={onStartDailyChallenge}
+                  className="inline-flex min-h-11 items-center gap-2 self-center rounded-full border border-cyan-100/20 bg-[#071018]/80 px-4 py-2 text-sm font-medium text-cyan-50/82 shadow-[0_12px_24px_-10px_rgba(0,0,0,0.6)] backdrop-blur-sm transition hover:border-cyan-100/34 hover:text-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c] sm:absolute sm:-top-14"
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      dailyDoneToday ? "bg-emerald-300" : "bg-cyan-300"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {dailyDoneToday ? "Daily done" : "Daily Challenge"}
+                  </span>
+                  {dailyStreak > 0 ? (
+                    <span className="text-cyan-100/60">
+                      {dailyStreak}-day streak
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
+              {primaryAction ? (
+                <button
+                  type="button"
+                  onClick={primaryAction.action}
                   className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_0_34px_rgba(52,211,153,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${emeraldCtaClass}`}
                 >
-                  Resume Quiz
+                  {primaryAction.label}
                 </button>
               ) : null}
               <button
                 type="button"
                 onClick={onStartQuiz}
                 className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_20px_25px_-5px_rgba(0,0,0,0.30)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${
-                  hasActiveQuiz && onResumeQuiz
+                  primaryAction
                     ? "border border-emerald-100/36 bg-emerald-300/18 text-emerald-50 transition hover:bg-emerald-300/28"
                     : "border border-emerald-100/70 bg-emerald-300/88 text-slate-950 transition hover:bg-emerald-200"
                 }`}

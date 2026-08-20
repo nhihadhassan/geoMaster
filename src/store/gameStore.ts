@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { features } from "@/config/features";
 import {
   countries as allCountries,
   getCountriesForRegion,
@@ -13,39 +14,46 @@ import {
 } from "@/utils/countryHints";
 import type { LearningFeature } from "@/data/learningFeatures";
 import type { GeoSoundEvent } from "@/utils/soundEffects";
+import {
+  persistAutoHideCorrectCard,
+  persistSoundEffectsEnabled,
+  persistTimerMultiplier,
+  readInitialAutoHideCorrectCard,
+  readInitialSoundEffectsEnabled,
+  readInitialTimerMultiplier,
+  normalizeTimerMultiplier,
+  persistLastSetup,
+  persistTimerMode,
+  readLastSetup,
+  readInitialTimerMode,
+  type TimerMode,
+} from "@/store/preferences";
+import {
+  clearQuizProgress,
+  QUIZ_PROGRESS_VERSION,
+  readQuizProgress,
+  writeQuizProgress,
+  type QuizProgressSnapshot,
+} from "@/store/quizPersistence";
+import type {
+  CountryResult,
+  CountryResultStatus,
+  GameMode,
+  GameStatus,
+  IdentifyGuessResult,
+  QuizFeedbackEvent,
+} from "@/store/gameTypes";
 
-export type GameStatus =
-  | "idle"
-  | "running"
-  | "paused"
-  | "completed"
-  | "failed"
-  | "gave-up";
-export type GameMode =
-  | "type-to-fill"
-  | "identify-shaded"
-  | "click-country"
-  | "capital-challenge";
-export type CountryResultStatus = "correct" | "assisted" | "missed";
-
-export type CountryResult = {
-  status: CountryResultStatus;
-  attemptsUsed: number;
-};
-
-export type IdentifyGuessResult = {
-  outcome: "correct" | "assisted" | "wrong" | "missed" | "ignored";
-  country?: Country;
-  clickedCountry?: Country | null;
-};
-
-export type QuizFeedbackEvent = {
-  kind: GeoSoundEvent;
-  sequence: number;
-  countryId?: string;
-  completed?: boolean;
-  perfect?: boolean;
-};
+export type {
+  CountryResult,
+  CountryResultStatus,
+  GameMode,
+  GameStatus,
+  IdentifyGuessResult,
+  QuizFeedbackEvent,
+} from "@/store/gameTypes";
+export { readQuizProgress, type QuizProgressSnapshot } from "@/store/quizPersistence";
+export { TIMER_MULTIPLIER_OPTIONS } from "@/store/preferences";
 
 type FeatureStateDebug = {
   source: string;
@@ -92,6 +100,7 @@ type GameState = {
   selectedRegion: QuizRegion;
   selectedSpecialRegion: "antarctica" | null;
   selectedMode: GameMode;
+  customQuizSet: CustomQuizSet | null;
   quizCountries: Country[];
   guessedCountryIds: string[];
   countryResults: Record<string, CountryResult>;
@@ -101,8 +110,20 @@ type GameState = {
   score: number;
   total: number;
   remainingSeconds: number;
+  // Wall-clock instant the running quiz expires. The timer is derived from this
+  // rather than decremented, so a backgrounded tab or a sleeping phone cannot
+  // silently freeze or slow the clock. Null while idle, paused, or untimed.
+  deadlineAt: number | null;
+  timerMode: TimerMode;
   gameStatus: GameStatus;
   incorrectAttempts: Record<string, number>;
+  /** A wrong map pick worth showing on the map itself: the country tapped, and
+   *  the right answer once it has been revealed. Cleared by the map effect. */
+  lastMissFeedback: {
+    wrongIso: string;
+    correctIso: string | null;
+    sequence: number;
+  } | null;
   lastMatchedCountry: Country | null;
   lastMatchSequence: number;
   feedbackSequence: number;
@@ -123,6 +144,10 @@ type GameState = {
   clearSpecialRegion: () => void;
   selectMode: (mode: GameMode) => void;
   startQuiz: () => void;
+  startCustomQuiz: (
+    countryIds: string[],
+    options?: { mode?: GameMode; label?: string; region?: QuizRegion },
+  ) => void;
   pauseQuiz: () => void;
   resumeQuiz: () => void;
   giveUp: () => void;
@@ -135,11 +160,13 @@ type GameState = {
   setAutoHideCorrectCard: (enabled: boolean) => void;
   setSoundEffectsEnabled: (enabled: boolean) => void;
   setTimerMultiplier: (multiplier: number) => void;
+  setTimerMode: (mode: TimerMode) => void;
   recordFeedbackEvent: (
     kind: GeoSoundEvent,
     options?: Omit<QuizFeedbackEvent, "kind" | "sequence">,
   ) => void;
   clearCorrectCard: () => void;
+  clearMissFeedback: () => void;
   selectLearningCountry: (iso: string | null) => void;
   selectLearningFeature: (feature: LearningFeature | null) => void;
   clearLearningCountry: () => void;
@@ -165,6 +192,13 @@ const shuffleIds = (countries: Country[]) =>
 const getCountryById = (countries: Country[], id: string | undefined) =>
   countries.find((country) => country.iso_a3 === id) ?? null;
 
+const QUIZ_MODES: GameMode[] = [
+  "type-to-fill",
+  "identify-shaded",
+  "click-country",
+  "capital-challenge",
+];
+
 const isTargetQueueMode = (mode: GameMode) =>
   mode === "identify-shaded" ||
   mode === "click-country" ||
@@ -176,28 +210,6 @@ const isPerfectCountryResultSet = (
 ) =>
   Object.values(countryResults).length === total &&
   Object.values(countryResults).every((result) => result.status === "correct");
-
-const AUTO_HIDE_CORRECT_CARD_KEY = "geomaster-auto-hide-correct-card";
-const SOUND_EFFECTS_ENABLED_KEY = "geomaster-sound-effects-enabled";
-const QUIZ_PROGRESS_KEY = "geomaster-quiz-progress";
-const QUIZ_PROGRESS_VERSION = 1;
-const TIMER_MULTIPLIER_KEY = "geomaster-timer-multiplier";
-
-export type QuizProgressSnapshot = {
-  v: number;
-  region: QuizRegion;
-  mode: GameMode;
-  status: "running" | "paused";
-  guessedCountryIds: string[];
-  countryResults: Record<string, CountryResult>;
-  incorrectAttempts: Record<string, number>;
-  score: number;
-  total: number;
-  remainingSeconds: number;
-  targetQueue: string[];
-  currentTargetIso: string | null;
-  savedAt: number;
-};
 
 const isResumableStatus = (
   status: GameStatus,
@@ -224,123 +236,10 @@ const buildQuizProgressSnapshot = (
     remainingSeconds: state.remainingSeconds,
     targetQueue: state.targetQueue,
     currentTargetIso: state.currentTargetCountry?.iso_a3 ?? null,
+    customCountryIds: state.customQuizSet?.countryIds,
+    customLabel: state.customQuizSet?.label,
     savedAt: Date.now(),
   };
-};
-
-const writeQuizProgress = (snapshot: QuizProgressSnapshot) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(QUIZ_PROGRESS_KEY, JSON.stringify(snapshot));
-  } catch {
-    // Storage can be unavailable (private mode, quota). The quiz keeps
-    // running; it just won't survive a reload.
-  }
-};
-
-const clearQuizProgress = () => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(QUIZ_PROGRESS_KEY);
-  } catch {
-    // Same storage caveat as writeQuizProgress.
-  }
-};
-
-export const readQuizProgress = (): QuizProgressSnapshot | null => {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const raw = window.localStorage.getItem(QUIZ_PROGRESS_KEY);
-
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as QuizProgressSnapshot;
-
-    if (
-      !parsed ||
-      parsed.v !== QUIZ_PROGRESS_VERSION ||
-      (parsed.status !== "running" && parsed.status !== "paused") ||
-      getCountriesForRegion(parsed.region).length === 0
-    ) {
-      return null;
-    }
-
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
-const readInitialAutoHideCorrectCard = () => {
-  if (typeof window === "undefined") {
-    return true;
-  }
-
-  return window.localStorage.getItem(AUTO_HIDE_CORRECT_CARD_KEY) !== "false";
-};
-
-const persistAutoHideCorrectCard = (enabled: boolean) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(AUTO_HIDE_CORRECT_CARD_KEY, String(enabled));
-};
-
-const readInitialSoundEffectsEnabled = () => {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  return window.localStorage.getItem(SOUND_EFFECTS_ENABLED_KEY) === "true";
-};
-
-const persistSoundEffectsEnabled = (enabled: boolean) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(SOUND_EFFECTS_ENABLED_KEY, String(enabled));
-};
-
-// Timer multiplier lets players give themselves more time before starting.
-// 1 = the region's standard timer; larger values scale it up.
-export const TIMER_MULTIPLIER_OPTIONS = [1, 1.5, 2, 3] as const;
-
-const DEFAULT_TIMER_MULTIPLIER = 1;
-
-const normalizeTimerMultiplier = (value: number) =>
-  (TIMER_MULTIPLIER_OPTIONS as readonly number[]).includes(value)
-    ? value
-    : DEFAULT_TIMER_MULTIPLIER;
-
-const readInitialTimerMultiplier = () => {
-  if (typeof window === "undefined") {
-    return DEFAULT_TIMER_MULTIPLIER;
-  }
-
-  return normalizeTimerMultiplier(
-    Number(window.localStorage.getItem(TIMER_MULTIPLIER_KEY)),
-  );
-};
-
-const persistTimerMultiplier = (multiplier: number) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(TIMER_MULTIPLIER_KEY, String(multiplier));
 };
 
 export const getScaledTimerSeconds = (
@@ -366,17 +265,43 @@ const buildFeedbackEvent = (
   };
 };
 
+// An explicit country list overriding the region roster: how "practice the
+// ones you missed" and the daily challenge reuse the whole quiz engine without
+// a parallel implementation.
+export type CustomQuizSet = {
+  countryIds: string[];
+  label: string;
+};
+
+const CUSTOM_SECONDS_PER_COUNTRY = 20;
+const CUSTOM_MINIMUM_SECONDS = 60;
+
+const resolveCustomCountries = (countryIds: string[]) =>
+  countryIds
+    .map((iso) => allCountries.find((country) => country.iso_a3 === iso))
+    .filter((country): country is Country => Boolean(country));
+
+const getCustomTimerSeconds = (count: number, timerMultiplier: number) =>
+  Math.round(
+    Math.max(count * CUSTOM_SECONDS_PER_COUNTRY, CUSTOM_MINIMUM_SECONDS) *
+      timerMultiplier,
+  );
+
 const createResetState = (
   selectedRegion: QuizRegion,
   selectedMode: GameMode,
   timerMultiplier: number,
+  customQuizSet: CustomQuizSet | null = null,
 ) => {
-  const quizCountries = getCountriesForRegion(selectedRegion);
+  const quizCountries = customQuizSet
+    ? resolveCustomCountries(customQuizSet.countryIds)
+    : getCountriesForRegion(selectedRegion);
 
   return {
     selectedRegion,
     selectedSpecialRegion: null,
     selectedMode,
+    customQuizSet,
     quizCountries,
     guessedCountryIds: [],
     countryResults: {},
@@ -385,13 +310,13 @@ const createResetState = (
     targetQueue: [],
     score: 0,
     total: quizCountries.length,
-    remainingSeconds: getScaledTimerSeconds(
-      selectedRegion,
-      selectedMode,
-      timerMultiplier,
-    ),
+    remainingSeconds: customQuizSet
+      ? getCustomTimerSeconds(quizCountries.length, timerMultiplier)
+      : getScaledTimerSeconds(selectedRegion, selectedMode, timerMultiplier),
+    deadlineAt: null,
     gameStatus: "idle" as GameStatus,
     incorrectAttempts: {},
+    lastMissFeedback: null,
     lastMatchedCountry: null,
     lastMatchSequence: 0,
     feedbackSequence: 0,
@@ -407,12 +332,54 @@ const createResetState = (
 };
 
 const initialTimerMultiplier = readInitialTimerMultiplier();
+const initialTimerMode = readInitialTimerMode();
+
+// A returning player resumes their last region and mode rather than the
+// hard-coded default, so the setup panel opens already configured.
+const initialSetup = (() => {
+  const fallback = {
+    region: "south-america" as QuizRegion,
+    mode: "type-to-fill" as GameMode,
+  };
+
+  if (!features.quickStart) {
+    return fallback;
+  }
+
+  const stored = readLastSetup();
+
+  if (!stored) {
+    return fallback;
+  }
+
+  const region = getCountriesForRegion(stored.region as QuizRegion).length
+    ? (stored.region as QuizRegion)
+    : fallback.region;
+  const mode = QUIZ_MODES.includes(stored.mode as GameMode)
+    ? (stored.mode as GameMode)
+    : fallback.mode;
+
+  return { region, mode };
+})();
+
+// A running quiz expires at a wall-clock instant; `remainingSeconds` is a
+// derived view of it that each tick refreshes.
+const deadlineFor = (remainingSeconds: number, timerMode: TimerMode) =>
+  timerMode === "untimed" ? null : Date.now() + remainingSeconds * 1000;
+
+const remainingSecondsFrom = (deadlineAt: number | null) =>
+  deadlineAt === null ? null : Math.max(Math.ceil((deadlineAt - Date.now()) / 1000), 0);
 
 export const useGameStore = create<GameState>((set, get) => ({
-  ...createResetState("south-america", "type-to-fill", initialTimerMultiplier),
+  ...createResetState(
+    initialSetup.region,
+    initialSetup.mode,
+    initialTimerMultiplier,
+  ),
   autoHideCorrectCard: readInitialAutoHideCorrectCard(),
   soundEffectsEnabled: readInitialSoundEffectsEnabled(),
   timerMultiplier: initialTimerMultiplier,
+  timerMode: initialTimerMode,
   debug: {
     mapLoaded: false,
     countrySourceLoaded: false,
@@ -477,11 +444,31 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
+    // Start from a full clock even if the previous run ended on an expired
+    // timer, then arm the wall-clock deadline the tick derives from.
+    const remainingSeconds = state.customQuizSet
+      ? getCustomTimerSeconds(state.quizCountries.length, state.timerMultiplier)
+      : getScaledTimerSeconds(
+          state.selectedRegion,
+          state.selectedMode,
+          state.timerMultiplier,
+        );
+    const deadlineAt = deadlineFor(remainingSeconds, state.timerMode);
+
+    if (features.quickStart && !state.customQuizSet) {
+      persistLastSetup({
+        region: state.selectedRegion,
+        mode: state.selectedMode,
+      });
+    }
+
     if (isTargetQueueMode(state.selectedMode)) {
       const [firstTargetId, ...targetQueue] = shuffleIds(state.quizCountries);
 
       set({
         gameStatus: "running",
+        remainingSeconds,
+        deadlineAt,
         currentInput: "",
         guessedCountryIds: [],
         countryResults: {},
@@ -503,6 +490,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       gameStatus: "running",
+      remainingSeconds,
+      deadlineAt,
       currentInput: "",
       guessedCountryIds: [],
       countryResults: {},
@@ -519,6 +508,22 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...buildFeedbackEvent(state, "quiz-start"),
     });
   },
+  startCustomQuiz: (countryIds, options) => {
+    const state = get();
+    const mode = options?.mode ?? state.selectedMode;
+    const region = options?.region ?? state.selectedRegion;
+    const label = options?.label ?? "Focused practice";
+    const customQuizSet = { countryIds: [...new Set(countryIds)], label };
+
+    if (customQuizSet.countryIds.length === 0) {
+      return;
+    }
+
+    // Reset onto the explicit roster, then hand off to the normal start path so
+    // the target queue, hints, scoring, and feedback events are all shared.
+    set(createResetState(region, mode, state.timerMultiplier, customQuizSet));
+    get().startQuiz();
+  },
   pauseQuiz: () => {
     const state = get();
 
@@ -528,6 +533,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       gameStatus: "paused",
+      remainingSeconds:
+        remainingSecondsFrom(state.deadlineAt) ?? state.remainingSeconds,
+      deadlineAt: null,
       currentInput: "",
       smartHint: null,
     });
@@ -539,12 +547,24 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    set({ gameStatus: "running" });
+    set({
+      gameStatus: "running",
+      deadlineAt: deadlineFor(state.remainingSeconds, state.timerMode),
+    });
   },
   resetQuiz: () => {
-    const { selectedRegion, selectedMode, timerMultiplier } = get();
+    const { selectedRegion, selectedMode, timerMultiplier, customQuizSet } =
+      get();
 
-    set(createResetState(selectedRegion, selectedMode, timerMultiplier));
+    // Try Again on a focused practice run replays the same roster.
+    set(
+      createResetState(
+        selectedRegion,
+        selectedMode,
+        timerMultiplier,
+        customQuizSet,
+      ),
+    );
   },
   giveUp: () => {
     const state = get();
@@ -555,6 +575,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     set({
       gameStatus: "gave-up",
+      deadlineAt: null,
       currentInput: "",
       currentTargetCountry: null,
       targetQueue: [],
@@ -579,7 +600,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const quizCountries = getCountriesForRegion(snapshot.region);
+    const customQuizSet = snapshot.customCountryIds?.length
+      ? {
+          countryIds: snapshot.customCountryIds,
+          label: snapshot.customLabel ?? "Focused practice",
+        }
+      : null;
+    const quizCountries = customQuizSet
+      ? resolveCustomCountries(customQuizSet.countryIds)
+      : getCountriesForRegion(snapshot.region);
 
     if (quizCountries.length === 0) {
       clearQuizProgress();
@@ -595,12 +624,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       // remainingSeconds is overridden below with the saved value; the
       // multiplier here only feeds createResetState's default computation.
-      ...createResetState(snapshot.region, snapshot.mode, get().timerMultiplier),
+      ...createResetState(
+        snapshot.region,
+        snapshot.mode,
+        get().timerMultiplier,
+        customQuizSet,
+      ),
       guessedCountryIds: snapshot.guessedCountryIds,
       countryResults: snapshot.countryResults,
       incorrectAttempts: snapshot.incorrectAttempts,
       score: snapshot.score,
       remainingSeconds: snapshot.remainingSeconds,
+      deadlineAt:
+        snapshot.status === "running"
+          ? deadlineFor(snapshot.remainingSeconds, get().timerMode)
+          : null,
       targetQueue: snapshot.targetQueue,
       currentTargetCountry,
       gameStatus: snapshot.status,
@@ -641,12 +679,31 @@ export const useGameStore = create<GameState>((set, get) => ({
         : {}),
     });
   },
+  setTimerMode: (mode) => {
+    persistTimerMode(mode);
+
+    const state = get();
+
+    // Switching while a quiz is live re-arms (or disarms) the clock in place
+    // rather than restarting the run.
+    set({
+      timerMode: mode,
+      deadlineAt:
+        state.gameStatus === "running"
+          ? deadlineFor(
+              remainingSecondsFrom(state.deadlineAt) ?? state.remainingSeconds,
+              mode,
+            )
+          : null,
+    });
+  },
   recordFeedbackEvent: (kind, options) => {
     set({
       ...buildFeedbackEvent(get(), kind, options),
     });
   },
   clearCorrectCard: () => set({ lastMatchedCountry: null }),
+  clearMissFeedback: () => set({ lastMissFeedback: null }),
   selectLearningCountry: (iso) => {
     const state = get();
 
@@ -1029,6 +1086,13 @@ export const useGameStore = create<GameState>((set, get) => ({
           ...nextState,
           countryResults,
           incorrectAttempts,
+          // Last attempt: the answer is revealed, so show the wrong pick and
+          // the right country together.
+          lastMissFeedback: {
+            wrongIso: clickedCountry.iso_a3,
+            correctIso: target.iso_a3,
+            sequence: state.feedbackSequence + 1,
+          },
           currentInput: "",
           currentTargetHints: [],
           smartHint: null,
@@ -1052,6 +1116,13 @@ export const useGameStore = create<GameState>((set, get) => ({
         incorrectAttempts,
         currentTargetHints,
         smartHint: currentTargetHints.at(-1) ?? null,
+        // Earlier attempts only mark the mistake; revealing the target here
+        // would hand over the answer.
+        lastMissFeedback: {
+          wrongIso: clickedCountry.iso_a3,
+          correctIso: null,
+          sequence: state.feedbackSequence + 1,
+        },
         ...buildFeedbackEvent(state, "wrong", {
           countryId: target.iso_a3,
         }),
@@ -1098,12 +1169,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const remainingSeconds = Math.max(state.remainingSeconds - 1, 0);
+    // Untimed runs have no deadline; there is nothing to count down.
+    const remainingSeconds = remainingSecondsFrom(state.deadlineAt);
+
+    if (remainingSeconds === null || remainingSeconds === state.remainingSeconds) {
+      return;
+    }
 
     set(
       remainingSeconds === 0
         ? {
             remainingSeconds,
+            deadlineAt: null,
             gameStatus: "failed",
             isPerfectRun: false,
             currentInput: "",

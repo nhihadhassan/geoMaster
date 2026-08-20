@@ -1,14 +1,18 @@
 "use client";
 
-import mapboxgl, { type GeoJSONSource, type Map } from "mapbox-gl";
+import type {
+  GeoJSONSource,
+  Map,
+  MapMouseEvent,
+} from "mapbox-gl";
 import { AnimatePresence, motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type MutableRefObject,
 } from "react";
 import type { FeatureCollection, Geometry } from "geojson";
 import { AntarcticaEducationCard } from "@/components/game/AntarcticaEducationCard";
@@ -22,11 +26,72 @@ import { ResultsDashboard } from "@/components/game/ResultsDashboard";
 import { ResumePrompt } from "@/components/game/ResumePrompt";
 import { TargetHintCard } from "@/components/game/TargetHintCard";
 import { TypeToFillInput } from "@/components/game/TypeToFillInput";
-import {
-  CaribbeanInsetMap,
-  caribbeanCountryIds,
-} from "@/components/map/CaribbeanInsetMap";
+import { features } from "@/config/features";
+import { caribbeanCountryIds } from "@/data/caribbean";
+
+const CaribbeanInsetMap = dynamic(
+  () =>
+    import("@/components/map/CaribbeanInsetMap").then(
+      (mapModule) => mapModule.CaribbeanInsetMap,
+    ),
+  { ssr: false },
+);
 import { CountryPopup } from "@/components/map/CountryPopup";
+import { ExploreSearch } from "@/components/map/ExploreSearch";
+import { IdlePromptToast } from "@/components/map/IdlePromptToast";
+import { MapControls } from "@/components/map/MapControls";
+import { useIdleGlobeRotation } from "@/components/map/useIdleGlobeRotation";
+import { MapDebugPanel } from "@/components/map/MapDebugPanel";
+import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
+import { MapUnavailable } from "@/components/map/MapUnavailable";
+import {
+  CITY_CIRCLE_LAYER_ID,
+  CITY_LABEL_LAYER_ID,
+  CITY_SOURCE_ID,
+  DEBUG_LABEL_LAYER_ID,
+  DEBUG_LABEL_SOURCE_ID,
+  DEBUG_LEADER_LAYER_ID,
+  DEBUG_LEADER_SOURCE_ID,
+  FILL_LAYER_ID,
+  GUIDE_CIRCLE_LAYER_ID,
+  GUIDE_CIRCLE_SOURCE_ID,
+  GUIDE_LINE_LAYER_ID,
+  GUIDE_LINE_SOURCE_ID,
+  LABEL_ANCHORS,
+  LABEL_KINDS,
+  LABEL_LAYER_IDS,
+  LABEL_LAYER_PREFIX,
+  LABEL_SOURCE_ID,
+  LANDMARK_CIRCLE_LAYER_ID,
+  LANDMARK_LABEL_LAYER_ID,
+  LANDMARK_SOURCE_ID,
+  LEADER_LAYER_ID,
+  LEADER_SOURCE_ID,
+  LEARNING_LABEL_LAYER_IDS,
+  LEARNING_LABEL_LAYER_PREFIX,
+  LEARNING_LABEL_SOURCE_ID,
+  LEARNING_LEADER_LAYER_ID,
+  LEARNING_LEADER_SOURCE_ID,
+  LINE_LAYER_ID,
+  MAP_STYLE,
+  PHYSICAL_LABEL_LAYER_ID,
+  PHYSICAL_SOURCE_ID,
+  REMAINING_PULSE_FILL_LAYER_ID,
+  REMAINING_PULSE_LINE_LAYER_ID,
+  SOURCE_ID,
+  SUBDIVISION_LABEL_LAYER_ID,
+  SUBDIVISION_SOURCE_ID,
+  TARGET_GLOW_LAYER_ID,
+  addTerrainAndFog,
+  buildFillColorExpression,
+  buildFillOpacityExpression,
+  buildRemainingPulseFilter,
+  getMapDebugSnapshot,
+  getPulseReason,
+  hideMapLabelsAndRoads,
+  setCountryFeatureState,
+  setLearningLayerVisibility,
+} from "@/components/map/mapLayers";
 import {
   countries,
   getRegionConfig,
@@ -50,6 +115,19 @@ import {
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import { useDailyChallenge } from "@/hooks/useDailyChallenge";
+import { useRecordQuizProgress } from "@/hooks/useRecordQuizProgress";
+import { useProgressStore } from "@/store/progressStore";
+import {
+  getMasteredCount,
+  getRegionMastery,
+  getWeakestCountryIds,
+} from "@/utils/countryMastery";
+import {
+  useDocumentVisible,
+  useMobilePerformanceMode,
+  usePrefersReducedMotion,
+} from "@/hooks/useMapEnvironment";
 import { useSoundEffects } from "@/hooks/useSoundEffects";
 import {
   readQuizProgress,
@@ -58,44 +136,12 @@ import {
   type QuizProgressSnapshot,
 } from "@/store/gameStore";
 import { getCountryFunFacts } from "@/utils/countryEducation";
+import type { ExploreSearchResult } from "@/utils/exploreSearch";
+import { isWebglAvailable } from "@/utils/webglSupport";
 
-const SOURCE_ID = "geomaster-countries";
-const FILL_LAYER_ID = "geomaster-country-fill";
-const LINE_LAYER_ID = "geomaster-country-line";
-const TARGET_GLOW_LAYER_ID = "geomaster-target-glow";
-const REMAINING_PULSE_FILL_LAYER_ID = "geomaster-remaining-pulse-fill";
-const REMAINING_PULSE_LINE_LAYER_ID = "geomaster-remaining-pulse-line";
-const LABEL_SOURCE_ID = "geomaster-country-labels";
-const LEADER_SOURCE_ID = "geomaster-country-leaders";
-const LEARNING_LABEL_SOURCE_ID = "geomaster-learning-country-labels";
-const LEARNING_LEADER_SOURCE_ID = "geomaster-learning-country-leaders";
-const GUIDE_CIRCLE_SOURCE_ID = "geomaster-small-country-guide-circles";
-const GUIDE_LINE_SOURCE_ID = "geomaster-small-country-guide-lines";
-const GUIDE_CIRCLE_LAYER_ID = "geomaster-small-country-guide-circle-layer";
-const GUIDE_LINE_LAYER_ID = "geomaster-small-country-guide-line-layer";
-const SUBDIVISION_SOURCE_ID = "geomaster-subdivisions";
-const SUBDIVISION_LABEL_LAYER_ID = "geomaster-subdivision-label-layer";
-const CITY_SOURCE_ID = "geomaster-cities";
-const CITY_CIRCLE_LAYER_ID = "geomaster-city-circle-layer";
-const CITY_LABEL_LAYER_ID = "geomaster-city-label-layer";
-const PHYSICAL_SOURCE_ID = "geomaster-physical-features";
-const PHYSICAL_LABEL_LAYER_ID = "geomaster-physical-feature-label-layer";
-const LANDMARK_SOURCE_ID = "geomaster-landmarks";
-const LANDMARK_CIRCLE_LAYER_ID = "geomaster-landmark-circle-layer";
-const LANDMARK_LABEL_LAYER_ID = "geomaster-landmark-label-layer";
-const LABEL_LAYER_PREFIX = "geomaster-country-label-layer";
-const LEADER_LAYER_ID = "geomaster-country-leader-layer";
-const LEARNING_LABEL_LAYER_PREFIX = "geomaster-learning-country-label-layer";
-const LEARNING_LEADER_LAYER_ID = "geomaster-learning-country-leader-layer";
-const DEBUG_LABEL_SOURCE_ID = "geomaster-debug-country-labels";
-const DEBUG_LEADER_SOURCE_ID = "geomaster-debug-country-leaders";
-const DEBUG_LABEL_LAYER_ID = "geomaster-debug-country-label-layer";
-const DEBUG_LEADER_LAYER_ID = "geomaster-debug-country-leader-layer";
-const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
 const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
-const IDLE_ROTATION_STEP_MS = 250;
 const REMAINING_PULSE_STEP_MS = 160;
 const TARGET_PULSE_STEP_MS = 120;
 const IDLE_PROMPT_INITIAL_DELAY_MS = 16_000;
@@ -117,727 +163,9 @@ const GENERIC_IDLE_PROMPTS = [
   "Choose a region when you are ready to turn exploration into a quiz.",
   "Try dragging the globe, then click a country that catches your eye.",
 ];
-const LABEL_ANCHORS = ["center", "left", "right", "top", "bottom"] as const;
-const LABEL_KINDS = ["fallback", "manual"] as const;
-const LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
-  LABEL_ANCHORS.map((anchor) => `${LABEL_LAYER_PREFIX}-${kind}-${anchor}`),
-);
-const LEARNING_LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
-  LABEL_ANCHORS.map(
-    (anchor) => `${LEARNING_LABEL_LAYER_PREFIX}-${kind}-${anchor}`,
-  ),
-);
-const GEOMASTER_LAYER_IDS = [
-  FILL_LAYER_ID,
-  LINE_LAYER_ID,
-  TARGET_GLOW_LAYER_ID,
-  REMAINING_PULSE_FILL_LAYER_ID,
-  REMAINING_PULSE_LINE_LAYER_ID,
-  GUIDE_LINE_LAYER_ID,
-  GUIDE_CIRCLE_LAYER_ID,
-  LEARNING_LEADER_LAYER_ID,
-  SUBDIVISION_LABEL_LAYER_ID,
-  CITY_CIRCLE_LAYER_ID,
-  CITY_LABEL_LAYER_ID,
-  PHYSICAL_LABEL_LAYER_ID,
-  LANDMARK_CIRCLE_LAYER_ID,
-  LANDMARK_LABEL_LAYER_ID,
-  LEADER_LAYER_ID,
-  ...LEARNING_LABEL_LAYER_IDS,
-  ...LABEL_LAYER_IDS,
-  DEBUG_LEADER_LAYER_ID,
-  DEBUG_LABEL_LAYER_ID,
-];
 
-const hideMapLabelsAndRoads = (map: Map) => {
-  const style = map.getStyle();
 
-  style.layers?.forEach((layer) => {
-    const id = layer.id.toLowerCase();
-    const shouldHide =
-      layer.type === "symbol" ||
-      id.includes("road") ||
-      id.includes("transit") ||
-      id.includes("admin") ||
-      id.includes("building") ||
-      id.includes("place") ||
-      id.includes("label");
 
-    if (shouldHide) {
-      try {
-        map.setLayoutProperty(layer.id, "visibility", "none");
-      } catch {
-        // Some Mapbox base layers are generated dynamically. Leave them alone.
-      }
-    }
-  });
-};
-
-const addTerrainAndFog = (
-  map: Map,
-  { terrainEnabled = true }: { terrainEnabled?: boolean } = {},
-) => {
-  try {
-    if (terrainEnabled) {
-      if (!map.getSource("mapbox-dem")) {
-        map.addSource("mapbox-dem", {
-          type: "raster-dem",
-          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-          tileSize: 512,
-          maxzoom: 14,
-        });
-      }
-
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.08 });
-    }
-
-    map.setFog({
-      color: "rgb(241, 245, 249)",
-      "high-color": "rgb(186, 230, 253)",
-      "horizon-blend": 0.08,
-      "space-color": "rgb(226, 232, 240)",
-      "star-intensity": 0,
-    });
-  } catch {
-    // Terrain is visual polish. The base map and game loop should still work.
-  }
-};
-
-const setCountryFeatureState = (
-  map: Map,
-  countryId: string,
-  state: Record<string, boolean | number>,
-) => {
-  if (!map.getSource(SOURCE_ID)) {
-    return {
-      source: SOURCE_ID,
-      id: countryId,
-      state,
-      ok: false,
-      error: "Country source is not loaded.",
-    };
-  }
-
-  try {
-    map.setFeatureState({ source: SOURCE_ID, id: countryId }, state);
-    return {
-      source: SOURCE_ID,
-      id: countryId,
-      state,
-      ok: true,
-    };
-  } catch {
-    return {
-      source: SOURCE_ID,
-      id: countryId,
-      state,
-      ok: false,
-      error: "Mapbox rejected setFeatureState for this feature id.",
-    };
-  }
-};
-
-const buildFillColorExpression = (
-  selectedIds: string[],
-  guessedIds: string[],
-  assistedIds: string[],
-  missedIds: string[],
-) => [
-  "case",
-  ["boolean", ["feature-state", "target"], false],
-  "#67e8f9",
-  ["in", ["get", "iso_a3"], ["literal", missedIds]],
-  "#f7b7b0",
-  ["in", ["get", "iso_a3"], ["literal", assistedIds]],
-  "#fbbf24",
-  ["boolean", ["feature-state", "guessed"], false],
-  "#22f6a5",
-  ["in", ["get", "iso_a3"], ["literal", guessedIds]],
-  "#22f6a5",
-  ["in", ["get", "iso_a3"], ["literal", selectedIds]],
-  "#748394",
-  ["in", ["get", "iso_a3"], ["literal", Array.from(quizCountryIds)]],
-  "#64748b",
-  "#94a3b8",
-] as mapboxgl.ExpressionSpecification;
-
-const buildFillOpacityExpression = (
-  selectedIds: string[],
-  guessedIds: string[],
-  assistedIds: string[],
-  missedIds: string[],
-) => [
-  "case",
-  ["boolean", ["feature-state", "target"], false],
-  0.72,
-  ["in", ["get", "iso_a3"], ["literal", missedIds]],
-  0.82,
-  ["in", ["get", "iso_a3"], ["literal", assistedIds]],
-  0.94,
-  ["boolean", ["feature-state", "guessed"], false],
-  0.92,
-  ["in", ["get", "iso_a3"], ["literal", guessedIds]],
-  0.92,
-  ["in", ["get", "iso_a3"], ["literal", selectedIds]],
-  0.5,
-  0.22,
-] as mapboxgl.ExpressionSpecification;
-
-const buildRemainingPulseFilter = (
-  remainingCountryIds: string[],
-  pulseActive: boolean,
-) =>
-  (pulseActive && remainingCountryIds.length > 0
-    ? ["in", ["get", "iso_a3"], ["literal", remainingCountryIds]]
-    : ["==", ["get", "iso_a3"], "__none__"]) as mapboxgl.FilterSpecification;
-
-const getPulseReason = (
-  remainingCount: number,
-  remainingSeconds: number,
-  isRunningTypeMode: boolean,
-) => {
-  if (!isRunningTypeMode) {
-    return "none";
-  }
-
-  const hasFewLeft = remainingCount <= 5;
-  const isLastMinute = remainingSeconds <= 60;
-
-  if (hasFewLeft && isLastMinute) {
-    return "5 left + last minute";
-  }
-
-  if (hasFewLeft) {
-    return "5 left";
-  }
-
-  if (isLastMinute) {
-    return "last minute";
-  }
-
-  return "none";
-};
-
-const formatDebugBoolean = (value: boolean) => (value ? "yes" : "no");
-
-const getMapDebugSnapshot = (map: Map) => ({
-  sourceIds: [
-    SOURCE_ID,
-    SUBDIVISION_SOURCE_ID,
-    CITY_SOURCE_ID,
-    PHYSICAL_SOURCE_ID,
-    LANDMARK_SOURCE_ID,
-    LEADER_SOURCE_ID,
-    LABEL_SOURCE_ID,
-    LEARNING_LEADER_SOURCE_ID,
-    LEARNING_LABEL_SOURCE_ID,
-    DEBUG_LEADER_SOURCE_ID,
-    DEBUG_LABEL_SOURCE_ID,
-  ].filter((sourceId) => Boolean(map.getSource(sourceId))),
-  layerIds: GEOMASTER_LAYER_IDS.filter((layerId) => Boolean(map.getLayer(layerId))),
-  labelSourceLoaded: Boolean(map.getSource(LABEL_SOURCE_ID)),
-  labelLayerLoaded: [...LABEL_LAYER_IDS, ...LEARNING_LABEL_LAYER_IDS].some(
-    (layerId) => Boolean(map.getLayer(layerId)),
-  ),
-  leaderSourceLoaded:
-    Boolean(map.getSource(LEADER_SOURCE_ID)) ||
-    Boolean(map.getSource(LEARNING_LEADER_SOURCE_ID)),
-  leaderLayerLoaded:
-    Boolean(map.getLayer(LEADER_LAYER_ID)) ||
-    Boolean(map.getLayer(LEARNING_LEADER_LAYER_ID)),
-  projection: map.getProjection?.().name ?? "unknown",
-});
-
-const LEARNING_LAYER_IDS = [
-  SUBDIVISION_LABEL_LAYER_ID,
-  CITY_CIRCLE_LAYER_ID,
-  CITY_LABEL_LAYER_ID,
-  PHYSICAL_LABEL_LAYER_ID,
-  LANDMARK_CIRCLE_LAYER_ID,
-  LANDMARK_LABEL_LAYER_ID,
-  LEARNING_LEADER_LAYER_ID,
-  ...LEARNING_LABEL_LAYER_IDS,
-];
-
-const setLearningLayerVisibility = (map: Map, visible: boolean) => {
-  LEARNING_LAYER_IDS.forEach((layerId) => {
-    if (!map.getLayer(layerId)) {
-      return;
-    }
-
-    map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
-  });
-};
-
-type MapDebugPanelProps = {
-  onTestBrazilShade: () => void;
-  onClearBrazilShade: () => void;
-  onTestCanadaLabel: () => void;
-  onTestStLuciaLabel: () => void;
-  onClearTestLabels: () => void;
-  remainingCount: number;
-  pulseActive: boolean;
-  pulseReason: string;
-  caribbeanInsetMounted: boolean;
-  targetHighlightActive: boolean;
-  insetTargetHighlightActive: boolean;
-  labelCount: number;
-  leaderLineCount: number;
-  insetLabelSourceLoaded: boolean;
-  expanded: boolean;
-  onToggleExpanded: () => void;
-};
-
-function MapDebugPanel({
-  onTestBrazilShade,
-  onClearBrazilShade,
-  onTestCanadaLabel,
-  onTestStLuciaLabel,
-  onClearTestLabels,
-  remainingCount,
-  pulseActive,
-  pulseReason,
-  caribbeanInsetMounted,
-  targetHighlightActive,
-  insetTargetHighlightActive,
-  labelCount,
-  leaderLineCount,
-  insetLabelSourceLoaded,
-  expanded,
-  onToggleExpanded,
-}: MapDebugPanelProps) {
-  const debug = useGameStore((state) => state.debug);
-  const selectedMode = useGameStore((state) => state.selectedMode);
-  const capitalHintEnabled = useGameStore(
-    (state) => state.capitalHintEnabled,
-  );
-  const quizCountries = useGameStore((state) => state.quizCountries);
-  const guessedCountryIds = useGameStore((state) => state.guessedCountryIds);
-  const countryResults = useGameStore((state) => state.countryResults);
-  const currentTargetHints = useGameStore((state) => state.currentTargetHints);
-  const targetQueue = useGameStore((state) => state.targetQueue);
-  const lastMatchedCountry = useGameStore((state) => state.lastMatchedCountry);
-  const currentTargetCountry = useGameStore(
-    (state) => state.currentTargetCountry,
-  );
-  const resultEntries = Object.entries(countryResults);
-  const assistedIds = resultEntries
-    .filter(([, result]) => result.status === "assisted")
-    .map(([iso]) => iso);
-  const missedIds = resultEntries
-    .filter(([, result]) => result.status === "missed")
-    .map(([iso]) => iso);
-
-  if (!expanded) {
-    return (
-      <button
-        type="button"
-        onClick={onToggleExpanded}
-        className="absolute left-5 top-36 z-30 rounded-full border border-white/14 bg-black/40 px-3 py-2 text-xs font-semibold text-white/66 shadow-xl shadow-black/30 backdrop-blur-2xl transition hover:bg-black/52 hover:text-white"
-      >
-        Debug
-      </button>
-    );
-  }
-
-  return (
-    <aside className="absolute left-5 top-36 z-20 max-h-80 w-[min(22rem,calc(100vw-2.5rem))] overflow-auto rounded-3xl border border-white/14 bg-black/44 p-4 font-mono text-xs text-white/72 shadow-2xl shadow-black/40 backdrop-blur-2xl">
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-sans text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/44">
-          Debug
-        </p>
-        <button
-          type="button"
-          onClick={onToggleExpanded}
-          className="rounded-full border border-white/12 bg-white/8 px-2 py-1 font-sans text-[0.65rem] font-semibold text-white/62 transition hover:bg-white/14 hover:text-white"
-        >
-          Hide
-        </button>
-      </div>
-      <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
-        <dt>Mapbox loaded</dt>
-        <dd>{formatDebugBoolean(debug.mapLoaded)}</dd>
-        <dt>Source loaded</dt>
-        <dd>{formatDebugBoolean(debug.countrySourceLoaded)}</dd>
-        <dt>Features</dt>
-        <dd>{debug.countryFeatureCount}</dd>
-        <dt>Region count</dt>
-        <dd>{quizCountries.length}</dd>
-        <dt>Mode</dt>
-        <dd>{selectedMode}</dd>
-        <dt>Last match</dt>
-        <dd>{lastMatchedCountry?.name ?? "none"}</dd>
-        <dt>Raw input</dt>
-        <dd>{debug.lastRawInput ?? "none"}</dd>
-        <dt>Norm input</dt>
-        <dd>{debug.lastNormalizedInput ?? "none"}</dd>
-        <dt>Matched</dt>
-        <dd>
-          {debug.lastMatchedIso
-            ? `${debug.lastMatchedIso} ${debug.lastMatchedName ?? ""}`
-            : "none"}
-        </dd>
-        <dt>Match method</dt>
-        <dd>{debug.lastMatchMethod ?? "none"}</dd>
-        <dt>Accepted</dt>
-        <dd>
-          {debug.lastMatchAccepted === null
-            ? "n/a"
-            : formatDebugBoolean(debug.lastMatchAccepted)}
-        </dd>
-        <dt>Popup ISO</dt>
-        <dd>{debug.lastPopupIso ?? "none"}</dd>
-        <dt>Shaded ISO</dt>
-        <dd>{debug.lastShadedIso ?? "none"}</dd>
-        <dt>Clicked ISO</dt>
-        <dd>{debug.lastClickedIso ?? "none"}</dd>
-        <dt>Clicked name</dt>
-        <dd>{debug.lastClickedName ?? "none"}</dd>
-        <dt>Click source</dt>
-        <dd>{debug.lastClickSource ?? "none"}</dd>
-        <dt>Target</dt>
-        <dd>
-          {currentTargetCountry
-            ? `${currentTargetCountry.iso_a3} ${currentTargetCountry.name}`
-            : "none"}
-        </dd>
-        <dt>Capital hint</dt>
-        <dd>{formatDebugBoolean(capitalHintEnabled)}</dd>
-        <dt>Target queue</dt>
-        <dd>{targetQueue.length}</dd>
-        <dt>Guessed count</dt>
-        <dd>{guessedCountryIds.length}</dd>
-        <dt>Results</dt>
-        <dd>{resultEntries.length}</dd>
-        <dt>Assisted</dt>
-        <dd>{assistedIds.length}</dd>
-        <dt>Missed</dt>
-        <dd>{missedIds.length}</dd>
-        <dt>Hints</dt>
-        <dd>{currentTargetHints.length}</dd>
-        <dt>Target highlight</dt>
-        <dd>{formatDebugBoolean(targetHighlightActive)}</dd>
-        <dt>Inset target</dt>
-        <dd>{formatDebugBoolean(insetTargetHighlightActive)}</dd>
-        <dt>Projection</dt>
-        <dd>{debug.projection}</dd>
-        <dt>Sources</dt>
-        <dd>{debug.sourceIds.join(", ") || "none"}</dd>
-        <dt>Layers</dt>
-        <dd>{debug.layerIds.length}</dd>
-        <dt>Label source</dt>
-        <dd>{formatDebugBoolean(debug.labelSourceLoaded)}</dd>
-        <dt>Label layer</dt>
-        <dd>{formatDebugBoolean(debug.labelLayerLoaded)}</dd>
-        <dt>Leader source</dt>
-        <dd>{formatDebugBoolean(debug.leaderSourceLoaded)}</dd>
-        <dt>Leader layer</dt>
-        <dd>{formatDebugBoolean(debug.leaderLayerLoaded)}</dd>
-        <dt>Label features</dt>
-        <dd>{debug.labelFeatureCount}</dd>
-        <dt>Leader features</dt>
-        <dd>{debug.leaderFeatureCount}</dd>
-        <dt>Inset label layer</dt>
-        <dd>{formatDebugBoolean(debug.insetLabelLayerLoaded)}</dd>
-        <dt>Last ISO exists</dt>
-        <dd>
-          {debug.guessedIsoExists === null
-            ? "n/a"
-            : formatDebugBoolean(debug.guessedIsoExists)}
-        </dd>
-        <dt>Last state</dt>
-        <dd>
-          {debug.lastFeatureStateCall
-            ? `${debug.lastFeatureStateCall.id} ${debug.lastFeatureStateCall.ok ? "ok" : "fail"}`
-            : "none"}
-        </dd>
-        <dt>Remaining</dt>
-        <dd>{remainingCount}</dd>
-        <dt>Pulse active</dt>
-        <dd>{formatDebugBoolean(pulseActive)}</dd>
-        <dt>Pulse reason</dt>
-        <dd>{pulseReason}</dd>
-        <dt>Feedback</dt>
-        <dd>{lastMatchedCountry?.name ?? "none"}</dd>
-        <dt>Caribbean inset</dt>
-        <dd>{formatDebugBoolean(caribbeanInsetMounted)}</dd>
-        <dt>Labels</dt>
-        <dd>{labelCount}</dd>
-        <dt>Leader lines</dt>
-        <dd>{leaderLineCount}</dd>
-        <dt>Inset labels</dt>
-        <dd>{formatDebugBoolean(insetLabelSourceLoaded)}</dd>
-        <dt>Inset missed</dt>
-        <dd>{debug.insetMissedCount}</dd>
-        <dt>Toast duration</dt>
-        <dd>7s</dd>
-      </dl>
-      <p className="mt-3 break-words text-white/58">
-        Guessed: {guessedCountryIds.join(", ") || "none"}
-      </p>
-      <p className="mt-2 break-words text-white/58">
-        Assisted: {assistedIds.join(", ") || "none"}
-      </p>
-      <p className="mt-2 break-words text-white/58">
-        Missed: {missedIds.join(", ") || "none"}
-      </p>
-      <p className="mt-2 break-words text-white/58">
-        Target hints: {currentTargetHints.join(" | ") || "none"}
-      </p>
-      {debug.lastFeatureStateCall?.error ? (
-        <p className="mt-2 rounded-xl border border-red-300/20 bg-red-950/30 p-2 text-red-100/80">
-          {debug.lastFeatureStateCall.error}
-        </p>
-      ) : null}
-      {debug.lastLabelLayerError ? (
-        <p className="mt-2 rounded-xl border border-red-300/20 bg-red-950/30 p-2 text-red-100/80">
-          {debug.lastLabelLayerError}
-        </p>
-      ) : null}
-      <div className="mt-3 flex gap-2 font-sans">
-        <button
-          type="button"
-          onClick={onTestBrazilShade}
-          className="rounded-full border border-emerald-200/24 bg-emerald-300/14 px-3 py-1.5 text-xs font-semibold text-emerald-50 transition hover:bg-emerald-300/22"
-        >
-          Test BRA shade
-        </button>
-        <button
-          type="button"
-          onClick={onClearBrazilShade}
-          className="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/14"
-        >
-          Clear test
-        </button>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2 font-sans">
-        <button
-          type="button"
-          onClick={onTestCanadaLabel}
-          className="rounded-full border border-sky-200/24 bg-sky-300/14 px-3 py-1.5 text-xs font-semibold text-sky-50 transition hover:bg-sky-300/22"
-        >
-          Test Canada Label
-        </button>
-        <button
-          type="button"
-          onClick={onTestStLuciaLabel}
-          className="rounded-full border border-sky-200/24 bg-sky-300/14 px-3 py-1.5 text-xs font-semibold text-sky-50 transition hover:bg-sky-300/22"
-        >
-          Test St Lucia Label
-        </button>
-        <button
-          type="button"
-          onClick={onClearTestLabels}
-          className="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/70 transition hover:bg-white/14"
-        >
-          Clear Test Labels
-        </button>
-      </div>
-    </aside>
-  );
-}
-
-function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncPreference = () => setPrefersReducedMotion(mediaQuery.matches);
-
-    syncPreference();
-    mediaQuery.addEventListener("change", syncPreference);
-
-    return () => mediaQuery.removeEventListener("change", syncPreference);
-  }, []);
-
-  return prefersReducedMotion;
-}
-
-const getInitialDocumentVisible = () =>
-  typeof document === "undefined" ? true : !document.hidden;
-
-function useDocumentVisible() {
-  const [documentVisible, setDocumentVisible] = useState(
-    getInitialDocumentVisible,
-  );
-
-  useEffect(() => {
-    const syncVisibility = () => setDocumentVisible(!document.hidden);
-
-    syncVisibility();
-    document.addEventListener("visibilitychange", syncVisibility);
-
-    return () =>
-      document.removeEventListener("visibilitychange", syncVisibility);
-  }, []);
-
-  return documentVisible;
-}
-
-const getInitialMobilePerformanceMode = (prefersReducedMotion: boolean) => {
-  if (typeof window === "undefined") {
-    return prefersReducedMotion;
-  }
-
-  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  const narrowViewport = window.matchMedia("(max-width: 767px)").matches;
-  const connection = (
-    navigator as Navigator & { connection?: { saveData?: boolean } }
-  ).connection;
-
-  return (
-    prefersReducedMotion ||
-    coarsePointer ||
-    narrowViewport ||
-    Boolean(connection?.saveData)
-  );
-};
-
-function useMobilePerformanceMode(prefersReducedMotion: boolean) {
-  const [mobilePerformanceMode, setMobilePerformanceMode] = useState(() =>
-    getInitialMobilePerformanceMode(prefersReducedMotion),
-  );
-
-  useEffect(() => {
-    const coarsePointer = window.matchMedia("(pointer: coarse)");
-    const narrowViewport = window.matchMedia("(max-width: 767px)");
-    const connection = (
-      navigator as Navigator & { connection?: { saveData?: boolean } }
-    ).connection;
-
-    const syncMode = () => {
-      setMobilePerformanceMode(
-        prefersReducedMotion ||
-          coarsePointer.matches ||
-          narrowViewport.matches ||
-          Boolean(connection?.saveData),
-      );
-    };
-
-    syncMode();
-    coarsePointer.addEventListener("change", syncMode);
-    narrowViewport.addEventListener("change", syncMode);
-
-    return () => {
-      coarsePointer.removeEventListener("change", syncMode);
-      narrowViewport.removeEventListener("change", syncMode);
-    };
-  }, [prefersReducedMotion]);
-
-  return mobilePerformanceMode;
-}
-
-function useIdleGlobeRotation({
-  enabled,
-  idleDelayMs,
-  mapRef,
-  onInteraction,
-  interactionKey,
-  documentVisible,
-}: {
-  enabled: boolean;
-  idleDelayMs: number;
-  mapRef: MutableRefObject<Map | null>;
-  onInteraction: () => void;
-  interactionKey: number;
-  documentVisible: boolean;
-}) {
-  useEffect(() => {
-    const map = mapRef.current;
-
-    if (!enabled || !documentVisible || !map) {
-      return;
-    }
-
-    let timeoutId: number | null = null;
-    let intervalId: number | null = null;
-    let previousTimestamp = 0;
-
-    const stopRotation = () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-
-      if (intervalId) {
-        window.clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    const handleInteraction = () => {
-      stopRotation();
-      onInteraction();
-    };
-
-    const rotateOnce = () => {
-      if (mapRef.current !== map) {
-        return;
-      }
-
-      const timestamp = performance.now();
-
-      if (!previousTimestamp) {
-        previousTimestamp = timestamp;
-      }
-
-      const elapsedSeconds = (timestamp - previousTimestamp) / 1000;
-      previousTimestamp = timestamp;
-      map.setBearing(map.getBearing() + elapsedSeconds * 0.18);
-    };
-
-    timeoutId = window.setTimeout(() => {
-      previousTimestamp = 0;
-      rotateOnce();
-      intervalId = window.setInterval(rotateOnce, IDLE_ROTATION_STEP_MS);
-    }, idleDelayMs);
-
-    map.on("dragstart", handleInteraction);
-    map.on("zoomstart", handleInteraction);
-    map.on("rotatestart", handleInteraction);
-    map.on("pitchstart", handleInteraction);
-    map.on("mousedown", handleInteraction);
-    map.on("touchstart", handleInteraction);
-    const canvas = map.getCanvas();
-    canvas.addEventListener("wheel", handleInteraction, { passive: true });
-
-    return () => {
-      stopRotation();
-      map.off("dragstart", handleInteraction);
-      map.off("zoomstart", handleInteraction);
-      map.off("rotatestart", handleInteraction);
-      map.off("pitchstart", handleInteraction);
-      map.off("mousedown", handleInteraction);
-      map.off("touchstart", handleInteraction);
-      canvas.removeEventListener("wheel", handleInteraction);
-    };
-  }, [
-    documentVisible,
-    enabled,
-    idleDelayMs,
-    interactionKey,
-    mapRef,
-    onInteraction,
-  ]);
-}
-
-function IdlePromptToast({ prompt }: { prompt: string }) {
-  return (
-    <motion.aside
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-      className="pointer-events-none absolute inset-x-3 bottom-[calc(5.9rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-sm rounded-2xl border border-white/12 bg-zinc-950/54 px-4 py-3 text-sm font-medium leading-5 text-white/72 shadow-lg shadow-black/24 backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-5 sm:max-w-xs"
-      aria-live="polite"
-    >
-      <span className="block text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-emerald-100/54">
-        Atlas note
-      </span>
-      <span className="mt-1 block">{prompt}</span>
-    </motion.aside>
-  );
-}
 
 export function MapContainer() {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
@@ -848,8 +176,18 @@ export function MapContainer() {
   const remainingPulseFrameRef = useRef<number | null>(null);
   const framingKeyboardInsetRef = useRef(0);
   const feedbackGlowTimeoutRef = useRef<number | null>(null);
+  const missFeedbackTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  // A fatal failure means the canvas will never render (no WebGL, or the Map
+  // constructor threw). Transient tile/style errors keep using the toast.
+  const [mapFatalError, setMapFatalError] = useState<string | null>(null);
+  const [mapRetryKey, setMapRetryKey] = useState(0);
+  // Mapbox is the heaviest thing on the page and the landing screen renders its
+  // own cobe globe on top of it, so hold initialization until the browser is
+  // idle (or the user leaves the landing, whichever comes first). The warm-up
+  // means the map is normally ready by the time the landing is dismissed.
+  const [mapInitAllowed, setMapInitAllowed] = useState(!features.lazyMapInit);
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
@@ -894,6 +232,7 @@ export function MapContainer() {
   const guessedCountryIds = useGameStore((state) => state.guessedCountryIds);
   const countryResults = useGameStore((state) => state.countryResults);
   const lastMatchedCountry = useGameStore((state) => state.lastMatchedCountry);
+  const lastMissFeedback = useGameStore((state) => state.lastMissFeedback);
   const lastMatchSequence = useGameStore((state) => state.lastMatchSequence);
   const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const currentTargetCountry = useGameStore(
@@ -924,6 +263,7 @@ export function MapContainer() {
     (state) => state.perfectRunSequence,
   );
   const clearCorrectCard = useGameStore((state) => state.clearCorrectCard);
+  const clearMissFeedback = useGameStore((state) => state.clearMissFeedback);
   const selectedLearningFeature = useGameStore(
     (state) => state.selectedLearningFeature,
   );
@@ -940,8 +280,45 @@ export function MapContainer() {
     (state) => state.submitMapClickGuess,
   );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
+  const startCustomQuiz = useGameStore((state) => state.startCustomQuiz);
+  const startQuiz = useGameStore((state) => state.startQuiz);
+  const progressHydrated = useProgressStore((state) => state.hydrated);
+  const countryProgress = useProgressStore((state) => state.countries);
 
   useSoundEffects(lastFeedbackEvent, { documentVisible });
+  useRecordQuizProgress();
+  const daily = useDailyChallenge();
+
+  useEffect(() => {
+    if (mapInitAllowed) {
+      return;
+    }
+
+    if (!landingOpen) {
+      const timeoutId = window.setTimeout(() => setMapInitAllowed(true), 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    const allow = () => setMapInitAllowed(true);
+    const idleWindow = window as typeof window & {
+      requestIdleCallback?: (
+        callback: () => void,
+        options?: { timeout: number },
+      ) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (idleWindow.requestIdleCallback) {
+      const handle = idleWindow.requestIdleCallback(allow, { timeout: 1500 });
+
+      return () => idleWindow.cancelIdleCallback?.(handle);
+    }
+
+    const timeoutId = window.setTimeout(allow, 900);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [landingOpen, mapInitAllowed]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -1023,6 +400,78 @@ export function MapContainer() {
 
     return [...GENERIC_IDLE_PROMPTS, ...countryPrompts];
   }, []);
+  const missTeachingNote = useMemo(() => {
+    if (!features.mapMissTeaching || !lastMissFeedback) {
+      return null;
+    }
+
+    const wrongCountry = countries.find(
+      (country) => country.iso_a3 === lastMissFeedback.wrongIso,
+    );
+
+    if (!wrongCountry) {
+      return null;
+    }
+
+    const correctCountry = lastMissFeedback.correctIso
+      ? countries.find(
+          (country) => country.iso_a3 === lastMissFeedback.correctIso,
+        )
+      : null;
+
+    return {
+      sequence: lastMissFeedback.sequence,
+      text: correctCountry
+        ? `That's ${wrongCountry.name} — ${correctCountry.name} is highlighted.`
+        : `That's ${wrongCountry.name}. Try again.`,
+    };
+  }, [lastMissFeedback]);
+  // Landing orientation. Until the stored progress has been read the copy stays
+  // on the first-time line, so the server render and the first client render
+  // agree and nothing flashes.
+  const masteredCount = useMemo(
+    () => (progressHydrated ? getMasteredCount(countryProgress) : 0),
+    [countryProgress, progressHydrated],
+  );
+  const weakCountryIds = useMemo(
+    () =>
+      progressHydrated
+        ? getWeakestCountryIds(countryProgress, { limit: 12 })
+        : [],
+    [countryProgress, progressHydrated],
+  );
+  const hasPlayedBefore =
+    progressHydrated && Object.keys(countryProgress).length > 0;
+  const landingContextLine = useMemo(() => {
+    if (!features.adaptiveLanding) {
+      return null;
+    }
+
+    const practisedCount = progressHydrated
+      ? Object.keys(countryProgress).length
+      : 0;
+
+    if (practisedCount === 0) {
+      return "Learn every country on a real world map — quiz yourself, explore, and practise what you miss.";
+    }
+
+    const regionLabel = getRegionConfig(selectedRegion).label;
+
+    // Early on there is nothing mastered yet, and "0 mastered" is a poor
+    // welcome, so lead with what the player has actually covered.
+    if (masteredCount === 0) {
+      return `${practisedCount} ${
+        practisedCount === 1 ? "country" : "countries"
+      } practised · keep going in ${regionLabel}`;
+    }
+
+    const regionMastery = getRegionMastery(countryProgress, selectedRegion);
+    const regionShare = Math.round(regionMastery.ratio * 100);
+
+    return `${masteredCount} ${
+      masteredCount === 1 ? "country" : "countries"
+    } mastered · ${regionLabel} ${regionShare}%`;
+  }, [countryProgress, masteredCount, progressHydrated, selectedRegion]);
   const registerMapInteraction = useCallback(() => {
     setHasMapInteraction(true);
     setIdleInteractionKey((key) => key + 1);
@@ -1381,6 +830,64 @@ export function MapContainer() {
     mapAnimationsEnabled,
     mapLoaded,
   ]);
+
+  // Show a wrong map pick where it happened, and - once the answer has been
+  // revealed - the country that was actually being asked for, so the mistake
+  // teaches the spatial relationship instead of only reporting an error.
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (
+      !features.mapMissTeaching ||
+      !mapLoaded ||
+      !map ||
+      !lastMissFeedback ||
+      mobilePerformanceMode
+    ) {
+      return;
+    }
+
+    const { wrongIso, correctIso } = lastMissFeedback;
+
+    setCountryFeatureState(map, wrongIso, { wrong: true });
+
+    if (correctIso) {
+      setCountryFeatureState(map, correctIso, { target: true, targetPulse: 0.9 });
+    }
+
+    const clear = () => {
+      if (mapRef.current !== map) {
+        return;
+      }
+
+      setCountryFeatureState(map, wrongIso, { wrong: false });
+
+      if (correctIso) {
+        setCountryFeatureState(map, correctIso, {
+          target: false,
+          targetPulse: 0,
+        });
+      }
+    };
+
+    missFeedbackTimeoutRef.current = window.setTimeout(
+      () => {
+        clear();
+        clearMissFeedback();
+        missFeedbackTimeoutRef.current = null;
+      },
+      correctIso ? 1600 : 900,
+    );
+
+    return () => {
+      if (missFeedbackTimeoutRef.current) {
+        window.clearTimeout(missFeedbackTimeoutRef.current);
+        missFeedbackTimeoutRef.current = null;
+      }
+
+      clear();
+    };
+  }, [clearMissFeedback, lastMissFeedback, mapLoaded, mobilePerformanceMode]);
 
   const addCountryLayers = useCallback(
     (
@@ -2201,49 +1708,113 @@ export function MapContainer() {
   );
 
   useEffect(() => {
-    if (!mapNodeRef.current || mapRef.current || !mapboxToken) {
+    if (!mapNodeRef.current || mapRef.current || !mapboxToken || !mapInitAllowed) {
       return;
     }
 
-    mapboxgl.accessToken = mapboxToken;
+    if (!isWebglAvailable()) {
+      // Deferred like the other state updates in this file so the effect does
+      // not set state synchronously during the commit.
+      const timeoutId = window.setTimeout(() => {
+        setMapFatalError("WebGL is not available in this browser.");
+        setMapLoaded(true);
+      }, 0);
 
-    const map = new mapboxgl.Map({
-      container: mapNodeRef.current,
-      style: MAP_STYLE,
-      center: [-58, -18],
-      zoom: 2.2,
-      pitch: 38,
-      bearing: -12,
-      projection: "globe",
-      antialias: !initialMapPerformanceModeRef.current,
-      attributionControl: false,
-    });
+      return () => window.clearTimeout(timeoutId);
+    }
 
-    mapRef.current = map;
-    map.addControl(
-      new mapboxgl.AttributionControl({ compact: true }),
-      "bottom-right",
-    );
+    const container = mapNodeRef.current;
+    let map: Map | null = null;
+    let cancelled = false;
 
-    map.once("load", () => {
-      hideMapLabelsAndRoads(map);
-      addTerrainAndFog(map, {
-        terrainEnabled: !initialMapPerformanceModeRef.current,
+    const failFatally = (message: string) => {
+      if (cancelled) {
+        return;
+      }
+
+      setMapFatalError(message);
+      setMapLoaded(true);
+    };
+
+    // mapbox-gl is the heaviest thing this app loads, so it is fetched here
+    // rather than at module scope. Everything below runs a microtask later than
+    // it used to; `cancelled` guards a unmount that beats the import.
+    void (async () => {
+      let mapboxgl: typeof import("mapbox-gl").default;
+
+      try {
+        mapboxgl = (await import("mapbox-gl")).default;
+      } catch {
+        failFatally("Could not load the map library.");
+
+        return;
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      mapboxgl.accessToken = mapboxToken;
+
+      try {
+        map = new mapboxgl.Map({
+          container,
+          style: MAP_STYLE,
+          center: [-58, -18],
+          zoom: 2.2,
+          pitch: 38,
+          bearing: -12,
+          projection: "globe",
+          antialias: !initialMapPerformanceModeRef.current,
+          attributionControl: false,
+        });
+      } catch (error) {
+        failFatally(
+          error instanceof Error
+            ? error.message
+            : "Mapbox could not create a map on this device.",
+        );
+
+        return;
+      }
+
+      if (cancelled) {
+        map.remove();
+        map = null;
+
+        return;
+      }
+
+      const createdMap = map;
+
+      mapRef.current = createdMap;
+      createdMap.addControl(
+        new mapboxgl.AttributionControl({ compact: true }),
+        "bottom-right",
+      );
+
+      createdMap.once("load", () => {
+        hideMapLabelsAndRoads(createdMap);
+        addTerrainAndFog(createdMap, {
+          terrainEnabled: !initialMapPerformanceModeRef.current,
+        });
+
+        setMapLoaded(true);
+        setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(createdMap) });
       });
 
-      setMapLoaded(true);
-      setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(map) });
-    });
-
-    map.on("error", (event) => {
-      if (event.error?.message) {
-        setMapError(event.error.message);
-        setMapLoaded(true);
-        setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(map) });
-      }
-    });
+      createdMap.on("error", (event) => {
+        if (event.error?.message) {
+          setMapError(event.error.message);
+          setMapLoaded(true);
+          setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(createdMap) });
+        }
+      });
+    })();
 
     return () => {
+      cancelled = true;
+
       if (remainingPulseFrameRef.current) {
         window.clearInterval(remainingPulseFrameRef.current);
         remainingPulseFrameRef.current = null;
@@ -2259,7 +1830,13 @@ export function MapContainer() {
         feedbackGlowTimeoutRef.current = null;
       }
 
-      map.remove();
+      if (missFeedbackTimeoutRef.current) {
+        window.clearTimeout(missFeedbackTimeoutRef.current);
+        missFeedbackTimeoutRef.current = null;
+      }
+
+      map?.remove();
+      map = null;
       mapRef.current = null;
       setMapDebug({
         mapLoaded: false,
@@ -2277,7 +1854,7 @@ export function MapContainer() {
         projection: "unknown",
       });
     };
-  }, [mapboxToken, setMapDebug]);
+  }, [mapboxToken, mapInitAllowed, mapRetryKey, setMapDebug]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2698,7 +2275,7 @@ export function MapContainer() {
       };
     }
 
-    const handleClick = (event: mapboxgl.MapMouseEvent) => {
+    const handleClick = (event: MapMouseEvent) => {
       registerMapInteraction();
 
       if (!map.getLayer(FILL_LAYER_ID)) {
@@ -2857,6 +2434,83 @@ export function MapContainer() {
     setLandingOpen(false);
   }, []);
 
+  const quickStartQuiz = useCallback(() => {
+    setRegionPanelOpen(false);
+    setLandingOpen(false);
+    startQuiz();
+  }, [startQuiz]);
+
+  const startDailyChallenge = useCallback(() => {
+    setRegionPanelOpen(false);
+    setLandingOpen(false);
+    daily.startDailyChallenge();
+  }, [daily]);
+
+  const practiceWeakSpots = useCallback(() => {
+    setRegionPanelOpen(false);
+    setLandingOpen(false);
+    startCustomQuiz(weakCountryIds, { label: "Weak spots" });
+  }, [startCustomQuiz, weakCountryIds]);
+
+  const handleExploreSearchSelect = useCallback(
+    (result: ExploreSearchResult) => {
+      registerMapInteraction();
+      selectLearningFeature(result.feature);
+      mapRef.current?.flyTo({
+        center: result.center,
+        zoom: result.zoom,
+        duration: 1200,
+        essential: true,
+      });
+    },
+    [registerMapInteraction, selectLearningFeature],
+  );
+
+  const handleZoomIn = useCallback(() => {
+    registerMapInteraction();
+    mapRef.current?.zoomIn({ duration: 320 });
+  }, [registerMapInteraction]);
+
+  const handleZoomOut = useCallback(() => {
+    registerMapInteraction();
+    mapRef.current?.zoomOut({ duration: 320 });
+  }, [registerMapInteraction]);
+
+  const handleRecenter = useCallback(() => {
+    registerMapInteraction();
+
+    const map = mapRef.current;
+
+    if (!map) {
+      return;
+    }
+
+    // Reframe on whatever the user is actually working on: the quiz region
+    // during a run, otherwise the default globe view.
+    if (gameStatus !== "idle" && !selectedSpecialRegion) {
+      const region = getRegionConfig(selectedRegion);
+
+      map.fitBounds(region.bounds, {
+        padding: 64,
+        pitch: region.pitch,
+        bearing: region.bearing,
+        duration: 900,
+        essential: true,
+      });
+
+      return;
+    }
+
+    map.flyTo({
+      center: [-32, 16],
+      zoom: typeof window !== "undefined" && window.innerWidth < 768 ? 1.1 : 1.7,
+      pitch: 24,
+      bearing: -12,
+      duration: 900,
+      essential: true,
+    });
+  }, [gameStatus, registerMapInteraction, selectedRegion, selectedSpecialRegion]);
+
   const reopenLanding = useCallback(() => {
     if (gameStatus === "running") {
       pauseQuiz();
@@ -2934,11 +2588,28 @@ export function MapContainer() {
         </p>
       </motion.div>
 
+      {features.mapControls && !landingOpen && mapLoaded && !mapFatalError ? (
+        <MapControls
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onRecenter={handleRecenter}
+        />
+      ) : null}
       {!landingOpen && !selectedSpecialRegion ? (
         <GameHud
           onOpenLanding={reopenLanding}
           onOpenRegionPanel={() => openRegionPanel("region")}
           regionPanelOpen={regionPanelOpen}
+          exploreSearch={
+            features.exploreSearch ? (
+              <ExploreSearch onSelect={handleExploreSearchSelect} />
+            ) : null
+          }
+          exploreSearchCompact={
+            features.exploreSearch ? (
+              <ExploreSearch onSelect={handleExploreSearchSelect} compact />
+            ) : null
+          }
         />
       ) : null}
       <AnimatePresence>
@@ -2952,6 +2623,21 @@ export function MapContainer() {
             onResume={handleResumeSavedQuiz}
             onDiscard={handleDiscardSavedQuiz}
           />
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {missTeachingNote && !landingOpen ? (
+          <motion.p
+            key={missTeachingNote.sequence}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="pointer-events-none absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-1/2 z-30 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-2xl border border-rose-200/22 bg-zinc-950/72 px-3 py-1.5 text-center text-xs font-semibold leading-4 text-rose-50 backdrop-blur-xl sm:bottom-28 sm:rounded-full"
+            aria-live="polite"
+          >
+            {missTeachingNote.text}
+          </motion.p>
         ) : null}
       </AnimatePresence>
       <AnimatePresence>
@@ -2976,31 +2662,33 @@ export function MapContainer() {
       </AnimatePresence>
       <AnimatePresence>
         {!landingOpen && caribbeanInsetMounted && topologyData ? (
-          <CaribbeanInsetMap
-            key="caribbean-inset"
-            mapboxToken={mapboxToken}
-            topologyData={topologyData}
-            guessedCountryIds={guessedCountryIds}
-            assistedCountryIds={assistedCountryIds}
-            visibleLabelIds={visibleLabelIds}
-            debugLabelIds={debugLabelIds}
-            missedCountryIds={missedCountryIds}
-            remainingCountryIds={remainingCountryIds}
-            pulseActive={pulseActive}
-            targetCountryId={
-              targetHighlightActive ? currentTargetCountry?.iso_a3 ?? null : null
-            }
-            mobilePerformanceMode={mobilePerformanceMode}
-            documentVisible={documentVisible}
-            correctPopupVisible={correctPopupVisible}
-            mobileExpanded={caribbeanInsetExpanded}
-            onMobileExpandedChange={setCaribbeanInsetExpanded}
-            clickEnabled={
-              selectedMode === "click-country" && gameStatus === "running"
-            }
-            onCountryClick={handleInsetCountryClick}
-            onLabelSourceLoaded={handleInsetLabelLayerLoaded}
-          />
+          <MapErrorBoundary key="caribbean-inset-boundary" fallback={() => null}>
+            <CaribbeanInsetMap
+              key="caribbean-inset"
+              mapboxToken={mapboxToken}
+              topologyData={topologyData}
+              guessedCountryIds={guessedCountryIds}
+              assistedCountryIds={assistedCountryIds}
+              visibleLabelIds={visibleLabelIds}
+              debugLabelIds={debugLabelIds}
+              missedCountryIds={missedCountryIds}
+              remainingCountryIds={remainingCountryIds}
+              pulseActive={pulseActive}
+              targetCountryId={
+                targetHighlightActive ? currentTargetCountry?.iso_a3 ?? null : null
+              }
+              mobilePerformanceMode={mobilePerformanceMode}
+              documentVisible={documentVisible}
+              correctPopupVisible={correctPopupVisible}
+              mobileExpanded={caribbeanInsetExpanded}
+              onMobileExpandedChange={setCaribbeanInsetExpanded}
+              clickEnabled={
+                selectedMode === "click-country" && gameStatus === "running"
+              }
+              onCountryClick={handleInsetCountryClick}
+              onLabelSourceLoaded={handleInsetLabelLayerLoaded}
+            />
+          </MapErrorBoundary>
         ) : null}
       </AnimatePresence>
       {!landingOpen &&
@@ -3054,7 +2742,10 @@ export function MapContainer() {
               keyboardInset={keyboardInset}
             />
           ) : null}
-          <ResultsDashboard />
+          <ResultsDashboard
+            onChangeRegion={() => openRegionPanel("region")}
+            onContinueLearning={() => setRegionPanelOpen(false)}
+          />
         </>
       ) : null}
       <AnimatePresence>
@@ -3074,6 +2765,24 @@ export function MapContainer() {
             onResumeQuiz={resumeActiveQuiz}
             onStartQuiz={closeLandingForQuiz}
             onExploreMap={closeLandingForExplore}
+            contextLine={landingContextLine}
+            onQuickStart={features.quickStart ? quickStartQuiz : undefined}
+            quickStartLabel={
+              // A newcomer has no reason to expect a particular region, so the
+              // named shortcut only appears once there is a habit to resume.
+              hasPlayedBefore
+                ? `Start ${getRegionConfig(selectedRegion).label}`
+                : "Start Learning"
+            }
+            onPracticeWeakSpots={
+              features.practiceMistakes ? practiceWeakSpots : undefined
+            }
+            weakSpotCount={weakCountryIds.length}
+            onStartDailyChallenge={
+              daily.available ? startDailyChallenge : undefined
+            }
+            dailyDoneToday={daily.doneToday}
+            dailyStreak={daily.streak}
           />
         ) : null}
       </AnimatePresence>
@@ -3095,6 +2804,17 @@ export function MapContainer() {
           insetLabelSourceLoaded={caribbeanInsetMounted && insetLabelSourceLoaded}
           expanded={debugExpanded}
           onToggleExpanded={() => setDebugExpanded((expanded) => !expanded)}
+        />
+      ) : null}
+
+      {mapFatalError ? (
+        <MapUnavailable
+          detail={mapFatalError}
+          onRetry={() => {
+            setMapFatalError(null);
+            setMapLoaded(false);
+            setMapRetryKey((key) => key + 1);
+          }}
         />
       ) : null}
 

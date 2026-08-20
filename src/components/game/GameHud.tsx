@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PlayTriangle } from "@/components/game/QuizCta";
 import { getRegionConfig } from "@/data/countries";
 import { modeLabels } from "@/data/gameModes";
+import { features } from "@/config/features";
 import { useGameStore } from "@/store/gameStore";
 import { formatTime } from "@/utils/formatTime";
 
@@ -74,6 +75,9 @@ type GameHudProps = {
   onOpenLanding: () => void;
   onOpenRegionPanel: () => void;
   regionPanelOpen: boolean;
+  /** Explore-mode search field, injected so the HUD stays free of map wiring. */
+  exploreSearch?: ReactNode;
+  exploreSearchCompact?: ReactNode;
 };
 
 function GeoMasterBrand({
@@ -108,7 +112,9 @@ function GeoMasterBrand({
           priority
         />
       </span>
-      <span className="min-w-0">
+      <span className={compact ? "hidden min-w-0 min-[360px]:block" : "min-w-0"}>
+        {/* On a very narrow header the icon carries the brand on its own so the
+            search field and quiz action keep usable widths. */}
         <span
           className={`block truncate font-semibold text-white/90 ${
             compact ? "text-sm" : "text-[0.95rem]"
@@ -158,6 +164,8 @@ export function GameHud({
   onOpenLanding,
   onOpenRegionPanel,
   regionPanelOpen,
+  exploreSearch,
+  exploreSearchCompact,
 }: GameHudProps) {
   const prefersReducedMotion = useReducedMotion();
   const selectedRegion = useGameStore((state) => state.selectedRegion);
@@ -174,7 +182,11 @@ export function GameHud({
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
   const giveUp = useGameStore((state) => state.giveUp);
   const tick = useGameStore((state) => state.tick);
+  const timerMode = useGameStore((state) => state.timerMode);
   const region = getRegionConfig(selectedRegion);
+  const customQuizSet = useGameStore((state) => state.customQuizSet);
+  // A focused practice or daily run names itself rather than its host region.
+  const quizLabel = customQuizSet?.label ?? region.label;
   const modeBResults = Object.values(countryResults);
   const perfectCount = modeBResults.filter(
     (result) => result.status === "correct",
@@ -203,7 +215,8 @@ export function GameHud({
     gameStatus === "completed" ||
     gameStatus === "failed" ||
     gameStatus === "gave-up";
-  const showTimer = gameStatus !== "idle";
+  const isUntimed = features.untimedMode && timerMode === "untimed";
+  const showTimer = gameStatus !== "idle" && !isUntimed;
   const statusLabel = isSetup
     ? "Quiz setup"
     : isFinished
@@ -215,7 +228,7 @@ export function GameHud({
       : gameStatus === "paused"
         ? "Paused"
         : "Quiz active";
-  const contextLabel = `${region.label} · ${modeLabels[selectedMode]}`;
+  const contextLabel = `${quizLabel} · ${modeLabels[selectedMode]}`;
   const feedbackTone = lastFeedbackEvent?.completed
     ? "complete"
     : lastFeedbackEvent?.kind === "correct" ||
@@ -231,8 +244,20 @@ export function GameHud({
     }
 
     const intervalId = window.setInterval(tick, 1000);
+    // Browsers throttle background intervals, so re-derive the clock the moment
+    // the tab (or a woken phone) comes back rather than waiting for a tick.
+    const syncOnVisible = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+      }
+    };
 
-    return () => window.clearInterval(intervalId);
+    document.addEventListener("visibilitychange", syncOnVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", syncOnVisible);
+    };
   }, [gameStatus, tick]);
 
   const primaryAction =
@@ -264,15 +289,18 @@ export function GameHud({
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          className="absolute left-1/2 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex min-h-14 w-[min(24rem,calc(100vw-1rem))] -translate-x-1/2 items-center justify-between gap-2 rounded-2xl border border-white/12 bg-zinc-950/54 px-2.5 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:hidden"
+          className="absolute left-1/2 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex min-h-14 w-[min(26rem,calc(100vw-1rem))] -translate-x-1/2 items-center justify-between gap-2 rounded-2xl border border-white/12 bg-zinc-950/54 px-2.5 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:hidden"
         >
           <GeoMasterBrand onOpenLanding={onOpenLanding} compact />
+          {exploreSearchCompact}
           <button
             type="button"
             onClick={onOpenRegionPanel}
             className="min-h-10 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
-            Choose Quiz
+            {/* The search field takes the middle of this header, so the label
+                shortens only when it is actually competing for room. */}
+            {exploreSearchCompact ? "Quiz" : "Choose Quiz"}
           </button>
         </motion.header>
       ) : (
@@ -330,6 +358,7 @@ export function GameHud({
           className="absolute left-1/2 top-4 z-20 hidden min-h-[3.25rem] -translate-x-1/2 items-center gap-2 rounded-2xl border border-white/12 bg-zinc-950/48 px-2.5 py-2 text-white shadow-lg shadow-black/22 backdrop-blur-xl sm:flex"
         >
           <GeoMasterBrand onOpenLanding={onOpenLanding} />
+          {exploreSearch}
           <button
             type="button"
             onClick={onOpenRegionPanel}
@@ -359,7 +388,7 @@ export function GameHud({
             </p>
             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2">
               <p className="truncate text-sm font-semibold text-white/84">
-                {region.label}
+                {quizLabel}
               </p>
               <span className="rounded-full border border-white/10 bg-white/7 px-2.5 py-1 text-xs font-semibold text-white/58">
                 {modeLabels[selectedMode]}

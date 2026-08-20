@@ -3,7 +3,10 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { CountryEducationCard } from "@/components/game/CountryEducationCard";
+import { ShareResultCard } from "@/components/game/ShareResultCard";
+import { features } from "@/config/features";
 import { getRegionConfig, type Country } from "@/data/countries";
+import { modeLabels } from "@/data/gameModes";
 import { useGameStore } from "@/store/gameStore";
 
 type ReviewGroup = {
@@ -18,7 +21,17 @@ const toneClasses: Record<ReviewGroup["tone"], string> = {
   rose: "border-rose-200/24 bg-rose-300/12 text-rose-50",
 };
 
-export function ResultsDashboard() {
+type ResultsDashboardProps = {
+  /** Reopens quiz setup. Omitted when there is nowhere to send the user. */
+  onChangeRegion?: () => void;
+  /** Dismisses the results and returns to explore mode on the same map. */
+  onContinueLearning?: () => void;
+};
+
+export function ResultsDashboard({
+  onChangeRegion,
+  onContinueLearning,
+}: ResultsDashboardProps = {}) {
   const prefersReducedMotion = useReducedMotion();
   const gameStatus = useGameStore((state) => state.gameStatus);
   const selectedRegion = useGameStore((state) => state.selectedRegion);
@@ -29,6 +42,8 @@ export function ResultsDashboard() {
   const score = useGameStore((state) => state.score);
   const total = useGameStore((state) => state.total);
   const resetQuiz = useGameStore((state) => state.resetQuiz);
+  const startCustomQuiz = useGameStore((state) => state.startCustomQuiz);
+  const backToRegionSelect = useGameStore((state) => state.backToRegionSelect);
   const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const reviewKey = `${gameStatus}-${selectedRegion}-${selectedMode}`;
   const [drawerState, setDrawerState] = useState<{
@@ -44,6 +59,8 @@ export function ResultsDashboard() {
   const selectedCountryId =
     drawerState.key === reviewKey ? drawerState.selectedCountryId : null;
   const region = getRegionConfig(selectedRegion);
+  const customQuizSet = useGameStore((state) => state.customQuizSet);
+  const quizLabel = customQuizSet?.label ?? region.label;
   const statusLabel =
     gameStatus === "completed"
       ? "Quiz complete"
@@ -124,6 +141,38 @@ export function ResultsDashboard() {
     (selectedCountryId ? countryById.get(selectedCountryId) : null) ??
     reviewCountries[0] ??
     null;
+  // Everything this run did not nail: outright misses plus answers that needed
+  // a hint. That is the set worth drilling next.
+  const practiceCountryIds = useMemo(() => {
+    if (isTargetQueueMode) {
+      return quizCountries
+        .filter((country) => {
+          const result = countryResults[country.iso_a3];
+
+          return (
+            result?.status === "missed" ||
+            result?.status === "assisted" ||
+            ((gameStatus === "failed" || gameStatus === "gave-up") && !result)
+          );
+        })
+        .map((country) => country.iso_a3);
+    }
+
+    const guessed = new Set(guessedCountryIds);
+
+    return quizCountries
+      .filter((country) => !guessed.has(country.iso_a3))
+      .map((country) => country.iso_a3);
+  }, [
+    countryResults,
+    gameStatus,
+    guessedCountryIds,
+    isTargetQueueMode,
+    quizCountries,
+  ]);
+  const canPracticeMistakes =
+    features.practiceMistakes && practiceCountryIds.length > 0;
+
   const completionPulse =
     Boolean(lastFeedbackEvent?.completed) && gameStatus === "completed";
 
@@ -164,13 +213,13 @@ export function ResultsDashboard() {
       }`}
     >
       <div
-        className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${
+        className={`flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between ${
           expanded
             ? "sticky top-0 z-10 -mx-4 -mt-4 border-b border-white/10 bg-zinc-950/86 px-4 py-3 backdrop-blur-2xl sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4"
             : ""
         }`}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 sm:min-w-[13rem]">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-100/60">
             {statusLabel}
           </p>
@@ -181,7 +230,7 @@ export function ResultsDashboard() {
                 : "mt-1 truncate text-lg font-semibold"
             }
           >
-            {region.label}
+            {quizLabel}
           </h2>
           <p
             className={
@@ -199,7 +248,7 @@ export function ResultsDashboard() {
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() =>
@@ -221,18 +270,71 @@ export function ResultsDashboard() {
               </>
             )}
           </button>
+          {onChangeRegion ? (
+            <button
+              type="button"
+              onClick={() => {
+                backToRegionSelect();
+                onChangeRegion();
+              }}
+              className="min-h-11 rounded-full border border-white/12 bg-white/7 px-4 py-2 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
+            >
+              Change Region
+            </button>
+          ) : null}
+          {onContinueLearning ? (
+            <button
+              type="button"
+              onClick={() => {
+                backToRegionSelect();
+                onContinueLearning();
+              }}
+              className="min-h-11 rounded-full border border-cyan-100/22 bg-cyan-300/12 px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20"
+            >
+              Explore
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={resetQuiz}
-            className="min-h-11 rounded-full border border-emerald-100/34 bg-emerald-300/22 px-4 py-2 text-sm font-semibold text-emerald-50 shadow-sm shadow-emerald-950/20 transition hover:bg-emerald-300/30"
+            className={`min-h-11 rounded-full border px-4 py-2 text-sm font-semibold transition ${
+              canPracticeMistakes
+                ? "border-white/12 bg-white/7 text-white/66 hover:bg-white/12 hover:text-white"
+                : "border-emerald-100/34 bg-emerald-300/22 text-emerald-50 shadow-sm shadow-emerald-950/20 hover:bg-emerald-300/30"
+            }`}
           >
             Try Again
           </button>
+          {canPracticeMistakes ? (
+            <button
+              type="button"
+              onClick={() =>
+                startCustomQuiz(practiceCountryIds, {
+                  label: `Practice · ${quizLabel}`,
+                })
+              }
+              className="min-h-11 rounded-full border border-emerald-100/34 bg-emerald-300/22 px-4 py-2 text-sm font-semibold text-emerald-50 shadow-sm shadow-emerald-950/20 transition hover:bg-emerald-300/30"
+            >
+              Practice {practiceCountryIds.length}
+            </button>
+          ) : null}
         </div>
       </div>
 
       {expanded ? (
-        <div className="mt-4 grid gap-4 pb-1 sm:mt-5 lg:grid-cols-[1fr_20rem]">
+        <>
+        <div className="mt-4 flex justify-end">
+          {features.shareResultCard ? (
+            <ShareResultCard
+              quizLabel={quizLabel}
+              modeLabel={modeLabels[selectedMode]}
+              score={score}
+              total={total}
+              statusLabel={statusLabel}
+            />
+          ) : null}
+        </div>
+        <div className="mt-3 grid gap-4 pb-1 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
             {reviewGroups.map((group) =>
               group.countries.length > 0 ? (
@@ -277,6 +379,7 @@ export function ResultsDashboard() {
             <CountryEducationCard country={selectedCountry} variant="review" />
           ) : null}
         </div>
+        </>
       ) : null}
     </motion.section>
   );

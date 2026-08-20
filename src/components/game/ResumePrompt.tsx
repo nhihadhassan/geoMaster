@@ -22,7 +22,8 @@ export function ResumePrompt({
   onDiscard,
 }: ResumePromptProps) {
   const prefersReducedMotion = useReducedMotion();
-  const regionLabel = getRegionConfig(snapshot.region).label;
+  const regionLabel =
+    snapshot.customLabel ?? getRegionConfig(snapshot.region).label;
 
   return (
     <motion.aside
