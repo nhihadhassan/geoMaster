@@ -28,6 +28,54 @@ import {
 } from "@/components/map/CaribbeanInsetMap";
 import { CountryPopup } from "@/components/map/CountryPopup";
 import {
+  CITY_CIRCLE_LAYER_ID,
+  CITY_LABEL_LAYER_ID,
+  CITY_SOURCE_ID,
+  DEBUG_LABEL_LAYER_ID,
+  DEBUG_LABEL_SOURCE_ID,
+  DEBUG_LEADER_LAYER_ID,
+  DEBUG_LEADER_SOURCE_ID,
+  FILL_LAYER_ID,
+  GUIDE_CIRCLE_LAYER_ID,
+  GUIDE_CIRCLE_SOURCE_ID,
+  GUIDE_LINE_LAYER_ID,
+  GUIDE_LINE_SOURCE_ID,
+  LABEL_ANCHORS,
+  LABEL_KINDS,
+  LABEL_LAYER_IDS,
+  LABEL_LAYER_PREFIX,
+  LABEL_SOURCE_ID,
+  LANDMARK_CIRCLE_LAYER_ID,
+  LANDMARK_LABEL_LAYER_ID,
+  LANDMARK_SOURCE_ID,
+  LEADER_LAYER_ID,
+  LEADER_SOURCE_ID,
+  LEARNING_LABEL_LAYER_IDS,
+  LEARNING_LABEL_LAYER_PREFIX,
+  LEARNING_LABEL_SOURCE_ID,
+  LEARNING_LEADER_LAYER_ID,
+  LEARNING_LEADER_SOURCE_ID,
+  LINE_LAYER_ID,
+  MAP_STYLE,
+  PHYSICAL_LABEL_LAYER_ID,
+  PHYSICAL_SOURCE_ID,
+  REMAINING_PULSE_FILL_LAYER_ID,
+  REMAINING_PULSE_LINE_LAYER_ID,
+  SOURCE_ID,
+  SUBDIVISION_LABEL_LAYER_ID,
+  SUBDIVISION_SOURCE_ID,
+  TARGET_GLOW_LAYER_ID,
+  addTerrainAndFog,
+  buildFillColorExpression,
+  buildFillOpacityExpression,
+  buildRemainingPulseFilter,
+  getMapDebugSnapshot,
+  getPulseReason,
+  hideMapLabelsAndRoads,
+  setCountryFeatureState,
+  setLearningLayerVisibility,
+} from "@/components/map/mapLayers";
+import {
   countries,
   getRegionConfig,
   quizCountryIds,
@@ -59,39 +107,6 @@ import {
 } from "@/store/gameStore";
 import { getCountryFunFacts } from "@/utils/countryEducation";
 
-const SOURCE_ID = "geomaster-countries";
-const FILL_LAYER_ID = "geomaster-country-fill";
-const LINE_LAYER_ID = "geomaster-country-line";
-const TARGET_GLOW_LAYER_ID = "geomaster-target-glow";
-const REMAINING_PULSE_FILL_LAYER_ID = "geomaster-remaining-pulse-fill";
-const REMAINING_PULSE_LINE_LAYER_ID = "geomaster-remaining-pulse-line";
-const LABEL_SOURCE_ID = "geomaster-country-labels";
-const LEADER_SOURCE_ID = "geomaster-country-leaders";
-const LEARNING_LABEL_SOURCE_ID = "geomaster-learning-country-labels";
-const LEARNING_LEADER_SOURCE_ID = "geomaster-learning-country-leaders";
-const GUIDE_CIRCLE_SOURCE_ID = "geomaster-small-country-guide-circles";
-const GUIDE_LINE_SOURCE_ID = "geomaster-small-country-guide-lines";
-const GUIDE_CIRCLE_LAYER_ID = "geomaster-small-country-guide-circle-layer";
-const GUIDE_LINE_LAYER_ID = "geomaster-small-country-guide-line-layer";
-const SUBDIVISION_SOURCE_ID = "geomaster-subdivisions";
-const SUBDIVISION_LABEL_LAYER_ID = "geomaster-subdivision-label-layer";
-const CITY_SOURCE_ID = "geomaster-cities";
-const CITY_CIRCLE_LAYER_ID = "geomaster-city-circle-layer";
-const CITY_LABEL_LAYER_ID = "geomaster-city-label-layer";
-const PHYSICAL_SOURCE_ID = "geomaster-physical-features";
-const PHYSICAL_LABEL_LAYER_ID = "geomaster-physical-feature-label-layer";
-const LANDMARK_SOURCE_ID = "geomaster-landmarks";
-const LANDMARK_CIRCLE_LAYER_ID = "geomaster-landmark-circle-layer";
-const LANDMARK_LABEL_LAYER_ID = "geomaster-landmark-label-layer";
-const LABEL_LAYER_PREFIX = "geomaster-country-label-layer";
-const LEADER_LAYER_ID = "geomaster-country-leader-layer";
-const LEARNING_LABEL_LAYER_PREFIX = "geomaster-learning-country-label-layer";
-const LEARNING_LEADER_LAYER_ID = "geomaster-learning-country-leader-layer";
-const DEBUG_LABEL_SOURCE_ID = "geomaster-debug-country-labels";
-const DEBUG_LEADER_SOURCE_ID = "geomaster-debug-country-leaders";
-const DEBUG_LABEL_LAYER_ID = "geomaster-debug-country-label-layer";
-const DEBUG_LEADER_LAYER_ID = "geomaster-debug-country-leader-layer";
-const MAP_STYLE = "mapbox://styles/mapbox/light-v11";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
 const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
@@ -117,257 +132,9 @@ const GENERIC_IDLE_PROMPTS = [
   "Choose a region when you are ready to turn exploration into a quiz.",
   "Try dragging the globe, then click a country that catches your eye.",
 ];
-const LABEL_ANCHORS = ["center", "left", "right", "top", "bottom"] as const;
-const LABEL_KINDS = ["fallback", "manual"] as const;
-const LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
-  LABEL_ANCHORS.map((anchor) => `${LABEL_LAYER_PREFIX}-${kind}-${anchor}`),
-);
-const LEARNING_LABEL_LAYER_IDS = LABEL_KINDS.flatMap((kind) =>
-  LABEL_ANCHORS.map(
-    (anchor) => `${LEARNING_LABEL_LAYER_PREFIX}-${kind}-${anchor}`,
-  ),
-);
-const GEOMASTER_LAYER_IDS = [
-  FILL_LAYER_ID,
-  LINE_LAYER_ID,
-  TARGET_GLOW_LAYER_ID,
-  REMAINING_PULSE_FILL_LAYER_ID,
-  REMAINING_PULSE_LINE_LAYER_ID,
-  GUIDE_LINE_LAYER_ID,
-  GUIDE_CIRCLE_LAYER_ID,
-  LEARNING_LEADER_LAYER_ID,
-  SUBDIVISION_LABEL_LAYER_ID,
-  CITY_CIRCLE_LAYER_ID,
-  CITY_LABEL_LAYER_ID,
-  PHYSICAL_LABEL_LAYER_ID,
-  LANDMARK_CIRCLE_LAYER_ID,
-  LANDMARK_LABEL_LAYER_ID,
-  LEADER_LAYER_ID,
-  ...LEARNING_LABEL_LAYER_IDS,
-  ...LABEL_LAYER_IDS,
-  DEBUG_LEADER_LAYER_ID,
-  DEBUG_LABEL_LAYER_ID,
-];
-
-const hideMapLabelsAndRoads = (map: Map) => {
-  const style = map.getStyle();
-
-  style.layers?.forEach((layer) => {
-    const id = layer.id.toLowerCase();
-    const shouldHide =
-      layer.type === "symbol" ||
-      id.includes("road") ||
-      id.includes("transit") ||
-      id.includes("admin") ||
-      id.includes("building") ||
-      id.includes("place") ||
-      id.includes("label");
-
-    if (shouldHide) {
-      try {
-        map.setLayoutProperty(layer.id, "visibility", "none");
-      } catch {
-        // Some Mapbox base layers are generated dynamically. Leave them alone.
-      }
-    }
-  });
-};
-
-const addTerrainAndFog = (
-  map: Map,
-  { terrainEnabled = true }: { terrainEnabled?: boolean } = {},
-) => {
-  try {
-    if (terrainEnabled) {
-      if (!map.getSource("mapbox-dem")) {
-        map.addSource("mapbox-dem", {
-          type: "raster-dem",
-          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
-          tileSize: 512,
-          maxzoom: 14,
-        });
-      }
-
-      map.setTerrain({ source: "mapbox-dem", exaggeration: 1.08 });
-    }
-
-    map.setFog({
-      color: "rgb(241, 245, 249)",
-      "high-color": "rgb(186, 230, 253)",
-      "horizon-blend": 0.08,
-      "space-color": "rgb(226, 232, 240)",
-      "star-intensity": 0,
-    });
-  } catch {
-    // Terrain is visual polish. The base map and game loop should still work.
-  }
-};
-
-const setCountryFeatureState = (
-  map: Map,
-  countryId: string,
-  state: Record<string, boolean | number>,
-) => {
-  if (!map.getSource(SOURCE_ID)) {
-    return {
-      source: SOURCE_ID,
-      id: countryId,
-      state,
-      ok: false,
-      error: "Country source is not loaded.",
-    };
-  }
-
-  try {
-    map.setFeatureState({ source: SOURCE_ID, id: countryId }, state);
-    return {
-      source: SOURCE_ID,
-      id: countryId,
-      state,
-      ok: true,
-    };
-  } catch {
-    return {
-      source: SOURCE_ID,
-      id: countryId,
-      state,
-      ok: false,
-      error: "Mapbox rejected setFeatureState for this feature id.",
-    };
-  }
-};
-
-const buildFillColorExpression = (
-  selectedIds: string[],
-  guessedIds: string[],
-  assistedIds: string[],
-  missedIds: string[],
-) => [
-  "case",
-  ["boolean", ["feature-state", "target"], false],
-  "#67e8f9",
-  ["in", ["get", "iso_a3"], ["literal", missedIds]],
-  "#f7b7b0",
-  ["in", ["get", "iso_a3"], ["literal", assistedIds]],
-  "#fbbf24",
-  ["boolean", ["feature-state", "guessed"], false],
-  "#22f6a5",
-  ["in", ["get", "iso_a3"], ["literal", guessedIds]],
-  "#22f6a5",
-  ["in", ["get", "iso_a3"], ["literal", selectedIds]],
-  "#748394",
-  ["in", ["get", "iso_a3"], ["literal", Array.from(quizCountryIds)]],
-  "#64748b",
-  "#94a3b8",
-] as mapboxgl.ExpressionSpecification;
-
-const buildFillOpacityExpression = (
-  selectedIds: string[],
-  guessedIds: string[],
-  assistedIds: string[],
-  missedIds: string[],
-) => [
-  "case",
-  ["boolean", ["feature-state", "target"], false],
-  0.72,
-  ["in", ["get", "iso_a3"], ["literal", missedIds]],
-  0.82,
-  ["in", ["get", "iso_a3"], ["literal", assistedIds]],
-  0.94,
-  ["boolean", ["feature-state", "guessed"], false],
-  0.92,
-  ["in", ["get", "iso_a3"], ["literal", guessedIds]],
-  0.92,
-  ["in", ["get", "iso_a3"], ["literal", selectedIds]],
-  0.5,
-  0.22,
-] as mapboxgl.ExpressionSpecification;
-
-const buildRemainingPulseFilter = (
-  remainingCountryIds: string[],
-  pulseActive: boolean,
-) =>
-  (pulseActive && remainingCountryIds.length > 0
-    ? ["in", ["get", "iso_a3"], ["literal", remainingCountryIds]]
-    : ["==", ["get", "iso_a3"], "__none__"]) as mapboxgl.FilterSpecification;
-
-const getPulseReason = (
-  remainingCount: number,
-  remainingSeconds: number,
-  isRunningTypeMode: boolean,
-) => {
-  if (!isRunningTypeMode) {
-    return "none";
-  }
-
-  const hasFewLeft = remainingCount <= 5;
-  const isLastMinute = remainingSeconds <= 60;
-
-  if (hasFewLeft && isLastMinute) {
-    return "5 left + last minute";
-  }
-
-  if (hasFewLeft) {
-    return "5 left";
-  }
-
-  if (isLastMinute) {
-    return "last minute";
-  }
-
-  return "none";
-};
 
 const formatDebugBoolean = (value: boolean) => (value ? "yes" : "no");
 
-const getMapDebugSnapshot = (map: Map) => ({
-  sourceIds: [
-    SOURCE_ID,
-    SUBDIVISION_SOURCE_ID,
-    CITY_SOURCE_ID,
-    PHYSICAL_SOURCE_ID,
-    LANDMARK_SOURCE_ID,
-    LEADER_SOURCE_ID,
-    LABEL_SOURCE_ID,
-    LEARNING_LEADER_SOURCE_ID,
-    LEARNING_LABEL_SOURCE_ID,
-    DEBUG_LEADER_SOURCE_ID,
-    DEBUG_LABEL_SOURCE_ID,
-  ].filter((sourceId) => Boolean(map.getSource(sourceId))),
-  layerIds: GEOMASTER_LAYER_IDS.filter((layerId) => Boolean(map.getLayer(layerId))),
-  labelSourceLoaded: Boolean(map.getSource(LABEL_SOURCE_ID)),
-  labelLayerLoaded: [...LABEL_LAYER_IDS, ...LEARNING_LABEL_LAYER_IDS].some(
-    (layerId) => Boolean(map.getLayer(layerId)),
-  ),
-  leaderSourceLoaded:
-    Boolean(map.getSource(LEADER_SOURCE_ID)) ||
-    Boolean(map.getSource(LEARNING_LEADER_SOURCE_ID)),
-  leaderLayerLoaded:
-    Boolean(map.getLayer(LEADER_LAYER_ID)) ||
-    Boolean(map.getLayer(LEARNING_LEADER_LAYER_ID)),
-  projection: map.getProjection?.().name ?? "unknown",
-});
-
-const LEARNING_LAYER_IDS = [
-  SUBDIVISION_LABEL_LAYER_ID,
-  CITY_CIRCLE_LAYER_ID,
-  CITY_LABEL_LAYER_ID,
-  PHYSICAL_LABEL_LAYER_ID,
-  LANDMARK_CIRCLE_LAYER_ID,
-  LANDMARK_LABEL_LAYER_ID,
-  LEARNING_LEADER_LAYER_ID,
-  ...LEARNING_LABEL_LAYER_IDS,
-];
-
-const setLearningLayerVisibility = (map: Map, visible: boolean) => {
-  LEARNING_LAYER_IDS.forEach((layerId) => {
-    if (!map.getLayer(layerId)) {
-      return;
-    }
-
-    map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
-  });
-};
 
 type MapDebugPanelProps = {
   onTestBrazilShade: () => void;
