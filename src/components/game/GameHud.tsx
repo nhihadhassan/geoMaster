@@ -296,7 +296,9 @@ export function GameHud({
             onClick={onOpenRegionPanel}
             className="min-h-10 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
-            Quiz
+            {/* The search field takes the middle of this header, so the label
+                shortens only when it is actually competing for room. */}
+            {exploreSearchCompact ? "Quiz" : "Choose Quiz"}
           </button>
         </motion.header>
       ) : (
