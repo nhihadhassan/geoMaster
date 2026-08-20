@@ -37,7 +37,9 @@ const CaribbeanInsetMap = dynamic(
   { ssr: false },
 );
 import { CountryPopup } from "@/components/map/CountryPopup";
+import { ExploreSearch } from "@/components/map/ExploreSearch";
 import { IdlePromptToast } from "@/components/map/IdlePromptToast";
+import { MapControls } from "@/components/map/MapControls";
 import { useIdleGlobeRotation } from "@/components/map/useIdleGlobeRotation";
 import { MapDebugPanel } from "@/components/map/MapDebugPanel";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
@@ -133,6 +135,7 @@ import {
   type QuizProgressSnapshot,
 } from "@/store/gameStore";
 import { getCountryFunFacts } from "@/utils/countryEducation";
+import type { ExploreSearchResult } from "@/utils/exploreSearch";
 import { isWebglAvailable } from "@/utils/webglSupport";
 
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
@@ -2441,6 +2444,65 @@ export function MapContainer() {
     startCustomQuiz(weakCountryIds, { label: "Weak spots" });
   }, [startCustomQuiz, weakCountryIds]);
 
+  const handleExploreSearchSelect = useCallback(
+    (result: ExploreSearchResult) => {
+      registerMapInteraction();
+      selectLearningFeature(result.feature);
+      mapRef.current?.flyTo({
+        center: result.center,
+        zoom: result.zoom,
+        duration: 1200,
+        essential: true,
+      });
+    },
+    [registerMapInteraction, selectLearningFeature],
+  );
+
+  const handleZoomIn = useCallback(() => {
+    registerMapInteraction();
+    mapRef.current?.zoomIn({ duration: 320 });
+  }, [registerMapInteraction]);
+
+  const handleZoomOut = useCallback(() => {
+    registerMapInteraction();
+    mapRef.current?.zoomOut({ duration: 320 });
+  }, [registerMapInteraction]);
+
+  const handleRecenter = useCallback(() => {
+    registerMapInteraction();
+
+    const map = mapRef.current;
+
+    if (!map) {
+      return;
+    }
+
+    // Reframe on whatever the user is actually working on: the quiz region
+    // during a run, otherwise the default globe view.
+    if (gameStatus !== "idle" && !selectedSpecialRegion) {
+      const region = getRegionConfig(selectedRegion);
+
+      map.fitBounds(region.bounds, {
+        padding: 64,
+        pitch: region.pitch,
+        bearing: region.bearing,
+        duration: 900,
+        essential: true,
+      });
+
+      return;
+    }
+
+    map.flyTo({
+      center: [-32, 16],
+      zoom: typeof window !== "undefined" && window.innerWidth < 768 ? 1.1 : 1.7,
+      pitch: 24,
+      bearing: -12,
+      duration: 900,
+      essential: true,
+    });
+  }, [gameStatus, registerMapInteraction, selectedRegion, selectedSpecialRegion]);
+
   const reopenLanding = useCallback(() => {
     if (gameStatus === "running") {
       pauseQuiz();
@@ -2518,11 +2580,28 @@ export function MapContainer() {
         </p>
       </motion.div>
 
+      {features.mapControls && !landingOpen && mapLoaded && !mapFatalError ? (
+        <MapControls
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onRecenter={handleRecenter}
+        />
+      ) : null}
       {!landingOpen && !selectedSpecialRegion ? (
         <GameHud
           onOpenLanding={reopenLanding}
           onOpenRegionPanel={() => openRegionPanel("region")}
           regionPanelOpen={regionPanelOpen}
+          exploreSearch={
+            features.exploreSearch ? (
+              <ExploreSearch onSelect={handleExploreSearchSelect} />
+            ) : null
+          }
+          exploreSearchCompact={
+            features.exploreSearch ? (
+              <ExploreSearch onSelect={handleExploreSearchSelect} compact />
+            ) : null
+          }
         />
       ) : null}
       <AnimatePresence>

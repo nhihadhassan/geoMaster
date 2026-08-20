@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PlayTriangle } from "@/components/game/QuizCta";
 import { getRegionConfig } from "@/data/countries";
 import { modeLabels } from "@/data/gameModes";
@@ -75,6 +75,9 @@ type GameHudProps = {
   onOpenLanding: () => void;
   onOpenRegionPanel: () => void;
   regionPanelOpen: boolean;
+  /** Explore-mode search field, injected so the HUD stays free of map wiring. */
+  exploreSearch?: ReactNode;
+  exploreSearchCompact?: ReactNode;
 };
 
 function GeoMasterBrand({
@@ -159,6 +162,8 @@ export function GameHud({
   onOpenLanding,
   onOpenRegionPanel,
   regionPanelOpen,
+  exploreSearch,
+  exploreSearchCompact,
 }: GameHudProps) {
   const prefersReducedMotion = useReducedMotion();
   const selectedRegion = useGameStore((state) => state.selectedRegion);
@@ -282,15 +287,16 @@ export function GameHud({
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          className="absolute left-1/2 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex min-h-14 w-[min(24rem,calc(100vw-1rem))] -translate-x-1/2 items-center justify-between gap-2 rounded-2xl border border-white/12 bg-zinc-950/54 px-2.5 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:hidden"
+          className="absolute left-1/2 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex min-h-14 w-[min(26rem,calc(100vw-1rem))] -translate-x-1/2 items-center justify-between gap-2 rounded-2xl border border-white/12 bg-zinc-950/54 px-2.5 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl sm:hidden"
         >
           <GeoMasterBrand onOpenLanding={onOpenLanding} compact />
+          {exploreSearchCompact}
           <button
             type="button"
             onClick={onOpenRegionPanel}
             className="min-h-10 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
-            Choose Quiz
+            Quiz
           </button>
         </motion.header>
       ) : (
@@ -348,6 +354,7 @@ export function GameHud({
           className="absolute left-1/2 top-4 z-20 hidden min-h-[3.25rem] -translate-x-1/2 items-center gap-2 rounded-2xl border border-white/12 bg-zinc-950/48 px-2.5 py-2 text-white shadow-lg shadow-black/22 backdrop-blur-xl sm:flex"
         >
           <GeoMasterBrand onOpenLanding={onOpenLanding} />
+          {exploreSearch}
           <button
             type="button"
             onClick={onOpenRegionPanel}
