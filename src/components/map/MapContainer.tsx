@@ -29,6 +29,8 @@ import { CountryPopup } from "@/components/map/CountryPopup";
 import { IdlePromptToast } from "@/components/map/IdlePromptToast";
 import { useIdleGlobeRotation } from "@/components/map/useIdleGlobeRotation";
 import { MapDebugPanel } from "@/components/map/MapDebugPanel";
+import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
+import { MapUnavailable } from "@/components/map/MapUnavailable";
 import {
   CITY_CIRCLE_LAYER_ID,
   CITY_LABEL_LAYER_ID,
@@ -113,6 +115,7 @@ import {
   type QuizProgressSnapshot,
 } from "@/store/gameStore";
 import { getCountryFunFacts } from "@/utils/countryEducation";
+import { isWebglAvailable } from "@/utils/webglSupport";
 
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
@@ -153,6 +156,10 @@ export function MapContainer() {
   const feedbackGlowTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  // A fatal failure means the canvas will never render (no WebGL, or the Map
+  // constructor threw). Transient tile/style errors keep using the toast.
+  const [mapFatalError, setMapFatalError] = useState<string | null>(null);
+  const [mapRetryKey, setMapRetryKey] = useState(0);
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
@@ -1508,19 +1515,45 @@ export function MapContainer() {
       return;
     }
 
+    if (!isWebglAvailable()) {
+      // Deferred like the other state updates in this file so the effect does
+      // not set state synchronously during the commit.
+      const timeoutId = window.setTimeout(() => {
+        setMapFatalError("WebGL is not available in this browser.");
+        setMapLoaded(true);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
+
     mapboxgl.accessToken = mapboxToken;
 
-    const map = new mapboxgl.Map({
-      container: mapNodeRef.current,
-      style: MAP_STYLE,
-      center: [-58, -18],
-      zoom: 2.2,
-      pitch: 38,
-      bearing: -12,
-      projection: "globe",
-      antialias: !initialMapPerformanceModeRef.current,
-      attributionControl: false,
-    });
+    let map: Map;
+
+    try {
+      map = new mapboxgl.Map({
+        container: mapNodeRef.current,
+        style: MAP_STYLE,
+        center: [-58, -18],
+        zoom: 2.2,
+        pitch: 38,
+        bearing: -12,
+        projection: "globe",
+        antialias: !initialMapPerformanceModeRef.current,
+        attributionControl: false,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Mapbox could not create a map on this device.";
+      const timeoutId = window.setTimeout(() => {
+        setMapFatalError(message);
+        setMapLoaded(true);
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
 
     mapRef.current = map;
     map.addControl(
@@ -1580,7 +1613,7 @@ export function MapContainer() {
         projection: "unknown",
       });
     };
-  }, [mapboxToken, setMapDebug]);
+  }, [mapboxToken, mapRetryKey, setMapDebug]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2279,31 +2312,33 @@ export function MapContainer() {
       </AnimatePresence>
       <AnimatePresence>
         {!landingOpen && caribbeanInsetMounted && topologyData ? (
-          <CaribbeanInsetMap
-            key="caribbean-inset"
-            mapboxToken={mapboxToken}
-            topologyData={topologyData}
-            guessedCountryIds={guessedCountryIds}
-            assistedCountryIds={assistedCountryIds}
-            visibleLabelIds={visibleLabelIds}
-            debugLabelIds={debugLabelIds}
-            missedCountryIds={missedCountryIds}
-            remainingCountryIds={remainingCountryIds}
-            pulseActive={pulseActive}
-            targetCountryId={
-              targetHighlightActive ? currentTargetCountry?.iso_a3 ?? null : null
-            }
-            mobilePerformanceMode={mobilePerformanceMode}
-            documentVisible={documentVisible}
-            correctPopupVisible={correctPopupVisible}
-            mobileExpanded={caribbeanInsetExpanded}
-            onMobileExpandedChange={setCaribbeanInsetExpanded}
-            clickEnabled={
-              selectedMode === "click-country" && gameStatus === "running"
-            }
-            onCountryClick={handleInsetCountryClick}
-            onLabelSourceLoaded={handleInsetLabelLayerLoaded}
-          />
+          <MapErrorBoundary key="caribbean-inset-boundary" fallback={() => null}>
+            <CaribbeanInsetMap
+              key="caribbean-inset"
+              mapboxToken={mapboxToken}
+              topologyData={topologyData}
+              guessedCountryIds={guessedCountryIds}
+              assistedCountryIds={assistedCountryIds}
+              visibleLabelIds={visibleLabelIds}
+              debugLabelIds={debugLabelIds}
+              missedCountryIds={missedCountryIds}
+              remainingCountryIds={remainingCountryIds}
+              pulseActive={pulseActive}
+              targetCountryId={
+                targetHighlightActive ? currentTargetCountry?.iso_a3 ?? null : null
+              }
+              mobilePerformanceMode={mobilePerformanceMode}
+              documentVisible={documentVisible}
+              correctPopupVisible={correctPopupVisible}
+              mobileExpanded={caribbeanInsetExpanded}
+              onMobileExpandedChange={setCaribbeanInsetExpanded}
+              clickEnabled={
+                selectedMode === "click-country" && gameStatus === "running"
+              }
+              onCountryClick={handleInsetCountryClick}
+              onLabelSourceLoaded={handleInsetLabelLayerLoaded}
+            />
+          </MapErrorBoundary>
         ) : null}
       </AnimatePresence>
       {!landingOpen &&
@@ -2398,6 +2433,17 @@ export function MapContainer() {
           insetLabelSourceLoaded={caribbeanInsetMounted && insetLabelSourceLoaded}
           expanded={debugExpanded}
           onToggleExpanded={() => setDebugExpanded((expanded) => !expanded)}
+        />
+      ) : null}
+
+      {mapFatalError ? (
+        <MapUnavailable
+          detail={mapFatalError}
+          onRetry={() => {
+            setMapFatalError(null);
+            setMapLoaded(false);
+            setMapRetryKey((key) => key + 1);
+          }}
         />
       ) : null}
 
