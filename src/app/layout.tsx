@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -14,8 +14,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#05080c",
+  // The map is full-bleed and the UI already handles safe areas itself.
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
   title: "GeoMaster",
+  // Installable as a home-screen app. Deliberately no service worker: the map
+  // needs the network, so an offline shell would promise more than it delivers.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "GeoMaster",
+    statusBarStyle: "black-translucent",
+  },
   description:
     "A premium, map-centric geography learning app for mastering world countries.",
   icons: {

@@ -3,8 +3,10 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { CountryEducationCard } from "@/components/game/CountryEducationCard";
+import { ShareResultCard } from "@/components/game/ShareResultCard";
 import { features } from "@/config/features";
 import { getRegionConfig, type Country } from "@/data/countries";
+import { modeLabels } from "@/data/gameModes";
 import { useGameStore } from "@/store/gameStore";
 
 type ReviewGroup = {
@@ -268,6 +270,15 @@ export function ResultsDashboard({
               </>
             )}
           </button>
+          {features.shareResultCard ? (
+            <ShareResultCard
+              quizLabel={quizLabel}
+              modeLabel={modeLabels[selectedMode]}
+              score={score}
+              total={total}
+              statusLabel={statusLabel}
+            />
+          ) : null}
           {onChangeRegion ? (
             <button
               type="button"
