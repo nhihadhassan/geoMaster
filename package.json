@@ -10,7 +10,10 @@
     "lint": "eslint",
     "generate:countries": "node --experimental-strip-types scripts/generate-country-data.ts",
     "validate:countries": "node --experimental-strip-types scripts/validate-country-data.ts",
-    "test:matcher": "node --experimental-strip-types scripts/test-country-matcher.ts"
+    "test:matcher": "node --experimental-strip-types scripts/test-country-matcher.ts",
+    "test:store": "tsx scripts/test-game-store.ts",
+    "test:progress": "tsx scripts/test-progress.ts",
+    "test": "npm run validate:countries && npm run test:matcher && npm run test:store && npm run test:progress"
   },
   "dependencies": {
     "clsx": "^2.1.1",
