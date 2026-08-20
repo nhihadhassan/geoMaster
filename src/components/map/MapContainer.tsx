@@ -2480,7 +2480,10 @@ export function MapContainer() {
               keyboardInset={keyboardInset}
             />
           ) : null}
-          <ResultsDashboard />
+          <ResultsDashboard
+            onChangeRegion={() => openRegionPanel("region")}
+            onContinueLearning={() => setRegionPanelOpen(false)}
+          />
         </>
       ) : null}
       <AnimatePresence>
