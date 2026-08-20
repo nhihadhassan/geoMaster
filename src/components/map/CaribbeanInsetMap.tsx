@@ -4,6 +4,7 @@ import mapboxgl, { type GeoJSONSource, type Map } from "mapbox-gl";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FeatureCollection, Geometry } from "geojson";
+import { caribbeanCountryIds } from "@/data/caribbean";
 import { countries } from "@/data/countries";
 import { buildLabelCollections } from "@/data/labelPlacements";
 import type { CountryProperties } from "@/hooks/useWorldTopology";
@@ -34,22 +35,6 @@ const CARIBBEAN_BOUNDS: [[number, number], [number, number]] = [
 ];
 const INSET_REMAINING_PULSE_STEP_MS = 180;
 const INSET_TARGET_PULSE_STEP_MS = 140;
-
-export const caribbeanCountryIds = new Set([
-  "ATG",
-  "BHS",
-  "BRB",
-  "CUB",
-  "DMA",
-  "DOM",
-  "GRD",
-  "HTI",
-  "JAM",
-  "KNA",
-  "LCA",
-  "VCT",
-  "TTO",
-]);
 
 type CaribbeanInsetMapProps = {
   mapboxToken: string;

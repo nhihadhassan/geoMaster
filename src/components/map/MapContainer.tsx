@@ -1,7 +1,12 @@
 "use client";
 
-import mapboxgl, { type GeoJSONSource, type Map } from "mapbox-gl";
+import type {
+  GeoJSONSource,
+  Map,
+  MapMouseEvent,
+} from "mapbox-gl";
 import { AnimatePresence, motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -21,10 +26,16 @@ import { ResultsDashboard } from "@/components/game/ResultsDashboard";
 import { ResumePrompt } from "@/components/game/ResumePrompt";
 import { TargetHintCard } from "@/components/game/TargetHintCard";
 import { TypeToFillInput } from "@/components/game/TypeToFillInput";
-import {
-  CaribbeanInsetMap,
-  caribbeanCountryIds,
-} from "@/components/map/CaribbeanInsetMap";
+import { features } from "@/config/features";
+import { caribbeanCountryIds } from "@/data/caribbean";
+
+const CaribbeanInsetMap = dynamic(
+  () =>
+    import("@/components/map/CaribbeanInsetMap").then(
+      (mapModule) => mapModule.CaribbeanInsetMap,
+    ),
+  { ssr: false },
+);
 import { CountryPopup } from "@/components/map/CountryPopup";
 import { IdlePromptToast } from "@/components/map/IdlePromptToast";
 import { useIdleGlobeRotation } from "@/components/map/useIdleGlobeRotation";
@@ -160,6 +171,11 @@ export function MapContainer() {
   // constructor threw). Transient tile/style errors keep using the toast.
   const [mapFatalError, setMapFatalError] = useState<string | null>(null);
   const [mapRetryKey, setMapRetryKey] = useState(0);
+  // Mapbox is the heaviest thing on the page and the landing screen renders its
+  // own cobe globe on top of it, so hold initialization until the browser is
+  // idle (or the user leaves the landing, whichever comes first). The warm-up
+  // means the map is normally ready by the time the landing is dismissed.
+  const [mapInitAllowed, setMapInitAllowed] = useState(!features.lazyMapInit);
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
   const [debugExpanded, setDebugExpanded] = useState(false);
@@ -252,6 +268,37 @@ export function MapContainer() {
   const setMapDebug = useGameStore((state) => state.setMapDebug);
 
   useSoundEffects(lastFeedbackEvent, { documentVisible });
+
+  useEffect(() => {
+    if (mapInitAllowed) {
+      return;
+    }
+
+    if (!landingOpen) {
+      const timeoutId = window.setTimeout(() => setMapInitAllowed(true), 0);
+
+      return () => window.clearTimeout(timeoutId);
+    }
+
+    const allow = () => setMapInitAllowed(true);
+    const idleWindow = window as typeof window & {
+      requestIdleCallback?: (
+        callback: () => void,
+        options?: { timeout: number },
+      ) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (idleWindow.requestIdleCallback) {
+      const handle = idleWindow.requestIdleCallback(allow, { timeout: 1500 });
+
+      return () => idleWindow.cancelIdleCallback?.(handle);
+    }
+
+    const timeoutId = window.setTimeout(allow, 900);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [landingOpen, mapInitAllowed]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -1511,7 +1558,7 @@ export function MapContainer() {
   );
 
   useEffect(() => {
-    if (!mapNodeRef.current || mapRef.current || !mapboxToken) {
+    if (!mapNodeRef.current || mapRef.current || !mapboxToken || !mapInitAllowed) {
       return;
     }
 
@@ -1526,60 +1573,98 @@ export function MapContainer() {
       return () => window.clearTimeout(timeoutId);
     }
 
-    mapboxgl.accessToken = mapboxToken;
+    const container = mapNodeRef.current;
+    let map: Map | null = null;
+    let cancelled = false;
 
-    let map: Map;
-
-    try {
-      map = new mapboxgl.Map({
-        container: mapNodeRef.current,
-        style: MAP_STYLE,
-        center: [-58, -18],
-        zoom: 2.2,
-        pitch: 38,
-        bearing: -12,
-        projection: "globe",
-        antialias: !initialMapPerformanceModeRef.current,
-        attributionControl: false,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Mapbox could not create a map on this device.";
-      const timeoutId = window.setTimeout(() => {
-        setMapFatalError(message);
-        setMapLoaded(true);
-      }, 0);
-
-      return () => window.clearTimeout(timeoutId);
-    }
-
-    mapRef.current = map;
-    map.addControl(
-      new mapboxgl.AttributionControl({ compact: true }),
-      "bottom-right",
-    );
-
-    map.once("load", () => {
-      hideMapLabelsAndRoads(map);
-      addTerrainAndFog(map, {
-        terrainEnabled: !initialMapPerformanceModeRef.current,
-      });
-
-      setMapLoaded(true);
-      setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(map) });
-    });
-
-    map.on("error", (event) => {
-      if (event.error?.message) {
-        setMapError(event.error.message);
-        setMapLoaded(true);
-        setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(map) });
+    const failFatally = (message: string) => {
+      if (cancelled) {
+        return;
       }
-    });
+
+      setMapFatalError(message);
+      setMapLoaded(true);
+    };
+
+    // mapbox-gl is the heaviest thing this app loads, so it is fetched here
+    // rather than at module scope. Everything below runs a microtask later than
+    // it used to; `cancelled` guards a unmount that beats the import.
+    void (async () => {
+      let mapboxgl: typeof import("mapbox-gl").default;
+
+      try {
+        mapboxgl = (await import("mapbox-gl")).default;
+      } catch {
+        failFatally("Could not load the map library.");
+
+        return;
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      mapboxgl.accessToken = mapboxToken;
+
+      try {
+        map = new mapboxgl.Map({
+          container,
+          style: MAP_STYLE,
+          center: [-58, -18],
+          zoom: 2.2,
+          pitch: 38,
+          bearing: -12,
+          projection: "globe",
+          antialias: !initialMapPerformanceModeRef.current,
+          attributionControl: false,
+        });
+      } catch (error) {
+        failFatally(
+          error instanceof Error
+            ? error.message
+            : "Mapbox could not create a map on this device.",
+        );
+
+        return;
+      }
+
+      if (cancelled) {
+        map.remove();
+        map = null;
+
+        return;
+      }
+
+      const createdMap = map;
+
+      mapRef.current = createdMap;
+      createdMap.addControl(
+        new mapboxgl.AttributionControl({ compact: true }),
+        "bottom-right",
+      );
+
+      createdMap.once("load", () => {
+        hideMapLabelsAndRoads(createdMap);
+        addTerrainAndFog(createdMap, {
+          terrainEnabled: !initialMapPerformanceModeRef.current,
+        });
+
+        setMapLoaded(true);
+        setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(createdMap) });
+      });
+
+      createdMap.on("error", (event) => {
+        if (event.error?.message) {
+          setMapError(event.error.message);
+          setMapLoaded(true);
+          setMapDebug({ mapLoaded: true, ...getMapDebugSnapshot(createdMap) });
+        }
+      });
+    })();
 
     return () => {
+      cancelled = true;
+
       if (remainingPulseFrameRef.current) {
         window.clearInterval(remainingPulseFrameRef.current);
         remainingPulseFrameRef.current = null;
@@ -1595,7 +1680,8 @@ export function MapContainer() {
         feedbackGlowTimeoutRef.current = null;
       }
 
-      map.remove();
+      map?.remove();
+      map = null;
       mapRef.current = null;
       setMapDebug({
         mapLoaded: false,
@@ -1613,7 +1699,7 @@ export function MapContainer() {
         projection: "unknown",
       });
     };
-  }, [mapboxToken, mapRetryKey, setMapDebug]);
+  }, [mapboxToken, mapInitAllowed, mapRetryKey, setMapDebug]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2034,7 +2120,7 @@ export function MapContainer() {
       };
     }
 
-    const handleClick = (event: mapboxgl.MapMouseEvent) => {
+    const handleClick = (event: MapMouseEvent) => {
       registerMapInteraction();
 
       if (!map.getLayer(FILL_LAYER_ID)) {
