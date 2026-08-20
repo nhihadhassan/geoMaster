@@ -89,3 +89,44 @@ export const persistTimerMode = (mode: TimerMode) => {
 
   window.localStorage.setItem(TIMER_MODE_KEY, mode);
 };
+
+// Last-used quiz setup, so a returning player can start again in one tap
+// instead of re-picking a region and mode every session.
+const LAST_SETUP_KEY = "geomaster-last-setup";
+
+export type LastSetup = {
+  region: string;
+  mode: string;
+};
+
+export const readLastSetup = (): LastSetup | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LAST_SETUP_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as LastSetup;
+
+    return parsed?.region && parsed?.mode ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+export const persistLastSetup = (setup: LastSetup) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(LAST_SETUP_KEY, JSON.stringify(setup));
+  } catch {
+    // Non-essential convenience; a failed write just means no quick start.
+  }
+};

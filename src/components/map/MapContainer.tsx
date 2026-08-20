@@ -114,6 +114,12 @@ import {
 } from "@/hooks/useWorldTopology";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { useRecordQuizProgress } from "@/hooks/useRecordQuizProgress";
+import { useProgressStore } from "@/store/progressStore";
+import {
+  getMasteredCount,
+  getRegionMastery,
+  getWeakestCountryIds,
+} from "@/utils/countryMastery";
 import {
   useDocumentVisible,
   useMobilePerformanceMode,
@@ -270,6 +276,10 @@ export function MapContainer() {
     (state) => state.submitMapClickGuess,
   );
   const setMapDebug = useGameStore((state) => state.setMapDebug);
+  const startCustomQuiz = useGameStore((state) => state.startCustomQuiz);
+  const startQuiz = useGameStore((state) => state.startQuiz);
+  const progressHydrated = useProgressStore((state) => state.hydrated);
+  const countryProgress = useProgressStore((state) => state.countries);
 
   useSoundEffects(lastFeedbackEvent, { documentVisible });
   useRecordQuizProgress();
@@ -411,6 +421,52 @@ export function MapContainer() {
         : `That's ${wrongCountry.name}. Try again.`,
     };
   }, [lastMissFeedback]);
+  // Landing orientation. Until the stored progress has been read the copy stays
+  // on the first-time line, so the server render and the first client render
+  // agree and nothing flashes.
+  const masteredCount = useMemo(
+    () => (progressHydrated ? getMasteredCount(countryProgress) : 0),
+    [countryProgress, progressHydrated],
+  );
+  const weakCountryIds = useMemo(
+    () =>
+      progressHydrated
+        ? getWeakestCountryIds(countryProgress, { limit: 12 })
+        : [],
+    [countryProgress, progressHydrated],
+  );
+  const hasPlayedBefore =
+    progressHydrated && Object.keys(countryProgress).length > 0;
+  const landingContextLine = useMemo(() => {
+    if (!features.adaptiveLanding) {
+      return null;
+    }
+
+    const practisedCount = progressHydrated
+      ? Object.keys(countryProgress).length
+      : 0;
+
+    if (practisedCount === 0) {
+      return "Learn every country on a real world map — quiz yourself, explore, and practise what you miss.";
+    }
+
+    const regionLabel = getRegionConfig(selectedRegion).label;
+
+    // Early on there is nothing mastered yet, and "0 mastered" is a poor
+    // welcome, so lead with what the player has actually covered.
+    if (masteredCount === 0) {
+      return `${practisedCount} ${
+        practisedCount === 1 ? "country" : "countries"
+      } practised · keep going in ${regionLabel}`;
+    }
+
+    const regionMastery = getRegionMastery(countryProgress, selectedRegion);
+    const regionShare = Math.round(regionMastery.ratio * 100);
+
+    return `${masteredCount} ${
+      masteredCount === 1 ? "country" : "countries"
+    } mastered · ${regionLabel} ${regionShare}%`;
+  }, [countryProgress, masteredCount, progressHydrated, selectedRegion]);
   const registerMapInteraction = useCallback(() => {
     setHasMapInteraction(true);
     setIdleInteractionKey((key) => key + 1);
@@ -2373,6 +2429,18 @@ export function MapContainer() {
     setLandingOpen(false);
   }, []);
 
+  const quickStartQuiz = useCallback(() => {
+    setRegionPanelOpen(false);
+    setLandingOpen(false);
+    startQuiz();
+  }, [startQuiz]);
+
+  const practiceWeakSpots = useCallback(() => {
+    setRegionPanelOpen(false);
+    setLandingOpen(false);
+    startCustomQuiz(weakCountryIds, { label: "Weak spots" });
+  }, [startCustomQuiz, weakCountryIds]);
+
   const reopenLanding = useCallback(() => {
     if (gameStatus === "running") {
       pauseQuiz();
@@ -2610,6 +2678,19 @@ export function MapContainer() {
             onResumeQuiz={resumeActiveQuiz}
             onStartQuiz={closeLandingForQuiz}
             onExploreMap={closeLandingForExplore}
+            contextLine={landingContextLine}
+            onQuickStart={features.quickStart ? quickStartQuiz : undefined}
+            quickStartLabel={
+              // A newcomer has no reason to expect a particular region, so the
+              // named shortcut only appears once there is a habit to resume.
+              hasPlayedBefore
+                ? `Start ${getRegionConfig(selectedRegion).label}`
+                : "Start Learning"
+            }
+            onPracticeWeakSpots={
+              features.practiceMistakes ? practiceWeakSpots : undefined
+            }
+            weakSpotCount={weakCountryIds.length}
           />
         ) : null}
       </AnimatePresence>

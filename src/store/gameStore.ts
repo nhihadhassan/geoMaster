@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { features } from "@/config/features";
 import {
   countries as allCountries,
   getCountriesForRegion,
@@ -21,7 +22,9 @@ import {
   readInitialSoundEffectsEnabled,
   readInitialTimerMultiplier,
   normalizeTimerMultiplier,
+  persistLastSetup,
   persistTimerMode,
+  readLastSetup,
   readInitialTimerMode,
   type TimerMode,
 } from "@/store/preferences";
@@ -189,6 +192,13 @@ const shuffleIds = (countries: Country[]) =>
 const getCountryById = (countries: Country[], id: string | undefined) =>
   countries.find((country) => country.iso_a3 === id) ?? null;
 
+const QUIZ_MODES: GameMode[] = [
+  "type-to-fill",
+  "identify-shaded",
+  "click-country",
+  "capital-challenge",
+];
+
 const isTargetQueueMode = (mode: GameMode) =>
   mode === "identify-shaded" ||
   mode === "click-country" ||
@@ -324,6 +334,34 @@ const createResetState = (
 const initialTimerMultiplier = readInitialTimerMultiplier();
 const initialTimerMode = readInitialTimerMode();
 
+// A returning player resumes their last region and mode rather than the
+// hard-coded default, so the setup panel opens already configured.
+const initialSetup = (() => {
+  const fallback = {
+    region: "south-america" as QuizRegion,
+    mode: "type-to-fill" as GameMode,
+  };
+
+  if (!features.quickStart) {
+    return fallback;
+  }
+
+  const stored = readLastSetup();
+
+  if (!stored) {
+    return fallback;
+  }
+
+  const region = getCountriesForRegion(stored.region as QuizRegion).length
+    ? (stored.region as QuizRegion)
+    : fallback.region;
+  const mode = QUIZ_MODES.includes(stored.mode as GameMode)
+    ? (stored.mode as GameMode)
+    : fallback.mode;
+
+  return { region, mode };
+})();
+
 // A running quiz expires at a wall-clock instant; `remainingSeconds` is a
 // derived view of it that each tick refreshes.
 const deadlineFor = (remainingSeconds: number, timerMode: TimerMode) =>
@@ -333,7 +371,11 @@ const remainingSecondsFrom = (deadlineAt: number | null) =>
   deadlineAt === null ? null : Math.max(Math.ceil((deadlineAt - Date.now()) / 1000), 0);
 
 export const useGameStore = create<GameState>((set, get) => ({
-  ...createResetState("south-america", "type-to-fill", initialTimerMultiplier),
+  ...createResetState(
+    initialSetup.region,
+    initialSetup.mode,
+    initialTimerMultiplier,
+  ),
   autoHideCorrectCard: readInitialAutoHideCorrectCard(),
   soundEffectsEnabled: readInitialSoundEffectsEnabled(),
   timerMultiplier: initialTimerMultiplier,
@@ -412,6 +454,13 @@ export const useGameStore = create<GameState>((set, get) => ({
           state.timerMultiplier,
         );
     const deadlineAt = deadlineFor(remainingSeconds, state.timerMode);
+
+    if (features.quickStart && !state.customQuizSet) {
+      persistLastSetup({
+        region: state.selectedRegion,
+        mode: state.selectedMode,
+      });
+    }
 
     if (isTargetQueueMode(state.selectedMode)) {
       const [firstTargetId, ...targetQueue] = shuffleIds(state.quizCountries);

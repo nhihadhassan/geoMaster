@@ -368,11 +368,30 @@ export function PremiumControls({
     </div>
   );
 
+  // Secondary preferences sit behind a disclosure so the path to starting a
+  // quiz is region -> mode -> Start, not a wall of switches.
   const togglesSection = (
-    <>
-      {autoHideToggle}
-      {soundEffectsToggle}
-    </>
+    <details className="group">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-2xl px-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58 transition hover:text-white/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70">
+        <span>Preferences</span>
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-4 transition group-open:rotate-180"
+          aria-hidden="true"
+        >
+          <path d="M5 8l5 5 5-5" />
+        </svg>
+      </summary>
+      <div className="mt-2">
+        {autoHideToggle}
+        {soundEffectsToggle}
+      </div>
+    </details>
   );
 
   const canStartQuiz = !isQuizLocked && !selectedSpecialRegion;
