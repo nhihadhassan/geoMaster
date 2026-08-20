@@ -112,9 +112,11 @@ export function ExploreSearch({ onSelect, compact = false }: ExploreSearchProps)
         aria-autocomplete="list"
         autoComplete="off"
         spellCheck={false}
-        placeholder="Search the map"
-        className={`w-full rounded-full border border-white/12 bg-white/8 px-4 text-white outline-none transition placeholder:text-white/48 focus:border-cyan-200/40 focus:bg-white/14 ${
-          compact ? "h-10 text-sm" : "h-11 text-sm"
+        // "Search the map" clips on a 320px header; the icon-free field reads
+        // fine with the shorter word.
+        placeholder={compact ? "Search" : "Search the map"}
+        className={`w-full rounded-full border border-white/12 bg-white/8 text-white outline-none transition placeholder:text-white/48 focus:border-cyan-200/40 focus:bg-white/14 ${
+          compact ? "h-10 px-3 text-sm" : "h-11 px-4 text-sm"
         }`}
       />
       <AnimatePresence>

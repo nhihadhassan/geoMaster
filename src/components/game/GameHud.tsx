@@ -112,7 +112,9 @@ function GeoMasterBrand({
           priority
         />
       </span>
-      <span className="min-w-0">
+      <span className={compact ? "hidden min-w-0 min-[360px]:block" : "min-w-0"}>
+        {/* On a very narrow header the icon carries the brand on its own so the
+            search field and quiz action keep usable widths. */}
         <span
           className={`block truncate font-semibold text-white/90 ${
             compact ? "text-sm" : "text-[0.95rem]"
