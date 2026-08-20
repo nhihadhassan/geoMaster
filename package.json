@@ -13,7 +13,9 @@
     "test:matcher": "node --experimental-strip-types scripts/test-country-matcher.ts",
     "test:store": "tsx scripts/test-game-store.ts",
     "test:progress": "tsx scripts/test-progress.ts",
-    "test": "npm run validate:countries && npm run test:matcher && npm run test:store && npm run test:progress"
+    "test": "npm run validate:countries && npm run test:matcher && npm run test:store && npm run test:progress && npm run test:search && npm run test:daily",
+    "test:search": "tsx scripts/test-explore-search.ts",
+    "test:daily": "tsx scripts/test-daily-challenge.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
