@@ -169,6 +169,8 @@ export const buildFillColorExpression = (
   missedIds: string[],
 ) => [
   "case",
+  ["boolean", ["feature-state", "wrong"], false],
+  "#fb7185",
   ["boolean", ["feature-state", "target"], false],
   "#67e8f9",
   ["in", ["get", "iso_a3"], ["literal", missedIds]],
@@ -193,6 +195,8 @@ export const buildFillOpacityExpression = (
   missedIds: string[],
 ) => [
   "case",
+  ["boolean", ["feature-state", "wrong"], false],
+  0.86,
   ["boolean", ["feature-state", "target"], false],
   0.72,
   ["in", ["get", "iso_a3"], ["literal", missedIds]],

@@ -114,6 +114,13 @@ type GameState = {
   timerMode: TimerMode;
   gameStatus: GameStatus;
   incorrectAttempts: Record<string, number>;
+  /** A wrong map pick worth showing on the map itself: the country tapped, and
+   *  the right answer once it has been revealed. Cleared by the map effect. */
+  lastMissFeedback: {
+    wrongIso: string;
+    correctIso: string | null;
+    sequence: number;
+  } | null;
   lastMatchedCountry: Country | null;
   lastMatchSequence: number;
   feedbackSequence: number;
@@ -156,6 +163,7 @@ type GameState = {
     options?: Omit<QuizFeedbackEvent, "kind" | "sequence">,
   ) => void;
   clearCorrectCard: () => void;
+  clearMissFeedback: () => void;
   selectLearningCountry: (iso: string | null) => void;
   selectLearningFeature: (feature: LearningFeature | null) => void;
   clearLearningCountry: () => void;
@@ -298,6 +306,7 @@ const createResetState = (
     deadlineAt: null,
     gameStatus: "idle" as GameStatus,
     incorrectAttempts: {},
+    lastMissFeedback: null,
     lastMatchedCountry: null,
     lastMatchSequence: 0,
     feedbackSequence: 0,
@@ -645,6 +654,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
   clearCorrectCard: () => set({ lastMatchedCountry: null }),
+  clearMissFeedback: () => set({ lastMissFeedback: null }),
   selectLearningCountry: (iso) => {
     const state = get();
 
@@ -1027,6 +1037,13 @@ export const useGameStore = create<GameState>((set, get) => ({
           ...nextState,
           countryResults,
           incorrectAttempts,
+          // Last attempt: the answer is revealed, so show the wrong pick and
+          // the right country together.
+          lastMissFeedback: {
+            wrongIso: clickedCountry.iso_a3,
+            correctIso: target.iso_a3,
+            sequence: state.feedbackSequence + 1,
+          },
           currentInput: "",
           currentTargetHints: [],
           smartHint: null,
@@ -1050,6 +1067,13 @@ export const useGameStore = create<GameState>((set, get) => ({
         incorrectAttempts,
         currentTargetHints,
         smartHint: currentTargetHints.at(-1) ?? null,
+        // Earlier attempts only mark the mistake; revealing the target here
+        // would hand over the answer.
+        lastMissFeedback: {
+          wrongIso: clickedCountry.iso_a3,
+          correctIso: null,
+          sequence: state.feedbackSequence + 1,
+        },
         ...buildFeedbackEvent(state, "wrong", {
           countryId: target.iso_a3,
         }),

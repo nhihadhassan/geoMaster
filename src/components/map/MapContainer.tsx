@@ -166,6 +166,7 @@ export function MapContainer() {
   const remainingPulseFrameRef = useRef<number | null>(null);
   const framingKeyboardInsetRef = useRef(0);
   const feedbackGlowTimeoutRef = useRef<number | null>(null);
+  const missFeedbackTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   // A fatal failure means the canvas will never render (no WebGL, or the Map
@@ -221,6 +222,7 @@ export function MapContainer() {
   const guessedCountryIds = useGameStore((state) => state.guessedCountryIds);
   const countryResults = useGameStore((state) => state.countryResults);
   const lastMatchedCountry = useGameStore((state) => state.lastMatchedCountry);
+  const lastMissFeedback = useGameStore((state) => state.lastMissFeedback);
   const lastMatchSequence = useGameStore((state) => state.lastMatchSequence);
   const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const currentTargetCountry = useGameStore(
@@ -251,6 +253,7 @@ export function MapContainer() {
     (state) => state.perfectRunSequence,
   );
   const clearCorrectCard = useGameStore((state) => state.clearCorrectCard);
+  const clearMissFeedback = useGameStore((state) => state.clearMissFeedback);
   const selectedLearningFeature = useGameStore(
     (state) => state.selectedLearningFeature,
   );
@@ -382,6 +385,32 @@ export function MapContainer() {
 
     return [...GENERIC_IDLE_PROMPTS, ...countryPrompts];
   }, []);
+  const missTeachingNote = useMemo(() => {
+    if (!features.mapMissTeaching || !lastMissFeedback) {
+      return null;
+    }
+
+    const wrongCountry = countries.find(
+      (country) => country.iso_a3 === lastMissFeedback.wrongIso,
+    );
+
+    if (!wrongCountry) {
+      return null;
+    }
+
+    const correctCountry = lastMissFeedback.correctIso
+      ? countries.find(
+          (country) => country.iso_a3 === lastMissFeedback.correctIso,
+        )
+      : null;
+
+    return {
+      sequence: lastMissFeedback.sequence,
+      text: correctCountry
+        ? `That's ${wrongCountry.name} — ${correctCountry.name} is highlighted.`
+        : `That's ${wrongCountry.name}. Try again.`,
+    };
+  }, [lastMissFeedback]);
   const registerMapInteraction = useCallback(() => {
     setHasMapInteraction(true);
     setIdleInteractionKey((key) => key + 1);
@@ -740,6 +769,64 @@ export function MapContainer() {
     mapAnimationsEnabled,
     mapLoaded,
   ]);
+
+  // Show a wrong map pick where it happened, and - once the answer has been
+  // revealed - the country that was actually being asked for, so the mistake
+  // teaches the spatial relationship instead of only reporting an error.
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (
+      !features.mapMissTeaching ||
+      !mapLoaded ||
+      !map ||
+      !lastMissFeedback ||
+      mobilePerformanceMode
+    ) {
+      return;
+    }
+
+    const { wrongIso, correctIso } = lastMissFeedback;
+
+    setCountryFeatureState(map, wrongIso, { wrong: true });
+
+    if (correctIso) {
+      setCountryFeatureState(map, correctIso, { target: true, targetPulse: 0.9 });
+    }
+
+    const clear = () => {
+      if (mapRef.current !== map) {
+        return;
+      }
+
+      setCountryFeatureState(map, wrongIso, { wrong: false });
+
+      if (correctIso) {
+        setCountryFeatureState(map, correctIso, {
+          target: false,
+          targetPulse: 0,
+        });
+      }
+    };
+
+    missFeedbackTimeoutRef.current = window.setTimeout(
+      () => {
+        clear();
+        clearMissFeedback();
+        missFeedbackTimeoutRef.current = null;
+      },
+      correctIso ? 1600 : 900,
+    );
+
+    return () => {
+      if (missFeedbackTimeoutRef.current) {
+        window.clearTimeout(missFeedbackTimeoutRef.current);
+        missFeedbackTimeoutRef.current = null;
+      }
+
+      clear();
+    };
+  }, [clearMissFeedback, lastMissFeedback, mapLoaded, mobilePerformanceMode]);
 
   const addCountryLayers = useCallback(
     (
@@ -1682,6 +1769,11 @@ export function MapContainer() {
         feedbackGlowTimeoutRef.current = null;
       }
 
+      if (missFeedbackTimeoutRef.current) {
+        window.clearTimeout(missFeedbackTimeoutRef.current);
+        missFeedbackTimeoutRef.current = null;
+      }
+
       map?.remove();
       map = null;
       mapRef.current = null;
@@ -2376,6 +2468,21 @@ export function MapContainer() {
             onResume={handleResumeSavedQuiz}
             onDiscard={handleDiscardSavedQuiz}
           />
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {missTeachingNote && !landingOpen ? (
+          <motion.p
+            key={missTeachingNote.sequence}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="pointer-events-none absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-1/2 z-30 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-2xl border border-rose-200/22 bg-zinc-950/72 px-3 py-1.5 text-center text-xs font-semibold leading-4 text-rose-50 backdrop-blur-xl sm:bottom-28 sm:rounded-full"
+            aria-live="polite"
+          >
+            {missTeachingNote.text}
+          </motion.p>
         ) : null}
       </AnimatePresence>
       <AnimatePresence>
