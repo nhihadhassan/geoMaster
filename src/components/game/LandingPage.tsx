@@ -24,6 +24,10 @@ type LandingPageProps = {
   /** Drills the countries this player keeps getting wrong. */
   onPracticeWeakSpots?: () => void;
   weakSpotCount?: number;
+  /** Today's fixed 12-country set. Omitted when the feature is off. */
+  onStartDailyChallenge?: () => void;
+  dailyDoneToday?: boolean;
+  dailyStreak?: number;
 };
 
 const HERO_GLOBE_CONFIG: GlobeConfig = {
@@ -75,6 +79,9 @@ export function LandingPage({
   quickStartLabel,
   onPracticeWeakSpots,
   weakSpotCount = 0,
+  onStartDailyChallenge,
+  dailyDoneToday = false,
+  dailyStreak = 0,
 }: LandingPageProps) {
   const prefersReducedMotion = useReducedMotion();
   // Exactly one strong action, chosen by where the player actually is:
@@ -136,8 +143,30 @@ export function LandingPage({
               duration: 0.56,
               ease: [0.16, 1, 0.3, 1],
             }}
-            className="relative z-20 mt-auto flex w-full max-w-md flex-col justify-center gap-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:flex-row sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            className="relative z-20 mt-auto flex w-full max-w-md flex-col items-center justify-center gap-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:flex-row sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
           >
+              {onStartDailyChallenge ? (
+                <button
+                  type="button"
+                  onClick={onStartDailyChallenge}
+                  className="inline-flex min-h-11 items-center gap-2 self-center rounded-full border border-cyan-100/20 bg-[#071018]/80 px-4 py-2 text-sm font-medium text-cyan-50/82 shadow-[0_12px_24px_-10px_rgba(0,0,0,0.6)] backdrop-blur-sm transition hover:border-cyan-100/34 hover:text-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c] sm:absolute sm:-top-14"
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      dailyDoneToday ? "bg-emerald-300" : "bg-cyan-300"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span>
+                    {dailyDoneToday ? "Daily done" : "Daily Challenge"}
+                  </span>
+                  {dailyStreak > 0 ? (
+                    <span className="text-cyan-100/60">
+                      {dailyStreak}-day streak
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
               {primaryAction ? (
                 <button
                   type="button"

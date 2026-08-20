@@ -115,6 +115,7 @@ import {
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import { useDailyChallenge } from "@/hooks/useDailyChallenge";
 import { useRecordQuizProgress } from "@/hooks/useRecordQuizProgress";
 import { useProgressStore } from "@/store/progressStore";
 import {
@@ -286,6 +287,7 @@ export function MapContainer() {
 
   useSoundEffects(lastFeedbackEvent, { documentVisible });
   useRecordQuizProgress();
+  const daily = useDailyChallenge();
 
   useEffect(() => {
     if (mapInitAllowed) {
@@ -2438,6 +2440,12 @@ export function MapContainer() {
     startQuiz();
   }, [startQuiz]);
 
+  const startDailyChallenge = useCallback(() => {
+    setRegionPanelOpen(false);
+    setLandingOpen(false);
+    daily.startDailyChallenge();
+  }, [daily]);
+
   const practiceWeakSpots = useCallback(() => {
     setRegionPanelOpen(false);
     setLandingOpen(false);
@@ -2770,6 +2778,11 @@ export function MapContainer() {
               features.practiceMistakes ? practiceWeakSpots : undefined
             }
             weakSpotCount={weakCountryIds.length}
+            onStartDailyChallenge={
+              daily.available ? startDailyChallenge : undefined
+            }
+            dailyDoneToday={daily.doneToday}
+            dailyStreak={daily.streak}
           />
         ) : null}
       </AnimatePresence>
