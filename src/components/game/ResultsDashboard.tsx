@@ -44,6 +44,8 @@ export function ResultsDashboard() {
   const selectedCountryId =
     drawerState.key === reviewKey ? drawerState.selectedCountryId : null;
   const region = getRegionConfig(selectedRegion);
+  const customQuizSet = useGameStore((state) => state.customQuizSet);
+  const quizLabel = customQuizSet?.label ?? region.label;
   const statusLabel =
     gameStatus === "completed"
       ? "Quiz complete"
@@ -181,7 +183,7 @@ export function ResultsDashboard() {
                 : "mt-1 truncate text-lg font-semibold"
             }
           >
-            {region.label}
+            {quizLabel}
           </h2>
           <p
             className={

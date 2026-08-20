@@ -177,6 +177,9 @@ export function GameHud({
   const tick = useGameStore((state) => state.tick);
   const timerMode = useGameStore((state) => state.timerMode);
   const region = getRegionConfig(selectedRegion);
+  const customQuizSet = useGameStore((state) => state.customQuizSet);
+  // A focused practice or daily run names itself rather than its host region.
+  const quizLabel = customQuizSet?.label ?? region.label;
   const modeBResults = Object.values(countryResults);
   const perfectCount = modeBResults.filter(
     (result) => result.status === "correct",
@@ -218,7 +221,7 @@ export function GameHud({
       : gameStatus === "paused"
         ? "Paused"
         : "Quiz active";
-  const contextLabel = `${region.label} · ${modeLabels[selectedMode]}`;
+  const contextLabel = `${quizLabel} · ${modeLabels[selectedMode]}`;
   const feedbackTone = lastFeedbackEvent?.completed
     ? "complete"
     : lastFeedbackEvent?.kind === "correct" ||
@@ -374,7 +377,7 @@ export function GameHud({
             </p>
             <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2">
               <p className="truncate text-sm font-semibold text-white/84">
-                {region.label}
+                {quizLabel}
               </p>
               <span className="rounded-full border border-white/10 bg-white/7 px-2.5 py-1 text-xs font-semibold text-white/58">
                 {modeLabels[selectedMode]}

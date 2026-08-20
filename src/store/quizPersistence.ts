@@ -4,7 +4,7 @@ import { getCountriesForRegion, type QuizRegion } from "@/data/countries";
 import type { CountryResult, GameMode } from "@/store/gameTypes";
 
 const QUIZ_PROGRESS_KEY = "geomaster-quiz-progress";
-export const QUIZ_PROGRESS_VERSION = 1;
+export const QUIZ_PROGRESS_VERSION = 2;
 
 export type QuizProgressSnapshot = {
   v: number;
@@ -19,6 +19,10 @@ export type QuizProgressSnapshot = {
   remainingSeconds: number;
   targetQueue: string[];
   currentTargetIso: string | null;
+  /** Present when the run used an explicit roster (focused practice, daily
+   *  challenge) rather than the region's full country list. */
+  customCountryIds?: string[];
+  customLabel?: string;
   savedAt: number;
 };
 
@@ -65,7 +69,8 @@ export const readQuizProgress = (): QuizProgressSnapshot | null => {
       !parsed ||
       parsed.v !== QUIZ_PROGRESS_VERSION ||
       (parsed.status !== "running" && parsed.status !== "paused") ||
-      getCountriesForRegion(parsed.region).length === 0
+      (!parsed.customCountryIds?.length &&
+        getCountriesForRegion(parsed.region).length === 0)
     ) {
       return null;
     }

@@ -97,6 +97,7 @@ type GameState = {
   selectedRegion: QuizRegion;
   selectedSpecialRegion: "antarctica" | null;
   selectedMode: GameMode;
+  customQuizSet: CustomQuizSet | null;
   quizCountries: Country[];
   guessedCountryIds: string[];
   countryResults: Record<string, CountryResult>;
@@ -133,6 +134,10 @@ type GameState = {
   clearSpecialRegion: () => void;
   selectMode: (mode: GameMode) => void;
   startQuiz: () => void;
+  startCustomQuiz: (
+    countryIds: string[],
+    options?: { mode?: GameMode; label?: string; region?: QuizRegion },
+  ) => void;
   pauseQuiz: () => void;
   resumeQuiz: () => void;
   giveUp: () => void;
@@ -213,6 +218,8 @@ const buildQuizProgressSnapshot = (
     remainingSeconds: state.remainingSeconds,
     targetQueue: state.targetQueue,
     currentTargetIso: state.currentTargetCountry?.iso_a3 ?? null,
+    customCountryIds: state.customQuizSet?.countryIds,
+    customLabel: state.customQuizSet?.label,
     savedAt: Date.now(),
   };
 };
@@ -240,17 +247,43 @@ const buildFeedbackEvent = (
   };
 };
 
+// An explicit country list overriding the region roster: how "practice the
+// ones you missed" and the daily challenge reuse the whole quiz engine without
+// a parallel implementation.
+export type CustomQuizSet = {
+  countryIds: string[];
+  label: string;
+};
+
+const CUSTOM_SECONDS_PER_COUNTRY = 20;
+const CUSTOM_MINIMUM_SECONDS = 60;
+
+const resolveCustomCountries = (countryIds: string[]) =>
+  countryIds
+    .map((iso) => allCountries.find((country) => country.iso_a3 === iso))
+    .filter((country): country is Country => Boolean(country));
+
+const getCustomTimerSeconds = (count: number, timerMultiplier: number) =>
+  Math.round(
+    Math.max(count * CUSTOM_SECONDS_PER_COUNTRY, CUSTOM_MINIMUM_SECONDS) *
+      timerMultiplier,
+  );
+
 const createResetState = (
   selectedRegion: QuizRegion,
   selectedMode: GameMode,
   timerMultiplier: number,
+  customQuizSet: CustomQuizSet | null = null,
 ) => {
-  const quizCountries = getCountriesForRegion(selectedRegion);
+  const quizCountries = customQuizSet
+    ? resolveCustomCountries(customQuizSet.countryIds)
+    : getCountriesForRegion(selectedRegion);
 
   return {
     selectedRegion,
     selectedSpecialRegion: null,
     selectedMode,
+    customQuizSet,
     quizCountries,
     guessedCountryIds: [],
     countryResults: {},
@@ -259,11 +292,9 @@ const createResetState = (
     targetQueue: [],
     score: 0,
     total: quizCountries.length,
-    remainingSeconds: getScaledTimerSeconds(
-      selectedRegion,
-      selectedMode,
-      timerMultiplier,
-    ),
+    remainingSeconds: customQuizSet
+      ? getCustomTimerSeconds(quizCountries.length, timerMultiplier)
+      : getScaledTimerSeconds(selectedRegion, selectedMode, timerMultiplier),
     deadlineAt: null,
     gameStatus: "idle" as GameStatus,
     incorrectAttempts: {},
@@ -364,11 +395,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Start from a full clock even if the previous run ended on an expired
     // timer, then arm the wall-clock deadline the tick derives from.
-    const remainingSeconds = getScaledTimerSeconds(
-      state.selectedRegion,
-      state.selectedMode,
-      state.timerMultiplier,
-    );
+    const remainingSeconds = state.customQuizSet
+      ? getCustomTimerSeconds(state.quizCountries.length, state.timerMultiplier)
+      : getScaledTimerSeconds(
+          state.selectedRegion,
+          state.selectedMode,
+          state.timerMultiplier,
+        );
     const deadlineAt = deadlineFor(remainingSeconds, state.timerMode);
 
     if (isTargetQueueMode(state.selectedMode)) {
@@ -417,6 +450,22 @@ export const useGameStore = create<GameState>((set, get) => ({
       ...buildFeedbackEvent(state, "quiz-start"),
     });
   },
+  startCustomQuiz: (countryIds, options) => {
+    const state = get();
+    const mode = options?.mode ?? state.selectedMode;
+    const region = options?.region ?? state.selectedRegion;
+    const label = options?.label ?? "Focused practice";
+    const customQuizSet = { countryIds: [...new Set(countryIds)], label };
+
+    if (customQuizSet.countryIds.length === 0) {
+      return;
+    }
+
+    // Reset onto the explicit roster, then hand off to the normal start path so
+    // the target queue, hints, scoring, and feedback events are all shared.
+    set(createResetState(region, mode, state.timerMultiplier, customQuizSet));
+    get().startQuiz();
+  },
   pauseQuiz: () => {
     const state = get();
 
@@ -446,9 +495,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
   resetQuiz: () => {
-    const { selectedRegion, selectedMode, timerMultiplier } = get();
+    const { selectedRegion, selectedMode, timerMultiplier, customQuizSet } =
+      get();
 
-    set(createResetState(selectedRegion, selectedMode, timerMultiplier));
+    // Try Again on a focused practice run replays the same roster.
+    set(
+      createResetState(
+        selectedRegion,
+        selectedMode,
+        timerMultiplier,
+        customQuizSet,
+      ),
+    );
   },
   giveUp: () => {
     const state = get();
@@ -484,7 +542,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       return;
     }
 
-    const quizCountries = getCountriesForRegion(snapshot.region);
+    const customQuizSet = snapshot.customCountryIds?.length
+      ? {
+          countryIds: snapshot.customCountryIds,
+          label: snapshot.customLabel ?? "Focused practice",
+        }
+      : null;
+    const quizCountries = customQuizSet
+      ? resolveCustomCountries(customQuizSet.countryIds)
+      : getCountriesForRegion(snapshot.region);
 
     if (quizCountries.length === 0) {
       clearQuizProgress();
@@ -500,7 +566,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       // remainingSeconds is overridden below with the saved value; the
       // multiplier here only feeds createResetState's default computation.
-      ...createResetState(snapshot.region, snapshot.mode, get().timerMultiplier),
+      ...createResetState(
+        snapshot.region,
+        snapshot.mode,
+        get().timerMultiplier,
+        customQuizSet,
+      ),
       guessedCountryIds: snapshot.guessedCountryIds,
       countryResults: snapshot.countryResults,
       incorrectAttempts: snapshot.incorrectAttempts,
