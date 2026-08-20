@@ -27,6 +27,8 @@ import {
   caribbeanCountryIds,
 } from "@/components/map/CaribbeanInsetMap";
 import { CountryPopup } from "@/components/map/CountryPopup";
+import { IdlePromptToast } from "@/components/map/IdlePromptToast";
+import { useIdleGlobeRotation } from "@/components/map/useIdleGlobeRotation";
 import { MapDebugPanel } from "@/components/map/MapDebugPanel";
 import {
   CITY_CIRCLE_LAYER_ID,
@@ -99,6 +101,11 @@ import {
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import {
+  useDocumentVisible,
+  useMobilePerformanceMode,
+  usePrefersReducedMotion,
+} from "@/hooks/useMapEnvironment";
 import { useSoundEffects } from "@/hooks/useSoundEffects";
 import {
   readQuizProgress,
@@ -111,7 +118,6 @@ import { getCountryFunFacts } from "@/utils/countryEducation";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
 const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
-const IDLE_ROTATION_STEP_MS = 250;
 const REMAINING_PULSE_STEP_MS = 160;
 const TARGET_PULSE_STEP_MS = 120;
 const IDLE_PROMPT_INITIAL_DELAY_MS = 16_000;
@@ -136,207 +142,6 @@ const GENERIC_IDLE_PROMPTS = [
 
 
 
-function usePrefersReducedMotion() {
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncPreference = () => setPrefersReducedMotion(mediaQuery.matches);
-
-    syncPreference();
-    mediaQuery.addEventListener("change", syncPreference);
-
-    return () => mediaQuery.removeEventListener("change", syncPreference);
-  }, []);
-
-  return prefersReducedMotion;
-}
-
-const getInitialDocumentVisible = () =>
-  typeof document === "undefined" ? true : !document.hidden;
-
-function useDocumentVisible() {
-  const [documentVisible, setDocumentVisible] = useState(
-    getInitialDocumentVisible,
-  );
-
-  useEffect(() => {
-    const syncVisibility = () => setDocumentVisible(!document.hidden);
-
-    syncVisibility();
-    document.addEventListener("visibilitychange", syncVisibility);
-
-    return () =>
-      document.removeEventListener("visibilitychange", syncVisibility);
-  }, []);
-
-  return documentVisible;
-}
-
-const getInitialMobilePerformanceMode = (prefersReducedMotion: boolean) => {
-  if (typeof window === "undefined") {
-    return prefersReducedMotion;
-  }
-
-  const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-  const narrowViewport = window.matchMedia("(max-width: 767px)").matches;
-  const connection = (
-    navigator as Navigator & { connection?: { saveData?: boolean } }
-  ).connection;
-
-  return (
-    prefersReducedMotion ||
-    coarsePointer ||
-    narrowViewport ||
-    Boolean(connection?.saveData)
-  );
-};
-
-function useMobilePerformanceMode(prefersReducedMotion: boolean) {
-  const [mobilePerformanceMode, setMobilePerformanceMode] = useState(() =>
-    getInitialMobilePerformanceMode(prefersReducedMotion),
-  );
-
-  useEffect(() => {
-    const coarsePointer = window.matchMedia("(pointer: coarse)");
-    const narrowViewport = window.matchMedia("(max-width: 767px)");
-    const connection = (
-      navigator as Navigator & { connection?: { saveData?: boolean } }
-    ).connection;
-
-    const syncMode = () => {
-      setMobilePerformanceMode(
-        prefersReducedMotion ||
-          coarsePointer.matches ||
-          narrowViewport.matches ||
-          Boolean(connection?.saveData),
-      );
-    };
-
-    syncMode();
-    coarsePointer.addEventListener("change", syncMode);
-    narrowViewport.addEventListener("change", syncMode);
-
-    return () => {
-      coarsePointer.removeEventListener("change", syncMode);
-      narrowViewport.removeEventListener("change", syncMode);
-    };
-  }, [prefersReducedMotion]);
-
-  return mobilePerformanceMode;
-}
-
-function useIdleGlobeRotation({
-  enabled,
-  idleDelayMs,
-  mapRef,
-  onInteraction,
-  interactionKey,
-  documentVisible,
-}: {
-  enabled: boolean;
-  idleDelayMs: number;
-  mapRef: MutableRefObject<Map | null>;
-  onInteraction: () => void;
-  interactionKey: number;
-  documentVisible: boolean;
-}) {
-  useEffect(() => {
-    const map = mapRef.current;
-
-    if (!enabled || !documentVisible || !map) {
-      return;
-    }
-
-    let timeoutId: number | null = null;
-    let intervalId: number | null = null;
-    let previousTimestamp = 0;
-
-    const stopRotation = () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-
-      if (intervalId) {
-        window.clearInterval(intervalId);
-        intervalId = null;
-      }
-    };
-
-    const handleInteraction = () => {
-      stopRotation();
-      onInteraction();
-    };
-
-    const rotateOnce = () => {
-      if (mapRef.current !== map) {
-        return;
-      }
-
-      const timestamp = performance.now();
-
-      if (!previousTimestamp) {
-        previousTimestamp = timestamp;
-      }
-
-      const elapsedSeconds = (timestamp - previousTimestamp) / 1000;
-      previousTimestamp = timestamp;
-      map.setBearing(map.getBearing() + elapsedSeconds * 0.18);
-    };
-
-    timeoutId = window.setTimeout(() => {
-      previousTimestamp = 0;
-      rotateOnce();
-      intervalId = window.setInterval(rotateOnce, IDLE_ROTATION_STEP_MS);
-    }, idleDelayMs);
-
-    map.on("dragstart", handleInteraction);
-    map.on("zoomstart", handleInteraction);
-    map.on("rotatestart", handleInteraction);
-    map.on("pitchstart", handleInteraction);
-    map.on("mousedown", handleInteraction);
-    map.on("touchstart", handleInteraction);
-    const canvas = map.getCanvas();
-    canvas.addEventListener("wheel", handleInteraction, { passive: true });
-
-    return () => {
-      stopRotation();
-      map.off("dragstart", handleInteraction);
-      map.off("zoomstart", handleInteraction);
-      map.off("rotatestart", handleInteraction);
-      map.off("pitchstart", handleInteraction);
-      map.off("mousedown", handleInteraction);
-      map.off("touchstart", handleInteraction);
-      canvas.removeEventListener("wheel", handleInteraction);
-    };
-  }, [
-    documentVisible,
-    enabled,
-    idleDelayMs,
-    interactionKey,
-    mapRef,
-    onInteraction,
-  ]);
-}
-
-function IdlePromptToast({ prompt }: { prompt: string }) {
-  return (
-    <motion.aside
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-      className="pointer-events-none absolute inset-x-3 bottom-[calc(5.9rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-sm rounded-2xl border border-white/12 bg-zinc-950/54 px-4 py-3 text-sm font-medium leading-5 text-white/72 shadow-lg shadow-black/24 backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-5 sm:max-w-xs"
-      aria-live="polite"
-    >
-      <span className="block text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-emerald-100/54">
-        Atlas note
-      </span>
-      <span className="mt-1 block">{prompt}</span>
-    </motion.aside>
-  );
-}
 
 export function MapContainer() {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
