@@ -213,13 +213,13 @@ export function ResultsDashboard({
       }`}
     >
       <div
-        className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${
+        className={`flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between ${
           expanded
             ? "sticky top-0 z-10 -mx-4 -mt-4 border-b border-white/10 bg-zinc-950/86 px-4 py-3 backdrop-blur-2xl sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4"
             : ""
         }`}
       >
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 sm:min-w-[13rem]">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-100/60">
             {statusLabel}
           </p>
@@ -248,7 +248,7 @@ export function ResultsDashboard({
             </p>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-nowrap">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() =>
@@ -270,15 +270,6 @@ export function ResultsDashboard({
               </>
             )}
           </button>
-          {features.shareResultCard ? (
-            <ShareResultCard
-              quizLabel={quizLabel}
-              modeLabel={modeLabels[selectedMode]}
-              score={score}
-              total={total}
-              statusLabel={statusLabel}
-            />
-          ) : null}
           {onChangeRegion ? (
             <button
               type="button"
@@ -331,7 +322,19 @@ export function ResultsDashboard({
       </div>
 
       {expanded ? (
-        <div className="mt-4 grid gap-4 pb-1 sm:mt-5 lg:grid-cols-[1fr_20rem]">
+        <>
+        <div className="mt-4 flex justify-end">
+          {features.shareResultCard ? (
+            <ShareResultCard
+              quizLabel={quizLabel}
+              modeLabel={modeLabels[selectedMode]}
+              score={score}
+              total={total}
+              statusLabel={statusLabel}
+            />
+          ) : null}
+        </div>
+        <div className="mt-3 grid gap-4 pb-1 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
             {reviewGroups.map((group) =>
               group.countries.length > 0 ? (
@@ -376,6 +379,7 @@ export function ResultsDashboard({
             <CountryEducationCard country={selectedCountry} variant="review" />
           ) : null}
         </div>
+        </>
       ) : null}
     </motion.section>
   );
