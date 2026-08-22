@@ -78,6 +78,8 @@ npm run test:store           # quiz engine, timer, persistence
 npm run test:progress        # mastery model
 npm run test:search          # explore search
 npm run test:daily           # daily challenge
+npm run test:motion          # map motion curves
+npm run test:e2e             # Playwright smoke journeys (desktop + mobile)
 ```
 
 ## Project structure
@@ -97,7 +99,8 @@ src/
 
 Features added in the August 2026 round are individually switchable in
 [`src/config/features.ts`](src/config/features.ts) — see
-[`docs/product-round-2026-08.md`](docs/product-round-2026-08.md).
+[`docs/product-round-2026-08.md`](docs/product-round-2026-08.md) and the
+follow-up [`docs/refinement-round-2026-08.md`](docs/refinement-round-2026-08.md).
 
 See [`DESIGN.md`](DESIGN.md) for the design system (colors, typography, layout tokens).
 
