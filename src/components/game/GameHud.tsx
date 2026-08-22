@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { PlayTriangle } from "@/components/game/QuizCta";
 import { getRegionConfig } from "@/data/countries";
 import { modeLabels } from "@/data/gameModes";
@@ -11,65 +11,6 @@ import { useGameStore } from "@/store/gameStore";
 import { formatTime } from "@/utils/formatTime";
 
 const brandIconSrc = "/brand/geomaster-icon-192.png";
-
-const END_CONFIRM_TIMEOUT_MS = 3200;
-
-function EndQuizButton({
-  onEnd,
-  compact = false,
-}: {
-  onEnd: () => void;
-  compact?: boolean;
-}) {
-  const [confirming, setConfirming] = useState(false);
-  const timeoutRef = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
-    },
-    [],
-  );
-
-  const handleClick = () => {
-    if (timeoutRef.current) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
-    if (confirming) {
-      setConfirming(false);
-      onEnd();
-
-      return;
-    }
-
-    setConfirming(true);
-    timeoutRef.current = window.setTimeout(() => {
-      setConfirming(false);
-      timeoutRef.current = null;
-    }, END_CONFIRM_TIMEOUT_MS);
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      aria-label={confirming ? "Confirm give up" : "Give up quiz"}
-      className={`inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border font-semibold transition ${
-        compact ? "px-3 text-xs" : "px-4 text-sm"
-      } ${
-        confirming
-          ? "border-rose-300/70 bg-rose-500/40 text-white hover:bg-rose-500/50"
-          : "border-rose-300/40 bg-rose-500/24 text-rose-50 hover:bg-rose-500/34"
-      }`}
-    >
-      {confirming ? "Give up?" : "Give Up"}
-    </button>
-  );
-}
 
 type GameHudProps = {
   onOpenLanding: () => void;
@@ -83,9 +24,12 @@ type GameHudProps = {
 function GeoMasterBrand({
   onOpenLanding,
   compact = false,
+  iconOnly = false,
 }: {
   onOpenLanding: () => void;
   compact?: boolean;
+  /** Mid-quiz the wordmark is dead weight; the icon still opens the intro. */
+  iconOnly?: boolean;
 }) {
   return (
     <button
@@ -112,7 +56,15 @@ function GeoMasterBrand({
           priority
         />
       </span>
-      <span className={compact ? "hidden min-w-0 min-[360px]:block" : "min-w-0"}>
+      <span
+        className={
+          iconOnly
+            ? "hidden"
+            : compact
+              ? "hidden min-w-0 min-[360px]:block"
+              : "min-w-0"
+        }
+      >
         {/* On a very narrow header the icon carries the brand on its own so the
             search field and quiz action keep usable widths. */}
         <span
@@ -180,7 +132,6 @@ export function GameHud({
   const resetQuiz = useGameStore((state) => state.resetQuiz);
   const pauseQuiz = useGameStore((state) => state.pauseQuiz);
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
-  const giveUp = useGameStore((state) => state.giveUp);
   const tick = useGameStore((state) => state.tick);
   const timerMode = useGameStore((state) => state.timerMode);
   const region = getRegionConfig(selectedRegion);
@@ -318,7 +269,7 @@ export function GameHud({
               />
             ) : null}
           </AnimatePresence>
-          <GeoMasterBrand onOpenLanding={onOpenLanding} compact />
+          <GeoMasterBrand onOpenLanding={onOpenLanding} compact iconOnly />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-white/60">
               {statusLabel}
@@ -333,9 +284,6 @@ export function GameHud({
                 {formatTime(remainingSeconds)}
               </p>
             </div>
-          ) : null}
-          {gameStatus === "running" ? (
-            <EndQuizButton onEnd={giveUp} compact />
           ) : null}
           <button
             type="button"
@@ -442,9 +390,6 @@ export function GameHud({
                   {formatTime(remainingSeconds)}
                 </p>
               </div>
-            ) : null}
-            {gameStatus === "running" ? (
-              <EndQuizButton onEnd={giveUp} />
             ) : null}
             <button
               type="button"

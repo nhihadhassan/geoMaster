@@ -3,6 +3,10 @@
 import createGlobe, { type COBEOptions } from "cobe";
 import { useEffect, useRef, useState } from "react";
 
+import {
+  useMobilePerformanceMode,
+  usePrefersReducedMotion,
+} from "@/hooks/useMapEnvironment";
 import { cn } from "@/lib/utils";
 
 export type GlobeConfig = COBEOptions & {
@@ -50,6 +54,21 @@ const GLOBE_CONFIG: GlobeConfig = {
 };
 
 const AUTO_ROTATION_STEP = 0.003;
+
+// Backing-store scale. 2 is retina-crisp; beyond that is oversampling the
+// display cannot show. Constrained devices drop to 1.5, which is still sharper
+// than the CSS size and costs less than half the pixels.
+const RENDER_SCALE = 2;
+const RENDER_SCALE_CONSTRAINED = 1.5;
+
+// Dot density. The globe is a background element, so a lighter mesh on a phone
+// is not a quality the user is looking at closely.
+const MAP_SAMPLES_CONSTRAINED = 12_000;
+
+// The city labels are React state, so projecting them every frame meant a
+// setState at 60fps. They drift slowly; ~8fps is indistinguishable and removes
+// the single largest cost on the landing.
+const LABEL_PROJECTION_INTERVAL_MS = 125;
 
 const toGlobeVector = ([latitude, longitude]: [number, number]) => {
   const lat = (latitude * Math.PI) / 180;
@@ -128,6 +147,11 @@ export function Globe({
   cityLabels?: GlobeCityLabel[];
   maxVisibleLabels?: number;
 }) {
+  // The globe consults the same environment probes the map uses, rather than
+  // carrying a performance system of its own.
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const performanceMode = useMobilePerformanceMode(prefersReducedMotion);
+  const holdStill = prefersReducedMotion;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const phiRef = useRef(config.phi ?? 0);
   const widthRef = useRef(0);
@@ -174,30 +198,46 @@ export function Globe({
     const globeConfig: GlobeConfig = { ...config };
     delete globeConfig.onRender;
 
+    // devicePixelRatio is the single scale knob here. Previously the caller's
+    // devicePixelRatio: 2 compounded with a hardcoded width * 2, so a 563px
+    // element rendered at 2252px - 5.1M pixels a frame on a phone.
+    const renderScale = performanceMode
+      ? RENDER_SCALE_CONSTRAINED
+      : RENDER_SCALE;
+
     const globe = createGlobe(canvas, {
       ...globeConfig,
-      width: widthRef.current * 2,
-      height: widthRef.current * 2,
+      devicePixelRatio: renderScale,
+      mapSamples: performanceMode
+        ? Math.min(globeConfig.mapSamples, MAP_SAMPLES_CONSTRAINED)
+        : globeConfig.mapSamples,
+      width: widthRef.current,
+      height: widthRef.current,
     });
 
     let frameId = 0;
+    let lastLabelProjection = 0;
 
     const render = (timestamp: number) => {
       const previousFrameTime = lastFrameTimeRef.current ?? timestamp;
       const frameScale = Math.min((timestamp - previousFrameTime) / 16.67, 60);
       lastFrameTimeRef.current = timestamp;
 
-      if (pointerInteracting.current === null) {
+      if (pointerInteracting.current === null && !holdStill) {
         phiRef.current += AUTO_ROTATION_STEP * frameScale;
       }
 
       globe.update({
         phi: phiRef.current + rotationRef.current,
-        width: widthRef.current * 2,
-        height: widthRef.current * 2,
+        width: widthRef.current,
+        height: widthRef.current,
       });
 
-      if (cityLabels.length > 0) {
+      if (
+        cityLabels.length > 0 &&
+        timestamp - lastLabelProjection >= LABEL_PROJECTION_INTERVAL_MS
+      ) {
+        lastLabelProjection = timestamp;
         setProjectedCityLabels(
           projectCityLabels({
             labels: cityLabels,
@@ -224,7 +264,7 @@ export function Globe({
       window.removeEventListener("resize", updateSize);
       globe.destroy();
     };
-  }, [cityLabels, config, maxVisibleLabels]);
+  }, [cityLabels, config, holdStill, maxVisibleLabels, performanceMode]);
 
   return (
     <div

@@ -40,6 +40,18 @@ import { CountryPopup } from "@/components/map/CountryPopup";
 import { ExploreSearch } from "@/components/map/ExploreSearch";
 import { IdlePromptToast } from "@/components/map/IdlePromptToast";
 import { MapControls } from "@/components/map/MapControls";
+import {
+  breathe,
+  easeOutCubic,
+  FEEDBACK_FLASH_MS,
+  MISS_MARK_MS,
+  MISS_REVEAL_MS,
+  MOTION_EPSILON,
+  mix,
+  REMAINING_BREATH_PERIOD_MS,
+  TARGET_BREATH_PERIOD_MS,
+} from "@/components/map/mapMotion";
+import { useMapMotion } from "@/components/map/useMapMotion";
 import { useIdleGlobeRotation } from "@/components/map/useIdleGlobeRotation";
 import { MapDebugPanel } from "@/components/map/MapDebugPanel";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
@@ -118,11 +130,7 @@ import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { useDailyChallenge } from "@/hooks/useDailyChallenge";
 import { useRecordQuizProgress } from "@/hooks/useRecordQuizProgress";
 import { useProgressStore } from "@/store/progressStore";
-import {
-  getMasteredCount,
-  getRegionMastery,
-  getWeakestCountryIds,
-} from "@/utils/countryMastery";
+import { getWeakestCountryIds } from "@/utils/countryMastery";
 import {
   useDocumentVisible,
   useMobilePerformanceMode,
@@ -142,8 +150,6 @@ import { isWebglAvailable } from "@/utils/webglSupport";
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
 const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
-const REMAINING_PULSE_STEP_MS = 160;
-const TARGET_PULSE_STEP_MS = 120;
 const IDLE_PROMPT_INITIAL_DELAY_MS = 16_000;
 const IDLE_PROMPT_INTERVAL_MS = 48_000;
 const IDLE_PROMPT_VISIBLE_MS = 6_500;
@@ -172,8 +178,6 @@ export function MapContainer() {
   const mapRef = useRef<Map | null>(null);
   const previousGuessedIdsRef = useRef<string[]>([]);
   const previousTargetIdRef = useRef<string | null>(null);
-  const pulseFrameRef = useRef<number | null>(null);
-  const remainingPulseFrameRef = useRef<number | null>(null);
   const framingKeyboardInsetRef = useRef(0);
   const feedbackGlowTimeoutRef = useRef<number | null>(null);
   const missFeedbackTimeoutRef = useRef<number | null>(null);
@@ -195,9 +199,6 @@ export function MapContainer() {
   const [resumableQuiz, setResumableQuiz] =
     useState<QuizProgressSnapshot | null>(null);
   const [regionPanelOpen, setRegionPanelOpen] = useState(false);
-  const [regionPanelTab, setRegionPanelTab] = useState<"region" | "mode">(
-    "region",
-  );
   const [idleInteractionKey, setIdleInteractionKey] = useState(0);
   const [hasMapInteraction, setHasMapInteraction] = useState(false);
   const [idlePrompt, setIdlePrompt] = useState<string | null>(null);
@@ -210,6 +211,9 @@ export function MapContainer() {
   const initialMapPerformanceModeRef = useRef(mobilePerformanceMode);
   const mapAnimationsEnabled =
     documentVisible && !prefersReducedMotion && !mobilePerformanceMode;
+  // One clock for every map effect below, so they share a timebase and a
+  // single on/off switch.
+  const subscribeMotion = useMapMotion(mapAnimationsEnabled);
   const [debugUiEnabled] = useState(() => {
     if (!IS_DEVELOPMENT || typeof window === "undefined") {
       return false;
@@ -429,10 +433,6 @@ export function MapContainer() {
   // Landing orientation. Until the stored progress has been read the copy stays
   // on the first-time line, so the server render and the first client render
   // agree and nothing flashes.
-  const masteredCount = useMemo(
-    () => (progressHydrated ? getMasteredCount(countryProgress) : 0),
-    [countryProgress, progressHydrated],
-  );
   const weakCountryIds = useMemo(
     () =>
       progressHydrated
@@ -442,48 +442,14 @@ export function MapContainer() {
   );
   const hasPlayedBefore =
     progressHydrated && Object.keys(countryProgress).length > 0;
-  const landingContextLine = useMemo(() => {
-    if (!features.adaptiveLanding) {
-      return null;
-    }
-
-    const practisedCount = progressHydrated
-      ? Object.keys(countryProgress).length
-      : 0;
-
-    if (practisedCount === 0) {
-      return "Learn every country on a real world map — quiz yourself, explore, and practise what you miss.";
-    }
-
-    const regionLabel = getRegionConfig(selectedRegion).label;
-
-    // Early on there is nothing mastered yet, and "0 mastered" is a poor
-    // welcome, so lead with what the player has actually covered.
-    if (masteredCount === 0) {
-      return `${practisedCount} ${
-        practisedCount === 1 ? "country" : "countries"
-      } practised · keep going in ${regionLabel}`;
-    }
-
-    const regionMastery = getRegionMastery(countryProgress, selectedRegion);
-    const regionShare = Math.round(regionMastery.ratio * 100);
-
-    return `${masteredCount} ${
-      masteredCount === 1 ? "country" : "countries"
-    } mastered · ${regionLabel} ${regionShare}%`;
-  }, [countryProgress, masteredCount, progressHydrated, selectedRegion]);
   const registerMapInteraction = useCallback(() => {
     setHasMapInteraction(true);
     setIdleInteractionKey((key) => key + 1);
   }, []);
-  const openRegionPanel = useCallback(
-    (tab: "region" | "mode" = "region") => {
-      setRegionPanelTab(tab);
-      setRegionPanelOpen(true);
-      registerMapInteraction();
-    },
-    [registerMapInteraction],
-  );
+  const openRegionPanel = useCallback(() => {
+    setRegionPanelOpen(true);
+    registerMapInteraction();
+  }, [registerMapInteraction]);
   const closeRegionPanel = useCallback(
     (open: boolean) => {
       setRegionPanelOpen(open);
@@ -791,33 +757,15 @@ export function MapContainer() {
       return;
     }
 
-    if (feedbackGlowTimeoutRef.current) {
-      window.clearTimeout(feedbackGlowTimeoutRef.current);
-      feedbackGlowTimeoutRef.current = null;
-    }
+    // Fades out on the shared clock rather than snapping off on a timeout, so
+    // a confirmation decays with the same easing the breath uses.
+    const peak = lastFeedbackEvent.kind === "assisted" ? 0.62 : 0.9;
+    const startedAt = performance.now();
+    let lastWritten = -1;
 
-    setCountryFeatureState(map, countryId, {
-      target: true,
-      targetPulse: lastFeedbackEvent.kind === "assisted" ? 0.62 : 0.9,
-    });
+    setCountryFeatureState(map, countryId, { target: true, targetPulse: peak });
 
-    feedbackGlowTimeoutRef.current = window.setTimeout(() => {
-      if (mapRef.current === map) {
-        setCountryFeatureState(map, countryId, {
-          target: false,
-          targetPulse: 0,
-        });
-      }
-
-      feedbackGlowTimeoutRef.current = null;
-    }, 650);
-
-    return () => {
-      if (feedbackGlowTimeoutRef.current) {
-        window.clearTimeout(feedbackGlowTimeoutRef.current);
-        feedbackGlowTimeoutRef.current = null;
-      }
-
+    const clear = () => {
       if (mapRef.current === map) {
         setCountryFeatureState(map, countryId, {
           target: false,
@@ -825,11 +773,34 @@ export function MapContainer() {
         });
       }
     };
-  }, [
-    lastFeedbackEvent,
-    mapAnimationsEnabled,
-    mapLoaded,
-  ]);
+
+    const unsubscribe = subscribeMotion(true, () => {
+      if (mapRef.current !== map) {
+        return;
+      }
+
+      const progress = (performance.now() - startedAt) / FEEDBACK_FLASH_MS;
+
+      if (progress >= 1) {
+        clear();
+        return;
+      }
+
+      const targetPulse = mix(peak, 0, easeOutCubic(progress));
+
+      if (Math.abs(targetPulse - lastWritten) < MOTION_EPSILON) {
+        return;
+      }
+
+      lastWritten = targetPulse;
+      setCountryFeatureState(map, countryId, { target: true, targetPulse });
+    });
+
+    return () => {
+      unsubscribe?.();
+      clear();
+    };
+  }, [lastFeedbackEvent, mapAnimationsEnabled, mapLoaded, subscribeMotion]);
 
   // Show a wrong map pick where it happened, and - once the answer has been
   // revealed - the country that was actually being asked for, so the mistake
@@ -852,7 +823,7 @@ export function MapContainer() {
     setCountryFeatureState(map, wrongIso, { wrong: true });
 
     if (correctIso) {
-      setCountryFeatureState(map, correctIso, { target: true, targetPulse: 0.9 });
+      setCountryFeatureState(map, correctIso, { target: true, targetPulse: 0 });
     }
 
     const clear = () => {
@@ -870,13 +841,35 @@ export function MapContainer() {
       }
     };
 
+    // Ease the revealed country up to full glow instead of snapping it on.
+    const revealStartedAt = performance.now();
+    const unsubscribeReveal = correctIso
+      ? subscribeMotion(true, () => {
+          if (mapRef.current !== map) {
+            return;
+          }
+
+          const progress = Math.min(
+            (performance.now() - revealStartedAt) / FEEDBACK_FLASH_MS,
+            1,
+          );
+
+          setCountryFeatureState(map, correctIso, {
+            target: true,
+            targetPulse: mix(0, 0.9, easeOutCubic(progress)),
+          });
+        })
+      : undefined;
+
+    // Same duration scale and easing as the correct-answer flash, so a wrong
+    // pick and a right one feel like two ends of one language.
     missFeedbackTimeoutRef.current = window.setTimeout(
       () => {
         clear();
         clearMissFeedback();
         missFeedbackTimeoutRef.current = null;
       },
-      correctIso ? 1600 : 900,
+      correctIso ? MISS_REVEAL_MS : MISS_MARK_MS,
     );
 
     return () => {
@@ -885,9 +878,16 @@ export function MapContainer() {
         missFeedbackTimeoutRef.current = null;
       }
 
+      unsubscribeReveal?.();
       clear();
     };
-  }, [clearMissFeedback, lastMissFeedback, mapLoaded, mobilePerformanceMode]);
+  }, [
+    clearMissFeedback,
+    lastMissFeedback,
+    mapLoaded,
+    mobilePerformanceMode,
+    subscribeMotion,
+  ]);
 
   const addCountryLayers = useCallback(
     (
@@ -1110,6 +1110,9 @@ export function MapContainer() {
           paint: {
             "line-color": "#22d3ee",
             "line-blur": 1.6,
+            // Narrow ranges on purpose: a wide line-width swing reads as
+            // chunky stepping, and a near-zero opacity floor makes the glow
+            // blink out. The breath should stay continuously visible.
             "line-opacity": [
               "case",
               ["boolean", ["feature-state", "target"], false],
@@ -1118,9 +1121,9 @@ export function MapContainer() {
                 ["linear"],
                 ["coalesce", ["feature-state", "targetPulse"], 0],
                 0,
-                0.38,
+                0.55,
                 1,
-                0.96,
+                0.85,
               ],
               0,
             ],
@@ -1132,9 +1135,9 @@ export function MapContainer() {
                 ["linear"],
                 ["coalesce", ["feature-state", "targetPulse"], 0],
                 0,
-                2,
+                3,
                 1,
-                7,
+                5,
               ],
               0,
             ],
@@ -1815,16 +1818,6 @@ export function MapContainer() {
     return () => {
       cancelled = true;
 
-      if (remainingPulseFrameRef.current) {
-        window.clearInterval(remainingPulseFrameRef.current);
-        remainingPulseFrameRef.current = null;
-      }
-
-      if (pulseFrameRef.current) {
-        window.clearInterval(pulseFrameRef.current);
-        pulseFrameRef.current = null;
-      }
-
       if (feedbackGlowTimeoutRef.current) {
         window.clearTimeout(feedbackGlowTimeoutRef.current);
         feedbackGlowTimeoutRef.current = null;
@@ -1988,11 +1981,6 @@ export function MapContainer() {
       buildRemainingPulseFilter(remainingCountryIds, pulseActive),
     );
 
-    if (remainingPulseFrameRef.current) {
-      window.clearInterval(remainingPulseFrameRef.current);
-      remainingPulseFrameRef.current = null;
-    }
-
     if (!pulseActive) {
       map.setPaintProperty(REMAINING_PULSE_FILL_LAYER_ID, "fill-opacity", 0);
       map.setPaintProperty(REMAINING_PULSE_LINE_LAYER_ID, "line-opacity", 0);
@@ -2005,39 +1993,40 @@ export function MapContainer() {
       return;
     }
 
-    const startedAt = performance.now();
-    const animate = () => {
+    let lastWritten = -1;
+
+    return subscribeMotion(true, (elapsed) => {
       if (mapRef.current !== map) {
         return;
       }
 
-      const now = performance.now();
-      const pulse = (Math.sin(((now - startedAt) / 1900) * Math.PI * 2) + 1) / 2;
+      const pulse = breathe(elapsed, REMAINING_BREATH_PERIOD_MS);
+
+      if (Math.abs(pulse - lastWritten) < MOTION_EPSILON) {
+        return;
+      }
+
+      lastWritten = pulse;
+      // Narrower swings than before: this is ambient context for what is left
+      // to find, so it should sit behind the target rather than compete.
       map.setPaintProperty(
         REMAINING_PULSE_FILL_LAYER_ID,
         "fill-opacity",
-        0.04 + pulse * 0.16,
+        mix(0.06, 0.14, pulse),
       );
       map.setPaintProperty(
         REMAINING_PULSE_LINE_LAYER_ID,
         "line-opacity",
-        0.18 + pulse * 0.44,
+        mix(0.26, 0.46, pulse),
       );
-    };
-
-    animate();
-    remainingPulseFrameRef.current = window.setInterval(
-      animate,
-      REMAINING_PULSE_STEP_MS,
-    );
-
-    return () => {
-      if (remainingPulseFrameRef.current) {
-        window.clearInterval(remainingPulseFrameRef.current);
-        remainingPulseFrameRef.current = null;
-      }
-    };
-  }, [mapAnimationsEnabled, mapLoaded, pulseActive, remainingCountryIds]);
+    });
+  }, [
+    mapAnimationsEnabled,
+    mapLoaded,
+    pulseActive,
+    remainingCountryIds,
+    subscribeMotion,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -2134,11 +2123,6 @@ export function MapContainer() {
       return;
     }
 
-    if (pulseFrameRef.current) {
-      window.clearInterval(pulseFrameRef.current);
-      pulseFrameRef.current = null;
-    }
-
     if (previousTargetIdRef.current) {
       setCountryFeatureState(map, previousTargetIdRef.current, {
         target: false,
@@ -2170,36 +2154,30 @@ export function MapContainer() {
       return;
     }
 
-    const startedAt = performance.now();
-    const pulse = () => {
+    const targetIso = currentTargetCountry.iso_a3;
+    let lastWritten = -1;
+
+    return subscribeMotion(true, (elapsed) => {
       if (mapRef.current !== map) {
         return;
       }
 
-      const now = performance.now();
-      const targetPulse = (Math.sin((now - startedAt) / 280) + 1) / 2;
+      const targetPulse = breathe(elapsed, TARGET_BREATH_PERIOD_MS);
 
-      setCountryFeatureState(map, currentTargetCountry.iso_a3, {
-        target: true,
-        targetPulse,
-      });
-    };
-
-    pulse();
-    pulseFrameRef.current = window.setInterval(pulse, TARGET_PULSE_STEP_MS);
-
-    return () => {
-      if (pulseFrameRef.current) {
-        window.clearInterval(pulseFrameRef.current);
-        pulseFrameRef.current = null;
+      if (Math.abs(targetPulse - lastWritten) < MOTION_EPSILON) {
+        return;
       }
-    };
+
+      lastWritten = targetPulse;
+      setCountryFeatureState(map, targetIso, { target: true, targetPulse });
+    });
   }, [
     currentTargetCountry,
     gameStatus,
     mapAnimationsEnabled,
     mapLoaded,
     selectedMode,
+    subscribeMotion,
     syncPaintExpressions,
   ]);
 
@@ -2424,7 +2402,6 @@ export function MapContainer() {
       backToRegionSelect();
     }
 
-    setRegionPanelTab("region");
     setRegionPanelOpen(true);
     setLandingOpen(false);
   }, [backToRegionSelect]);
@@ -2598,7 +2575,7 @@ export function MapContainer() {
       {!landingOpen && !selectedSpecialRegion ? (
         <GameHud
           onOpenLanding={reopenLanding}
-          onOpenRegionPanel={() => openRegionPanel("region")}
+          onOpenRegionPanel={() => openRegionPanel()}
           regionPanelOpen={regionPanelOpen}
           exploreSearch={
             features.exploreSearch ? (
@@ -2649,7 +2626,6 @@ export function MapContainer() {
         <PremiumControls
           panelOpen={regionPanelOpen}
           onPanelOpenChange={closeRegionPanel}
-          defaultMobileTab={regionPanelTab}
         />
       ) : null}
       <AnimatePresence>
@@ -2743,7 +2719,7 @@ export function MapContainer() {
             />
           ) : null}
           <ResultsDashboard
-            onChangeRegion={() => openRegionPanel("region")}
+            onChangeRegion={() => openRegionPanel()}
             onContinueLearning={() => setRegionPanelOpen(false)}
           />
         </>
@@ -2765,7 +2741,6 @@ export function MapContainer() {
             onResumeQuiz={resumeActiveQuiz}
             onStartQuiz={closeLandingForQuiz}
             onExploreMap={closeLandingForExplore}
-            contextLine={landingContextLine}
             onQuickStart={features.quickStart ? quickStartQuiz : undefined}
             quickStartLabel={
               // A newcomer has no reason to expect a particular region, so the

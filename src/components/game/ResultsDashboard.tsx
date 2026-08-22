@@ -8,11 +8,30 @@ import { features } from "@/config/features";
 import { getRegionConfig, type Country } from "@/data/countries";
 import { modeLabels } from "@/data/gameModes";
 import { useGameStore } from "@/store/gameStore";
+import { useProgressStore } from "@/store/progressStore";
+import { getMasteryLevel, type MasteryLevel } from "@/utils/countryMastery";
 
 type ReviewGroup = {
   label: string;
   tone: "emerald" | "amber" | "rose";
   countries: Country[];
+};
+
+// The chip's colour already says how this run went. The dot says how the
+// country has gone over time, so a chronic miss reads differently from a
+// one-off slip - and this is the read a future mastery map will build on.
+const masteryDotClasses: Record<MasteryLevel, string> = {
+  mastered: "bg-emerald-300",
+  learning: "bg-cyan-300/80",
+  shaky: "bg-rose-300",
+  unseen: "bg-white/25",
+};
+
+const masteryLabels: Record<MasteryLevel, string> = {
+  mastered: "mastered over time",
+  learning: "still learning",
+  shaky: "often missed",
+  unseen: "first time seen",
 };
 
 const toneClasses: Record<ReviewGroup["tone"], string> = {
@@ -60,6 +79,9 @@ export function ResultsDashboard({
     drawerState.key === reviewKey ? drawerState.selectedCountryId : null;
   const region = getRegionConfig(selectedRegion);
   const customQuizSet = useGameStore((state) => state.customQuizSet);
+  const countryProgress = useProgressStore((state) => state.countries);
+  const progressHydrated = useProgressStore((state) => state.hydrated);
+  const showMastery = features.progressTracking && progressHydrated;
   const quizLabel = customQuizSet?.label ?? region.label;
   const statusLabel =
     gameStatus === "completed"
@@ -334,6 +356,22 @@ export function ResultsDashboard({
             />
           ) : null}
         </div>
+        {showMastery ? (
+          <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.68rem] font-medium text-white/45">
+            <span className="uppercase tracking-[0.18em] text-white/38">
+              Over time
+            </span>
+            {(["mastered", "learning", "shaky"] as const).map((level) => (
+              <span key={level} className="inline-flex items-center gap-1.5">
+                <span
+                  className={`size-1.5 rounded-full ${masteryDotClasses[level]}`}
+                  aria-hidden="true"
+                />
+                {masteryLabels[level]}
+              </span>
+            ))}
+          </p>
+        ) : null}
         <div className="mt-3 grid gap-4 pb-1 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-4">
             {reviewGroups.map((group) =>
@@ -360,13 +398,27 @@ export function ResultsDashboard({
                             selectedCountryId: country.iso_a3,
                           }))
                         }
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:bg-white/16 ${
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:bg-white/16 ${
                           selectedCountry?.iso_a3 === country.iso_a3
                             ? "border-white/70 bg-white/18 text-white"
                             : toneClasses[group.tone]
                         }`}
                       >
-                        {country.name}
+                        {showMastery ? (
+                          <span
+                            className={`size-1.5 shrink-0 rounded-full ${
+                              masteryDotClasses[
+                                getMasteryLevel(countryProgress[country.iso_a3])
+                              ]
+                            }`}
+                            title={`${country.name}: ${
+                              masteryLabels[
+                                getMasteryLevel(countryProgress[country.iso_a3])
+                              ]
+                            }`}
+                          />
+                        ) : null}
+                        <span>{country.name}</span>
                       </button>
                     ))}
                   </div>
