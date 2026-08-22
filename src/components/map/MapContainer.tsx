@@ -199,9 +199,6 @@ export function MapContainer() {
   const [resumableQuiz, setResumableQuiz] =
     useState<QuizProgressSnapshot | null>(null);
   const [regionPanelOpen, setRegionPanelOpen] = useState(false);
-  const [regionPanelTab, setRegionPanelTab] = useState<"region" | "mode">(
-    "region",
-  );
   const [idleInteractionKey, setIdleInteractionKey] = useState(0);
   const [hasMapInteraction, setHasMapInteraction] = useState(false);
   const [idlePrompt, setIdlePrompt] = useState<string | null>(null);
@@ -449,14 +446,10 @@ export function MapContainer() {
     setHasMapInteraction(true);
     setIdleInteractionKey((key) => key + 1);
   }, []);
-  const openRegionPanel = useCallback(
-    (tab: "region" | "mode" = "region") => {
-      setRegionPanelTab(tab);
-      setRegionPanelOpen(true);
-      registerMapInteraction();
-    },
-    [registerMapInteraction],
-  );
+  const openRegionPanel = useCallback(() => {
+    setRegionPanelOpen(true);
+    registerMapInteraction();
+  }, [registerMapInteraction]);
   const closeRegionPanel = useCallback(
     (open: boolean) => {
       setRegionPanelOpen(open);
@@ -2409,7 +2402,6 @@ export function MapContainer() {
       backToRegionSelect();
     }
 
-    setRegionPanelTab("region");
     setRegionPanelOpen(true);
     setLandingOpen(false);
   }, [backToRegionSelect]);
@@ -2583,7 +2575,7 @@ export function MapContainer() {
       {!landingOpen && !selectedSpecialRegion ? (
         <GameHud
           onOpenLanding={reopenLanding}
-          onOpenRegionPanel={() => openRegionPanel("region")}
+          onOpenRegionPanel={() => openRegionPanel()}
           regionPanelOpen={regionPanelOpen}
           exploreSearch={
             features.exploreSearch ? (
@@ -2634,7 +2626,6 @@ export function MapContainer() {
         <PremiumControls
           panelOpen={regionPanelOpen}
           onPanelOpenChange={closeRegionPanel}
-          defaultMobileTab={regionPanelTab}
         />
       ) : null}
       <AnimatePresence>
@@ -2728,7 +2719,7 @@ export function MapContainer() {
             />
           ) : null}
           <ResultsDashboard
-            onChangeRegion={() => openRegionPanel("region")}
+            onChangeRegion={() => openRegionPanel()}
             onContinueLearning={() => setRegionPanelOpen(false)}
           />
         </>
