@@ -14,10 +14,6 @@ type LandingPageProps = {
   onExploreMap: () => void;
   hasActiveQuiz?: boolean;
   onResumeQuiz?: () => void;
-  /** One line of orientation: what GeoMaster is for a newcomer, or where the
-   *  returning player stands. Kept to a single line on purpose - this is a
-   *  globe-first landing, not a marketing page. */
-  contextLine?: string | null;
   /** Starts the player's last region and mode without opening quiz setup. */
   onQuickStart?: () => void;
   quickStartLabel?: string;
@@ -74,7 +70,6 @@ export function LandingPage({
   onExploreMap,
   hasActiveQuiz = false,
   onResumeQuiz,
-  contextLine,
   onQuickStart,
   quickStartLabel,
   onPracticeWeakSpots,
@@ -128,11 +123,6 @@ export function LandingPage({
             <h1 className="bg-[linear-gradient(180deg,#e7fbff_0%,#8ddfed_36%,#246275_72%,#101922_100%)] bg-clip-text text-[clamp(3.55rem,14.5vw,9rem)] font-bold leading-[0.84] text-transparent drop-shadow-[0_24px_32px_rgba(0,0,0,0.82)] sm:leading-[0.82]">
               GeoMaster
             </h1>
-            {contextLine ? (
-              <p className="mt-3 max-w-md text-balance text-sm font-medium leading-5 text-cyan-50/62 drop-shadow-[0_2px_10px_rgba(0,0,0,0.75)] sm:mt-4 sm:text-base sm:leading-6">
-                {contextLine}
-              </p>
-            ) : null}
           </motion.div>
 
           <motion.div
@@ -143,13 +133,13 @@ export function LandingPage({
               duration: 0.56,
               ease: [0.16, 1, 0.3, 1],
             }}
-            className="relative z-20 mt-auto flex w-full max-w-md flex-col items-center justify-center gap-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:flex-row sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            className="relative z-20 mt-auto flex w-full flex-col items-center gap-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:gap-5 sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
           >
               {onStartDailyChallenge ? (
                 <button
                   type="button"
                   onClick={onStartDailyChallenge}
-                  className="inline-flex min-h-11 items-center gap-2 self-center rounded-full border border-cyan-100/20 bg-[#071018]/80 px-4 py-2 text-sm font-medium text-cyan-50/82 shadow-[0_12px_24px_-10px_rgba(0,0,0,0.6)] backdrop-blur-sm transition hover:border-cyan-100/34 hover:text-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c] sm:absolute sm:-top-14"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-cyan-100/20 bg-[#071018]/80 px-4 py-2 text-sm font-medium text-cyan-50/82 shadow-[0_12px_24px_-10px_rgba(0,0,0,0.6)] backdrop-blur-sm transition hover:border-cyan-100/34 hover:text-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c]"
                 >
                   <span
                     className={`size-1.5 rounded-full ${
@@ -167,33 +157,35 @@ export function LandingPage({
                   ) : null}
                 </button>
               ) : null}
-              {primaryAction ? (
+              <div className="flex w-full max-w-md flex-col items-center gap-3 sm:max-w-none sm:flex-row sm:justify-center">
+                {primaryAction ? (
+                  <button
+                    type="button"
+                    onClick={primaryAction.action}
+                    className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_0_34px_rgba(52,211,153,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${emeraldCtaClass}`}
+                  >
+                    {primaryAction.label}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={primaryAction.action}
-                  className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_0_34px_rgba(52,211,153,0.22)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${emeraldCtaClass}`}
+                  onClick={onStartQuiz}
+                  className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_20px_25px_-5px_rgba(0,0,0,0.30)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${
+                    primaryAction
+                      ? "border border-emerald-100/36 bg-emerald-300/18 text-emerald-50 transition hover:bg-emerald-300/28"
+                      : "border border-emerald-100/70 bg-emerald-300/88 text-slate-950 transition hover:bg-emerald-200"
+                  }`}
                 >
-                  {primaryAction.label}
+                  {hasActiveQuiz && onResumeQuiz ? "New Quiz" : "Choose a Quiz"}
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={onStartQuiz}
-                className={`min-h-11 rounded-full px-6 py-3 text-base font-semibold shadow-[0_20px_25px_-5px_rgba(0,0,0,0.30)] focus:outline-none focus:ring-2 focus:ring-emerald-200/80 focus:ring-offset-2 focus:ring-offset-[#05080c] ${
-                  primaryAction
-                    ? "border border-emerald-100/36 bg-emerald-300/18 text-emerald-50 transition hover:bg-emerald-300/28"
-                    : "border border-emerald-100/70 bg-emerald-300/88 text-slate-950 transition hover:bg-emerald-200"
-                }`}
-              >
-                {hasActiveQuiz && onResumeQuiz ? "New Quiz" : "Choose a Quiz"}
-              </button>
-              <button
-                type="button"
-                onClick={onExploreMap}
-                className="min-h-11 rounded-full border border-cyan-100/24 bg-[#071018]/92 px-6 py-3 text-base font-semibold text-cyan-50 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(186,230,253,0.16)] transition hover:border-cyan-100/36 hover:bg-[#0b1822] focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c]"
-              >
-                Explore Map
-              </button>
+                <button
+                  type="button"
+                  onClick={onExploreMap}
+                  className="min-h-11 rounded-full border border-cyan-100/24 bg-[#071018]/92 px-6 py-3 text-base font-semibold text-cyan-50 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(186,230,253,0.16)] transition hover:border-cyan-100/36 hover:bg-[#0b1822] focus:outline-none focus:ring-2 focus:ring-cyan-200/70 focus:ring-offset-2 focus:ring-offset-[#05080c]"
+                >
+                  Explore Map
+                </button>
+              </div>
           </motion.div>
         </div>
       </div>
