@@ -312,9 +312,9 @@ export function PremiumControls({
   const timerOptions = (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <span className="block text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
+        <h3 className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
           Timer
-        </span>
+        </h3>
         <span className="font-mono text-xs font-semibold tabular-nums text-white/60">
           {untimedEnabled
             ? "No limit"
@@ -503,9 +503,9 @@ export function PremiumControls({
       >
         <div>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
+            <h3 className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
               Region
-            </p>
+            </h3>
             <MinimizeButton onClick={closePanel} />
           </div>
           {canStartQuiz ? (
@@ -514,10 +514,7 @@ export function PremiumControls({
           <div className="mt-2">{regionOptions}</div>
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">
-          <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
-            Mode
-          </p>
-          {modeOptions}
+          <SetupSection title="Mode">{modeOptions}</SetupSection>
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">
           {timerOptions}

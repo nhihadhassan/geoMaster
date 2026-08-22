@@ -16,7 +16,8 @@
     "test": "npm run validate:countries && npm run test:matcher && npm run test:store && npm run test:progress && npm run test:search && npm run test:daily && npm run test:motion",
     "test:search": "tsx scripts/test-explore-search.ts",
     "test:daily": "tsx scripts/test-daily-challenge.ts",
-    "test:motion": "tsx scripts/test-map-motion.ts"
+    "test:motion": "tsx scripts/test-map-motion.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -32,6 +33,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/geojson": "^7946.0.16",
     "@types/mapbox-gl": "^3.4.1",

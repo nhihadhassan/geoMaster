@@ -17,7 +17,10 @@ export function ExploreSearch({ onSelect, compact = false }: ExploreSearchProps)
   const rootRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const results = useMemo(() => searchExplore(query), [query]);
-  const listboxId = "explore-search-results";
+  // Both variants render simultaneously (one per breakpoint), so ids must not
+  // collide - otherwise the labels bind to whichever input came first.
+  const inputId = compact ? "explore-search-compact" : "explore-search";
+  const listboxId = `${inputId}-results`;
 
   useEffect(() => {
     if (!open) {
@@ -91,11 +94,11 @@ export function ExploreSearch({ onSelect, compact = false }: ExploreSearchProps)
       ref={rootRef}
       className={`relative ${compact ? "min-w-0 flex-1" : "w-56"}`}
     >
-      <label className="sr-only" htmlFor="explore-search">
+      <label className="sr-only" htmlFor={inputId}>
         Search countries, cities, and landmarks
       </label>
       <input
-        id="explore-search"
+        id={inputId}
         ref={inputRef}
         value={query}
         onChange={(event) => {
