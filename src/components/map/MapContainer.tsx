@@ -126,7 +126,8 @@ import {
   useWorldTopology,
   type CountryProperties,
 } from "@/hooks/useWorldTopology";
-import { useKeyboardInset } from "@/hooks/useKeyboardInset";
+import { useVisualViewport } from "@/utils/visualViewport";
+import { getQuizFramePadding } from "@/utils/quizCamera";
 import { useDailyChallenge } from "@/hooks/useDailyChallenge";
 import { useRecordQuizProgress } from "@/hooks/useRecordQuizProgress";
 import { useProgressStore } from "@/store/progressStore";
@@ -178,7 +179,6 @@ export function MapContainer() {
   const mapRef = useRef<Map | null>(null);
   const previousGuessedIdsRef = useRef<string[]>([]);
   const previousTargetIdRef = useRef<string | null>(null);
-  const framingKeyboardInsetRef = useRef(0);
   const feedbackGlowTimeoutRef = useRef<number | null>(null);
   const missFeedbackTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -207,7 +207,11 @@ export function MapContainer() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const documentVisible = useDocumentVisible();
   const mobilePerformanceMode = useMobilePerformanceMode(prefersReducedMotion);
-  const keyboardInset = useKeyboardInset();
+  const visualViewport = useVisualViewport();
+  const visualViewportRef = useRef(visualViewport);
+  useEffect(() => {
+    visualViewportRef.current = visualViewport;
+  }, [visualViewport]);
   const initialMapPerformanceModeRef = useRef(mobilePerformanceMode);
   const mapAnimationsEnabled =
     documentVisible && !prefersReducedMotion && !mobilePerformanceMode;
@@ -1851,6 +1855,58 @@ export function MapContainer() {
 
   useEffect(() => {
     const map = mapRef.current;
+    const container = mapNodeRef.current;
+
+    if (!mapLoaded || !map || !container) {
+      return;
+    }
+
+    let frame: number | null = null;
+    const resizeMap = () => {
+      frame = null;
+      if (!mapRef.current) {
+        return;
+      }
+
+      const camera = {
+        center: map.getCenter(),
+        zoom: map.getZoom(),
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      };
+      map.stop();
+      map.resize();
+      map.jumpTo(camera);
+    };
+    const scheduleResize = () => {
+      if (frame === null) {
+        frame = window.requestAnimationFrame(resizeMap);
+      }
+    };
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(scheduleResize)
+        : null;
+
+    observer?.observe(container);
+    scheduleResize();
+
+    return () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      observer?.disconnect();
+    };
+  }, [
+    mapLoaded,
+    visualViewport.keyboardActive,
+    visualViewport.offsetTop,
+    visualViewport.usableHeight,
+    visualViewport.usableWidth,
+  ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
 
     if (!mapLoaded || !map) {
       return;
@@ -2045,21 +2101,15 @@ export function MapContainer() {
       gameStatus !== "idle" &&
       !isAntarctica;
     const shouldFrameIdleRegion = gameStatus === "idle" && regionPanelOpen;
-    // Lift the framed region above the on-screen keyboard so it stays visible
-    // while typing on mobile.
-    const isNarrowViewport =
-      typeof window !== "undefined" && window.innerWidth < 768;
-    const regionPadding = isNarrowViewport
-      ? { top: 104, right: 24, bottom: 142 + keyboardInset, left: 24 }
-      : gameStatus === "running" || gameStatus === "paused"
-        ? { top: 112, right: 96, bottom: 148, left: 96 }
-        : { top: 118, right: 240, bottom: 154, left: 240 };
-    // A keyboard open/close should re-frame quickly rather than run the full
-    // 1.3s intro flight.
-    const keyboardInsetChanged =
-      keyboardInset !== framingKeyboardInsetRef.current;
-    framingKeyboardInsetRef.current = keyboardInset;
-    const framingDuration = keyboardInsetChanged ? 450 : 1300;
+    const regionPadding = getQuizFramePadding({
+      width:
+        visualViewportRef.current.usableWidth ||
+        (typeof window !== "undefined" ? window.innerWidth : 1024),
+      height:
+        visualViewportRef.current.usableHeight ||
+        (typeof window !== "undefined" ? window.innerHeight : 768),
+      running: gameStatus === "running" || gameStatus === "paused",
+    });
 
     try {
       map.setProjection(gameStatus === "idle" ? "globe" : "mercator");
@@ -2081,8 +2131,9 @@ export function MapContainer() {
         padding: regionPadding,
         pitch: region.pitch,
         bearing: region.bearing,
-        duration: framingDuration,
+        duration: 1300,
         essential: true,
+        retainPadding: false,
       });
     } else if (shouldFrameIdleRegion) {
       map.flyTo({
@@ -2107,7 +2158,6 @@ export function MapContainer() {
     setMapDebug(getMapDebugSnapshot(map));
   }, [
     gameStatus,
-    keyboardInset,
     mapLoaded,
     regionPanelOpen,
     selectedMode,
@@ -2466,13 +2516,24 @@ export function MapContainer() {
     // during a run, otherwise the default globe view.
     if (gameStatus !== "idle" && !selectedSpecialRegion) {
       const region = getRegionConfig(selectedRegion);
+      const frameWidth =
+        visualViewportRef.current.usableWidth ||
+        (typeof window !== "undefined" ? window.innerWidth : 1024);
+      const frameHeight =
+        visualViewportRef.current.usableHeight ||
+        (typeof window !== "undefined" ? window.innerHeight : 768);
 
       map.fitBounds(region.bounds, {
-        padding: 64,
+        padding: getQuizFramePadding({
+          width: frameWidth,
+          height: frameHeight,
+          running: true,
+        }),
         pitch: region.pitch,
         bearing: region.bearing,
         duration: 900,
         essential: true,
+        retainPadding: false,
       });
 
       return;
@@ -2547,7 +2608,24 @@ export function MapContainer() {
 
   return (
     <main
-      className={`relative h-dvh min-h-dvh w-full overflow-hidden bg-slate-100 text-white ${
+      data-testid="quiz-shell"
+      data-keyboard-active={visualViewport.keyboardActive ? "true" : "false"}
+      style={
+        visualViewport.keyboardActive
+          ? {
+              height: `${visualViewport.usableHeight}px`,
+              minHeight: `${visualViewport.usableHeight}px`,
+              top: `${visualViewport.offsetTop}px`,
+              left: `${visualViewport.offsetLeft}px`,
+              width: `${visualViewport.usableWidth}px`,
+            }
+          : undefined
+      }
+      className={`${
+        visualViewport.keyboardActive
+          ? "fixed min-h-0"
+          : "relative h-dvh min-h-dvh"
+      } w-full overflow-hidden bg-slate-100 text-white ${
         landingOpen ? "[&_.mapboxgl-control-container]:hidden" : ""
       }`}
     >
@@ -2655,6 +2733,7 @@ export function MapContainer() {
               }
               mobilePerformanceMode={mobilePerformanceMode}
               documentVisible={documentVisible}
+              keyboardActive={visualViewport.keyboardActive}
               correctPopupVisible={correctPopupVisible}
               mobileExpanded={caribbeanInsetExpanded}
               onMobileExpandedChange={setCaribbeanInsetExpanded}
@@ -2715,7 +2794,6 @@ export function MapContainer() {
           {gameStatus === "running" ? (
             <TypeToFillInput
               onCountryMatched={handleCountryMatched}
-              keyboardInset={keyboardInset}
             />
           ) : null}
           <ResultsDashboard
