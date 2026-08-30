@@ -868,7 +868,7 @@ export function CaribbeanInsetMap({
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
       className={`absolute inset-x-3 bottom-[calc(8.85rem+env(safe-area-inset-bottom))] z-20 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/56 p-2 text-white shadow-xl shadow-black/28 backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-36 sm:w-[min(19rem,calc(100vw-2.5rem))] sm:rounded-3xl sm:p-3 ${
         keyboardActive
-          ? "top-[calc(9rem+env(safe-area-inset-top))] bottom-[calc(10rem+env(safe-area-inset-bottom))] z-30"
+          ? "top-[calc(9.25rem+env(safe-area-inset-top))] bottom-[calc(10rem+env(safe-area-inset-bottom))] z-30"
           : ""
       }`}
       role="region"
