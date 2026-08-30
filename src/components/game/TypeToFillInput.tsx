@@ -1,10 +1,11 @@
 "use client";
 
 import { motion, useAnimationControls, useReducedMotion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
-import type { Country } from "@/data/countries";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { countries as allCountries, type Country } from "@/data/countries";
 import { useGameStore, type IdentifyGuessResult } from "@/store/gameStore";
 import { findCountryMatch, normalizeCountryText } from "@/utils/countryMatcher";
+import { useLateQuizHint } from "@/hooks/useLateQuizHint";
 
 type TypeToFillInputProps = {
   onCountryMatched: (
@@ -44,9 +45,39 @@ export function TypeToFillInput({
     [guessedCountryIds, quizCountries],
   );
   const [localHint, setLocalHint] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const feedbackTimeoutRef = useRef<number | null>(null);
+  const lateHint = useLateQuizHint();
   const feedbackControls = useAnimationControls();
   const prefersReducedMotion = useReducedMotion();
   const inputDisabled = gameStatus !== "running";
+  const showFeedback = useCallback((message: string) => {
+    setFeedbackMessage(message);
+    if (feedbackTimeoutRef.current !== null) {
+      window.clearTimeout(feedbackTimeoutRef.current);
+    }
+    feedbackTimeoutRef.current = window.setTimeout(() => {
+      setFeedbackMessage(null);
+      feedbackTimeoutRef.current = null;
+    }, 1800);
+  }, []);
+  const clearFeedback = useCallback(() => {
+    setFeedbackMessage(null);
+    if (feedbackTimeoutRef.current !== null) {
+      window.clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (feedbackTimeoutRef.current !== null) {
+        window.clearTimeout(feedbackTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     void feedbackControls.start({
       opacity: 1,
@@ -108,8 +139,22 @@ export function TypeToFillInput({
                 ? "Time expired"
                 : gameStatus === "gave-up"
                   ? "Quiz ended"
-                  : "Choose a region, then start the quiz"}
+            : "Choose a region, then start the quiz"}
         </div>
+        {lateHint.hintText ? (
+          <p className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 rounded-full border border-amber-200/20 bg-zinc-950/72 px-3 py-1 text-xs font-semibold text-amber-100 backdrop-blur-xl">
+            Hint: {lateHint.hintText}
+          </p>
+        ) : null}
+        {lateHint.eligible ? (
+          <button
+            type="button"
+            onClick={lateHint.request}
+            className="pointer-events-auto absolute -top-10 left-3 min-h-8 rounded-full border border-amber-200/24 bg-amber-300/12 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+          >
+            Hint?
+          </button>
+        ) : null}
       </motion.div>
     );
   }
@@ -139,6 +184,7 @@ export function TypeToFillInput({
   ) => {
     vibrate(14);
     setLocalHint(null);
+    clearFeedback();
     onCountryMatched(country, outcome);
   };
 
@@ -148,6 +194,7 @@ export function TypeToFillInput({
     }
 
     setCurrentInput(value);
+    setFeedbackMessage(null);
 
     if (selectedMode !== "type-to-fill") {
       return;
@@ -160,7 +207,7 @@ export function TypeToFillInput({
       return;
     }
 
-    if (submitTypeGuess(match.country)) {
+    if (submitTypeGuess(match.country) === "accepted") {
       recordMatchDebug(value, match, true);
       acceptMatch(match.country);
     } else {
@@ -174,6 +221,7 @@ export function TypeToFillInput({
     }
 
     const match = findCountryMatch(currentInput, quizCountries);
+    const globalMatch = findCountryMatch(currentInput, allCountries);
 
     if (
       selectedMode === "identify-shaded" ||
@@ -184,6 +232,10 @@ export function TypeToFillInput({
         recordFeedbackEvent("wrong");
         vibrate([18, 24, 18]);
         return;
+      }
+
+      if (globalMatch && !match) {
+        showFeedback("Not in this quiz");
       }
 
       const result =
@@ -212,9 +264,21 @@ export function TypeToFillInput({
 
     if (!match) {
       recordMatchDebug(currentInput, null, false);
-      setLocalHint("No match yet");
-      recordFeedbackEvent("wrong");
+      if (globalMatch) {
+        setCurrentInput("");
+        showFeedback("Not in this quiz");
+      } else {
+        setLocalHint("No country found");
+        showFeedback("No country found");
+      }
       vibrate([18, 24, 18]);
+      return;
+    }
+
+    if (guessedCountryIds.includes(match.country.iso_a3)) {
+      setCurrentInput("");
+      setLocalHint(null);
+      showFeedback(`Already guessed ${match.country.name}`);
     }
   };
 
@@ -238,7 +302,13 @@ export function TypeToFillInput({
           }
         }}
         disabled={inputDisabled}
+        type="text"
+        name="geomaster-country-answer"
+        inputMode="text"
+        enterKeyHint="done"
         autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="words"
         spellCheck={false}
         placeholder={
           gameStatus === "idle"
@@ -268,10 +338,19 @@ export function TypeToFillInput({
           Submit
         </button>
       ) : null}
-      {localHint || smartHint ? (
-        <p className="pointer-events-none absolute -top-10 left-1/2 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-2xl border border-amber-200/20 bg-zinc-950/68 px-3 py-1 text-center text-xs font-semibold leading-4 text-amber-100 backdrop-blur-xl sm:-top-9 sm:max-w-[min(36rem,calc(100vw-2rem))] sm:rounded-full">
-          {smartHint ?? localHint}
+      {feedbackMessage || localHint || smartHint ? (
+        <p className={`pointer-events-none absolute -top-10 left-1/2 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-2xl border px-3 py-1 text-center text-xs font-semibold leading-4 backdrop-blur-xl sm:-top-9 sm:max-w-[min(36rem,calc(100vw-2rem))] sm:rounded-full ${feedbackMessage ? "border-rose-200/24 bg-zinc-950/76 text-rose-50" : "border-amber-200/20 bg-zinc-950/68 text-amber-100"}`} aria-live="polite">
+          {feedbackMessage ?? smartHint ?? localHint}
         </p>
+      ) : null}
+      {lateHint.eligible && !feedbackMessage && !localHint ? (
+        <button
+          type="button"
+          onClick={lateHint.request}
+          className="absolute -top-10 left-3 min-h-8 rounded-full border border-amber-200/24 bg-amber-300/12 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+        >
+          Hint?
+        </button>
       ) : null}
     </motion.div>
   );

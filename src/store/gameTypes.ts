@@ -30,6 +30,19 @@ export type IdentifyGuessResult = {
   clickedCountry?: Country | null;
 };
 
+export type TypeGuessOutcome =
+  | "accepted"
+  | "duplicate"
+  | "out-of-quiz"
+  | "no-match"
+  | "ignored";
+
+export type HintReveal = {
+  countryId: string;
+  text: string;
+  level: number;
+};
+
 export type QuizFeedbackEvent = {
   kind: GeoSoundEvent;
   sequence: number;

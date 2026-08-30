@@ -60,7 +60,8 @@ export function ResultsDashboard({
   const countryResults = useGameStore((state) => state.countryResults);
   const score = useGameStore((state) => state.score);
   const total = useGameStore((state) => state.total);
-  const resetQuiz = useGameStore((state) => state.resetQuiz);
+  const retryQuiz = useGameStore((state) => state.retryQuiz);
+  const hintsUsed = useGameStore((state) => state.hintsUsed);
   const startCustomQuiz = useGameStore((state) => state.startCustomQuiz);
   const backToRegionSelect = useGameStore((state) => state.backToRegionSelect);
   const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
@@ -263,6 +264,13 @@ export function ResultsDashboard({
           >
             You found {score} of {total} countries.
           </p>
+          <p className="mt-1 text-xs font-medium text-white/50">
+            {hintsUsed === 0
+              ? "No hints used"
+              : hintsUsed === 1
+                ? "1 hint used"
+                : `${hintsUsed} hints used`}
+          </p>
           {isTargetQueueMode ? (
             <p className="mt-1 text-xs font-medium text-white/50">
               Perfect {perfectCount} · With hints {assistedCount} · Missed{" "}
@@ -318,7 +326,7 @@ export function ResultsDashboard({
           ) : null}
           <button
             type="button"
-            onClick={resetQuiz}
+            onClick={retryQuiz}
             className={`min-h-11 rounded-full border px-4 py-2 text-sm font-semibold transition ${
               canPracticeMistakes
                 ? "border-white/12 bg-white/7 text-white/66 hover:bg-white/12 hover:text-white"

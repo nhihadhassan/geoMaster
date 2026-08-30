@@ -16,7 +16,7 @@ test("the mobile quiz HUD stays within its width", async ({ page }) => {
   await openQuizSetup(page);
   await startConfiguredQuiz(page);
 
-  const header = visible(page.locator("header"));
+  const header = visible(page.getByTestId("mobile-quiz-hud"));
   await expect(header).toBeVisible();
 
   const overflows = await header.evaluate(

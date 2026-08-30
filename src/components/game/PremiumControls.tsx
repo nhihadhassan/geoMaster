@@ -436,7 +436,15 @@ export function PremiumControls({
 
     return (
       <div ref={panelRootRef}>
-        <span className="sm:hidden">{compactChip}</span>
+        <span
+          className={
+            gameStatus === "running" || gameStatus === "paused"
+              ? "hidden sm:inline"
+              : "sm:hidden"
+          }
+        >
+          {compactChip}
+        </span>
         <motion.button
           type="button"
           initial={{ opacity: 0, x: -14, scale: 0.96 }}

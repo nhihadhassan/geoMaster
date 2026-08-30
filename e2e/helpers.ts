@@ -38,7 +38,7 @@ export const openQuizSetup = async (page: Page) => {
 /** Starts the currently configured quiz and waits for the running HUD. */
 export const startConfiguredQuiz = async (page: Page) => {
   await startButton(page).click();
-  await expect(visible(page.getByText("Quiz active"))).toBeVisible();
+  await expect(visible(page.getByRole("button", { name: "Pause" }))).toBeVisible();
 };
 
 /** Ends a running quiz the way the UI now requires: Pause, then End Quiz. */
