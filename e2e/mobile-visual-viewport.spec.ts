@@ -103,6 +103,54 @@ test("keeps the quiz shell anchored through repeated visual viewport changes", a
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
+test("constrains Caribbean detail between the prompt and answer dock", async ({
+  page,
+}) => {
+  await openFresh(page);
+  await openQuizSetup(page);
+  await visible(page.getByRole("button", { name: "North America 23 countries" })).click();
+  await visible(page.getByRole("button", { name: /Identify Name/ })).click();
+  await visible(page.getByRole("button", { name: "Start Quiz" })).click();
+
+  const shell = page.getByTestId("quiz-shell");
+  const input = visible(page.getByRole("textbox"));
+  await input.focus();
+  await page.evaluate(() => {
+    window.__setMockVisualViewport?.({ height: 430, offsetTop: 0 });
+  });
+  await expect(shell).toHaveAttribute("data-keyboard-active", "true");
+
+  const panel = page.getByRole("region", { name: "Caribbean detail map" });
+  const close = page.getByRole("button", { name: "Minimize Caribbean detail map" });
+  const open = page.getByRole("button", { name: "Open Caribbean detail map" });
+  if (await open.isVisible()) {
+    await open.click({ force: true });
+  }
+  await expect(panel).toBeVisible();
+  await expect(close).toBeVisible();
+
+  const boxes = await page.evaluate(() => {
+    const rect = (selector: string) =>
+      document.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+    return {
+      target: rect("aside[aria-label='Target prompt']"),
+      panel: rect("aside[aria-label='Caribbean detail map']"),
+      region: Array.from(document.querySelectorAll("button")).find((button) =>
+        button.textContent?.includes("Regions · North America"),
+      )?.getBoundingClientRect(),
+      input: rect("#country-guess"),
+    };
+  });
+
+  expect(boxes.panel).not.toBeUndefined();
+  expect(boxes.target).not.toBeUndefined();
+  expect(boxes.region).not.toBeUndefined();
+  expect(boxes.input).not.toBeUndefined();
+  expect(boxes.panel?.top ?? 0).toBeGreaterThanOrEqual((boxes.target?.bottom ?? 0) - 1);
+  expect(boxes.panel?.bottom ?? 9999).toBeLessThanOrEqual((boxes.region?.top ?? 0) + 1);
+  expect(boxes.panel?.bottom ?? 9999).toBeLessThanOrEqual((boxes.input?.top ?? 0) + 1);
+});
+
 declare global {
   interface Window {
     __setMockVisualViewport?: (next: {

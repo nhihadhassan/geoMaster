@@ -64,6 +64,7 @@ export function TargetHintCard({
           stiffness: 320,
           damping: 30,
         }}
+        aria-label="Target prompt"
         className="absolute inset-x-3 top-[calc(5.1rem+env(safe-area-inset-top))] z-20 rounded-3xl border border-cyan-200/16 bg-zinc-950/62 p-2.5 text-white shadow-xl shadow-cyan-950/24 backdrop-blur-xl sm:hidden"
       >
         <div className="flex items-center justify-between gap-2">
