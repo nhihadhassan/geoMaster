@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import type { Country } from "@/data/countries";
 import type { GameMode } from "@/store/gameStore";
+import { useLateQuizHint } from "@/hooks/useLateQuizHint";
 
 type TargetHintCardProps = {
   mode: Extract<
@@ -31,6 +32,7 @@ export function TargetHintCard({
     countryId: string | null;
     expanded: boolean;
   }>({ countryId: null, expanded: false });
+  const lateHint = useLateQuizHint();
 
   if (!targetCountry) {
     return null;
@@ -79,7 +81,21 @@ export function TargetHintCard({
             <p className="mt-1 truncate text-sm font-semibold leading-tight text-white">
               {prompt}
             </p>
+            {lateHint.hintText ? (
+              <p className="mt-1 text-xs font-medium text-amber-100/82">
+                Hint: {lateHint.hintText}
+              </p>
+            ) : null}
           </div>
+          {lateHint.eligible ? (
+            <button
+              type="button"
+              onClick={lateHint.request}
+              className="min-h-11 shrink-0 rounded-full border border-amber-200/24 bg-amber-300/12 px-3 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+            >
+              Hint?
+            </button>
+          ) : null}
           {hasHints ? (
             <button
               type="button"
@@ -193,6 +209,11 @@ export function TargetHintCard({
         <p className="mt-3 text-lg font-semibold leading-tight text-white">
           {prompt}
         </p>
+        {lateHint.hintText ? (
+          <p className="mt-2 text-sm font-medium text-amber-100/82">
+            Hint: {lateHint.hintText}
+          </p>
+        ) : null}
         <p className="mt-2 text-sm leading-5 text-white/58">{instructions}</p>
         <p className="mt-3 inline-flex rounded-full border border-white/12 bg-white/8 px-3 py-1 text-xs font-semibold text-white/64">
           Attempt {Math.min(attemptCount + 1, 3)} / 3

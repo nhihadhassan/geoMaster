@@ -69,3 +69,22 @@ test("pausing stops the clock and resuming restarts it", async ({ page }) => {
   await page.waitForTimeout(2_200);
   await expect(timer).not.toHaveText(paused ?? "");
 });
+
+test("type mode gives clear duplicate feedback and mobile-safe input hints", async ({
+  page,
+}) => {
+  await openFresh(page);
+  await openQuizSetup(page);
+  await startConfiguredQuiz(page);
+
+  const input = visible(page.getByRole("textbox"));
+  await expect(input).toHaveAttribute("autocomplete", "off");
+  await expect(input).toHaveAttribute("autocorrect", "off");
+  await expect(input).toHaveAttribute("enterkeyhint", "done");
+
+  await input.fill("Brazil");
+  await input.fill("Brazil");
+  await input.press("Enter");
+
+  await expect(visible(page.getByText("Already guessed Brazil"))).toBeVisible();
+});

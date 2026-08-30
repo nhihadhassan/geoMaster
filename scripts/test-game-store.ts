@@ -52,13 +52,13 @@ test("a guess outside the roster, or a repeat, is rejected", () => {
 
   assertEqual(
     store().submitTypeGuess(outsider),
-    false,
-    "a country outside the roster should be rejected",
+    "out-of-quiz",
+    "a country outside the roster should be classified",
   );
-  assertEqual(store().submitTypeGuess(first), true, "first guess counts");
+  assertEqual(store().submitTypeGuess(first), "accepted", "first guess counts");
   assertEqual(
     store().submitTypeGuess(first),
-    false,
+    "duplicate",
     "the same country should not score twice",
   );
   assertEqual(store().score, 1, "score should count unique guesses only");
@@ -305,6 +305,38 @@ test("finishing a run clears the saved snapshot", () => {
     null,
     "ending a run should clear the saved snapshot",
   );
+});
+
+test("deliberate hints count once and make the answered target assisted", () => {
+  resetToRegion("south-america");
+  store().selectMode("identify-shaded");
+  store().startQuiz();
+
+  const target = store().currentTargetCountry;
+  const reveal = store().requestHint();
+
+  assert(reveal !== null, "a running target quiz should reveal a hint");
+  assertEqual(store().hintsUsed, 1, "one deliberate reveal should count");
+
+  const result = store().submitIdentifyGuess(target);
+  assertEqual(result.outcome, "assisted", "a hinted answer is assisted");
+});
+
+test("retry immediately restarts the same quiz configuration", () => {
+  resetToRegion("south-america");
+  store().selectMode("type-to-fill");
+  store().startQuiz();
+  store().submitTypeGuess(store().quizCountries[0]);
+  store().requestHint();
+
+  store().retryQuiz();
+
+  assertEqual(store().gameStatus, "running", "retry should start immediately");
+  assertEqual(store().selectedRegion, "south-america", "region is preserved");
+  assertEqual(store().selectedMode, "type-to-fill", "mode is preserved");
+  assertEqual(store().score, 0, "retry clears score");
+  assertEqual(store().hintsUsed, 0, "retry clears hint count");
+  assertEqual(store().currentInput, "", "retry clears input");
 });
 
 await runTests("Game store checks");

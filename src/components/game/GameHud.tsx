@@ -129,7 +129,7 @@ export function GameHud({
   const gameStatus = useGameStore((state) => state.gameStatus);
   const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
   const startQuiz = useGameStore((state) => state.startQuiz);
-  const resetQuiz = useGameStore((state) => state.resetQuiz);
+  const retryQuiz = useGameStore((state) => state.retryQuiz);
   const pauseQuiz = useGameStore((state) => state.pauseQuiz);
   const resumeQuiz = useGameStore((state) => state.resumeQuiz);
   const tick = useGameStore((state) => state.tick);
@@ -217,7 +217,7 @@ export function GameHud({
       : gameStatus === "paused"
         ? { label: "Resume", action: resumeQuiz, tone: "emerald" as const }
         : isFinished
-          ? { label: "Try Again", action: resetQuiz, tone: "emerald" as const }
+          ? { label: "Try Again", action: retryQuiz, tone: "emerald" as const }
           : {
               label: "Start Quiz",
               action: startQuiz,
@@ -254,6 +254,34 @@ export function GameHud({
             {exploreSearchCompact ? "Quiz" : "Choose Quiz"}
           </button>
         </motion.header>
+      ) : gameStatus === "running" || gameStatus === "paused" ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 28 }}
+          data-testid="mobile-quiz-hud"
+          className="pointer-events-none absolute inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex items-center justify-between text-white sm:hidden"
+        >
+          <span className="rounded-full border border-white/12 bg-zinc-950/58 px-3 py-2 text-sm font-semibold tabular-nums text-white/86 shadow-lg shadow-black/24 backdrop-blur-xl">
+            {progressCount}/{total}
+          </span>
+          <div className="pointer-events-auto flex items-center gap-2">
+            {showTimer ? (
+              <span className="rounded-full border border-white/12 bg-zinc-950/58 px-3 py-2 text-white shadow-lg shadow-black/24 backdrop-blur-xl">
+                <p className="font-mono text-sm font-semibold tabular-nums">
+                  {formatTime(remainingSeconds)}
+                </p>
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={primaryAction.action}
+              className={`min-h-11 rounded-full border px-4 py-2 text-xs font-semibold transition ${primaryToneClass}`}
+            >
+              {primaryAction.label}
+            </button>
+          </div>
+        </motion.div>
       ) : (
         <motion.header
           initial={{ opacity: 0, y: -16 }}

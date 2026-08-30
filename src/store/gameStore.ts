@@ -40,8 +40,10 @@ import type {
   CountryResultStatus,
   GameMode,
   GameStatus,
+  HintReveal,
   IdentifyGuessResult,
   QuizFeedbackEvent,
+  TypeGuessOutcome,
 } from "@/store/gameTypes";
 
 export type {
@@ -49,8 +51,10 @@ export type {
   CountryResultStatus,
   GameMode,
   GameStatus,
+  HintReveal,
   IdentifyGuessResult,
   QuizFeedbackEvent,
+  TypeGuessOutcome,
 } from "@/store/gameTypes";
 export { readQuizProgress, type QuizProgressSnapshot } from "@/store/quizPersistence";
 export { TIMER_MULTIPLIER_OPTIONS } from "@/store/preferences";
@@ -132,6 +136,9 @@ type GameState = {
   perfectRunSequence: number;
   currentTargetHints: string[];
   smartHint: string | null;
+  hintsUsed: number;
+  hintTargetIso: string | null;
+  hintRevealLevels: Record<string, number>;
   capitalHintEnabled: boolean;
   autoHideCorrectCard: boolean;
   soundEffectsEnabled: boolean;
@@ -152,11 +159,13 @@ type GameState = {
   resumeQuiz: () => void;
   giveUp: () => void;
   resetQuiz: () => void;
+  retryQuiz: () => void;
   backToRegionSelect: () => void;
   resumeSavedQuiz: (snapshot?: QuizProgressSnapshot) => void;
   discardSavedQuiz: () => void;
   setCurrentInput: (value: string) => void;
   setCapitalHintEnabled: (enabled: boolean) => void;
+  requestHint: () => HintReveal | null;
   setAutoHideCorrectCard: (enabled: boolean) => void;
   setSoundEffectsEnabled: (enabled: boolean) => void;
   setTimerMultiplier: (multiplier: number) => void;
@@ -171,7 +180,7 @@ type GameState = {
   selectLearningFeature: (feature: LearningFeature | null) => void;
   clearLearningCountry: () => void;
   clearLearningFeature: () => void;
-  submitTypeGuess: (country: Country) => boolean;
+  submitTypeGuess: (country: Country) => TypeGuessOutcome;
   submitIdentifyGuess: (country: Country | null) => IdentifyGuessResult;
   submitCapitalGuess: (country: Country | null) => IdentifyGuessResult;
   submitMapClickGuess: (
@@ -211,6 +220,28 @@ const isPerfectCountryResultSet = (
   Object.values(countryResults).length === total &&
   Object.values(countryResults).every((result) => result.status === "correct");
 
+const getRequestedHints = (country: Country, mode: GameMode) => {
+  const firstLetter = country.name.charAt(0).toUpperCase();
+  const locationHint =
+    country.hints?.subregionHint ?? country.hints?.locationHint ?? "Look closely at the map.";
+  const strongerLocationHint =
+    country.hints?.neighborHint ?? country.hints?.locationHint ?? locationHint;
+
+  if (mode === "type-to-fill") {
+    return [locationHint, `Starts with ${firstLetter}`, `Capital: ${country.capital}`];
+  }
+
+  if (mode === "identify-shaded") {
+    return [locationHint, `Starts with ${firstLetter}`, `Capital: ${country.capital}`];
+  }
+
+  if (mode === "click-country") {
+    return [locationHint, strongerLocationHint, `Starts with ${firstLetter}`];
+  }
+
+  return [`Starts with ${firstLetter}`, strongerLocationHint, `Ends with ${country.name.slice(-1).toUpperCase()}`];
+};
+
 const isResumableStatus = (
   status: GameStatus,
 ): status is "running" | "paused" =>
@@ -236,6 +267,9 @@ const buildQuizProgressSnapshot = (
     remainingSeconds: state.remainingSeconds,
     targetQueue: state.targetQueue,
     currentTargetIso: state.currentTargetCountry?.iso_a3 ?? null,
+    hintsUsed: state.hintsUsed,
+    hintTargetIso: state.hintTargetIso,
+    hintRevealLevels: state.hintRevealLevels,
     customCountryIds: state.customQuizSet?.countryIds,
     customLabel: state.customQuizSet?.label,
     savedAt: Date.now(),
@@ -325,6 +359,9 @@ const createResetState = (
     perfectRunSequence: 0,
     currentTargetHints: [],
     smartHint: null,
+    hintsUsed: 0,
+    hintTargetIso: null,
+    hintRevealLevels: {},
     capitalHintEnabled: false,
     learningCountry: null,
     selectedLearningFeature: null,
@@ -479,6 +516,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         isPerfectRun: false,
         currentTargetHints: [],
         smartHint: null,
+        hintsUsed: 0,
+        hintTargetIso: null,
+        hintRevealLevels: {},
         incorrectAttempts: {},
         learningCountry: null,
         selectedLearningFeature: null,
@@ -502,6 +542,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       isPerfectRun: false,
       currentTargetHints: [],
       smartHint: null,
+      hintsUsed: 0,
+      hintTargetIso: null,
+      hintRevealLevels: {},
       incorrectAttempts: {},
       learningCountry: null,
       selectedLearningFeature: null,
@@ -565,6 +608,20 @@ export const useGameStore = create<GameState>((set, get) => ({
         customQuizSet,
       ),
     );
+  },
+  retryQuiz: () => {
+    const { selectedRegion, selectedMode, timerMultiplier, customQuizSet } =
+      get();
+
+    set(
+      createResetState(
+        selectedRegion,
+        selectedMode,
+        timerMultiplier,
+        customQuizSet,
+      ),
+    );
+    get().startQuiz();
   },
   giveUp: () => {
     const state = get();
@@ -641,6 +698,9 @@ export const useGameStore = create<GameState>((set, get) => ({
           : null,
       targetQueue: snapshot.targetQueue,
       currentTargetCountry,
+      hintsUsed: snapshot.hintsUsed ?? 0,
+      hintTargetIso: snapshot.hintTargetIso ?? null,
+      hintRevealLevels: snapshot.hintRevealLevels ?? {},
       gameStatus: snapshot.status,
     });
   },
@@ -649,6 +709,55 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
   setCurrentInput: (value) => set({ currentInput: value }),
   setCapitalHintEnabled: (enabled) => set({ capitalHintEnabled: enabled }),
+  requestHint: () => {
+    const state = get();
+
+    if (state.gameStatus !== "running") {
+      return null;
+    }
+
+    const target = isTargetQueueMode(state.selectedMode)
+      ? state.currentTargetCountry
+      : state.quizCountries.find(
+          (country) => !state.guessedCountryIds.includes(country.iso_a3),
+        ) ?? null;
+
+    if (!target) {
+      return null;
+    }
+
+    const hints = getRequestedHints(target, state.selectedMode);
+    const currentLevel = state.hintRevealLevels[target.iso_a3] ?? 0;
+    const visibleHints = new Set(state.currentTargetHints);
+    let level = currentLevel;
+
+    while (level < hints.length && visibleHints.has(hints[level])) {
+      level += 1;
+    }
+
+    if (level >= hints.length) {
+      return null;
+    }
+
+    const text = hints[level];
+    const hintRevealLevels = {
+      ...state.hintRevealLevels,
+      [target.iso_a3]: level + 1,
+    };
+
+    set({
+      hintsUsed: state.hintsUsed + 1,
+      hintTargetIso: target.iso_a3,
+      hintRevealLevels,
+      currentTargetHints: isTargetQueueMode(state.selectedMode)
+        ? [...state.currentTargetHints, text]
+        : state.currentTargetHints,
+      smartHint: text,
+      isPerfectRun: false,
+    });
+
+    return { countryId: target.iso_a3, text, level: level + 1 };
+  },
   setAutoHideCorrectCard: (enabled) => {
     persistAutoHideCorrectCard(enabled);
     set({ autoHideCorrectCard: enabled });
@@ -738,18 +847,21 @@ export const useGameStore = create<GameState>((set, get) => ({
   submitTypeGuess: (country) => {
     const state = get();
 
-    if (
-      state.gameStatus !== "running" ||
-      state.selectedMode !== "type-to-fill" ||
-      !state.quizCountries.some((quizCountry) => quizCountry.iso_a3 === country.iso_a3) ||
-      state.guessedCountryIds.includes(country.iso_a3)
-    ) {
-      return false;
+    if (state.gameStatus !== "running" || state.selectedMode !== "type-to-fill") {
+      return "ignored";
+    }
+
+    if (!state.quizCountries.some((quizCountry) => quizCountry.iso_a3 === country.iso_a3)) {
+      return "out-of-quiz";
+    }
+
+    if (state.guessedCountryIds.includes(country.iso_a3)) {
+      return "duplicate";
     }
 
     const guessedCountryIds = [...state.guessedCountryIds, country.iso_a3];
     const isComplete = guessedCountryIds.length === state.quizCountries.length;
-    const perfectRunSequence = isComplete
+    const perfectRunSequence = isComplete && state.hintsUsed === 0
       ? state.perfectRunSequence + 1
       : state.perfectRunSequence;
 
@@ -758,11 +870,13 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentInput: "",
       lastMatchedCountry: country,
       lastMatchSequence: state.lastMatchSequence + 1,
-      isPerfectRun: isComplete,
+      isPerfectRun: isComplete && state.hintsUsed === 0,
       perfectRunSequence,
       score: guessedCountryIds.length,
       gameStatus: isComplete ? "completed" : "running",
       smartHint: null,
+      hintTargetIso:
+        state.hintTargetIso === country.iso_a3 ? null : state.hintTargetIso,
       ...buildFeedbackEvent(state, "correct", {
         countryId: country.iso_a3,
         completed: isComplete,
@@ -770,7 +884,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }),
     });
 
-    return true;
+    return "accepted";
   },
   submitIdentifyGuess: (country) => {
     const state = get();
@@ -863,7 +977,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const attemptsUsed = state.incorrectAttempts[target.iso_a3] ?? 0;
     const resultStatus: CountryResultStatus =
-      attemptsUsed === 0 ? "correct" : "assisted";
+      attemptsUsed === 0 && (state.hintRevealLevels[target.iso_a3] ?? 0) === 0
+        ? "correct"
+        : "assisted";
     const guessedCountryIds = [...state.guessedCountryIds, target.iso_a3];
     const countryResults = {
       ...state.countryResults,
@@ -883,6 +999,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMatchSequence: state.lastMatchSequence + 1,
       currentTargetHints: [],
       smartHint: null,
+      hintTargetIso: null,
       ...buildFeedbackEvent(state, resultStatus, {
         countryId: target.iso_a3,
         completed: nextState.gameStatus === "completed",
@@ -983,7 +1100,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const attemptsUsed = state.incorrectAttempts[target.iso_a3] ?? 0;
     const resultStatus: CountryResultStatus =
-      attemptsUsed === 0 ? "correct" : "assisted";
+      attemptsUsed === 0 && (state.hintRevealLevels[target.iso_a3] ?? 0) === 0
+        ? "correct"
+        : "assisted";
     const guessedCountryIds = [...state.guessedCountryIds, target.iso_a3];
     const countryResults = {
       ...state.countryResults,
@@ -1003,6 +1122,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMatchSequence: state.lastMatchSequence + 1,
       currentTargetHints: [],
       smartHint: null,
+      hintTargetIso: null,
       ...buildFeedbackEvent(state, resultStatus, {
         countryId: target.iso_a3,
         completed: nextState.gameStatus === "completed",
@@ -1133,7 +1253,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const attemptsUsed = state.incorrectAttempts[target.iso_a3] ?? 0;
     const resultStatus: CountryResultStatus =
-      attemptsUsed === 0 ? "correct" : "assisted";
+      attemptsUsed === 0 && (state.hintRevealLevels[target.iso_a3] ?? 0) === 0
+        ? "correct"
+        : "assisted";
     const guessedCountryIds = [...state.guessedCountryIds, target.iso_a3];
     const countryResults = {
       ...state.countryResults,
@@ -1153,6 +1275,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       lastMatchSequence: state.lastMatchSequence + 1,
       currentTargetHints: [],
       smartHint: null,
+      hintTargetIso: null,
       ...buildFeedbackEvent(state, resultStatus, {
         countryId: target.iso_a3,
         completed: nextState.gameStatus === "completed",

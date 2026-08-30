@@ -288,6 +288,28 @@ export function CaribbeanInsetMap({
   useEffect(() => {
     const map = mapRef.current;
 
+    if (!mapLoaded || !map || !mobilePerformanceMode) {
+      return;
+    }
+
+    const interactive = mobileExpanded && !keyboardActive && !correctPopupVisible;
+    if (interactive) {
+      map.dragPan.enable();
+      map.touchZoomRotate.enable();
+      map.touchZoomRotate.disableRotation();
+    } else {
+      map.dragPan.disable();
+      map.touchZoomRotate.disable();
+    }
+    map.doubleClickZoom.disable();
+    map.scrollZoom.disable();
+    map.boxZoom.disable();
+    map.keyboard.disable();
+  }, [correctPopupVisible, keyboardActive, mapLoaded, mobileExpanded, mobilePerformanceMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
     if (!mapLoaded || !map) {
       return;
     }
@@ -839,6 +861,10 @@ export function CaribbeanInsetMap({
     };
   }, [documentVisible, mapLoaded, mobilePerformanceMode, targetCountryId]);
 
+  if (mobilePerformanceMode && correctPopupVisible) {
+    return null;
+  }
+
   if (mobilePerformanceMode && !shouldRenderInsetMap) {
     return (
       <motion.button
@@ -892,6 +918,22 @@ export function CaribbeanInsetMap({
           {mobilePerformanceMode || keyboardActive ? (
             <button
               type="button"
+              onClick={() =>
+                mapRef.current?.fitBounds(CARIBBEAN_BOUNDS, {
+                  padding: 18,
+                  duration: 420,
+                  essential: true,
+                })
+              }
+              className="grid size-11 place-items-center rounded-full border border-white/12 bg-white/8 text-sm font-semibold text-white/70 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200/70 sm:hidden"
+              aria-label="Recenter Caribbean detail map"
+            >
+              ◎
+            </button>
+          ) : null}
+          {mobilePerformanceMode || keyboardActive ? (
+            <button
+              type="button"
               onClick={() => onMobileExpandedChange?.(false)}
               className="grid size-11 place-items-center rounded-full border border-white/12 bg-white/8 text-lg leading-none text-white/70 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200/70 sm:hidden"
               aria-label="Minimize Caribbean detail map"
@@ -906,7 +948,7 @@ export function CaribbeanInsetMap({
           keyboardActive ? "h-12 min-h-0 max-h-none" : "h-36 max-h-[22dvh] min-h-32"
         }`}
       >
-        <div ref={mapNodeRef} className="absolute inset-0" />
+        <div ref={mapNodeRef} className="absolute inset-0 touch-none overscroll-contain" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,0.10),transparent_10rem)]" />
       </div>
     </motion.aside>

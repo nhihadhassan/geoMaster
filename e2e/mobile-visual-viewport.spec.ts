@@ -65,7 +65,7 @@ test("keeps the quiz shell anchored through repeated visual viewport changes", a
   const reduced = await page.evaluate(() => {
     const shell = document.querySelector<HTMLElement>('[data-testid="quiz-shell"]');
     const input = document.querySelector<HTMLElement>('#country-guess');
-    const header = document.querySelector<HTMLElement>('header');
+    const header = document.querySelector<HTMLElement>('[data-testid="mobile-quiz-hud"]');
     const shellRect = shell?.getBoundingClientRect();
     const inputRect = input?.getBoundingClientRect();
     const headerRect = header?.getBoundingClientRect();
@@ -139,19 +139,14 @@ test("constrains Caribbean detail between the prompt and answer dock", async ({
     return {
       target: rect("aside[aria-label='Target prompt']"),
       panel: rect("aside[aria-label='Caribbean detail map']"),
-      region: Array.from(document.querySelectorAll("button")).find((button) =>
-        button.textContent?.includes("Regions · North America"),
-      )?.getBoundingClientRect(),
       input: rect("#country-guess"),
     };
   });
 
   expect(boxes.panel).not.toBeUndefined();
   expect(boxes.target).not.toBeUndefined();
-  expect(boxes.region).not.toBeUndefined();
   expect(boxes.input).not.toBeUndefined();
   expect(boxes.panel?.top ?? 0).toBeGreaterThanOrEqual((boxes.target?.bottom ?? 0) - 1);
-  expect(boxes.panel?.bottom ?? 9999).toBeLessThanOrEqual((boxes.region?.top ?? 0) + 1);
   expect(boxes.panel?.bottom ?? 9999).toBeLessThanOrEqual((boxes.input?.top ?? 0) + 1);
 });
 

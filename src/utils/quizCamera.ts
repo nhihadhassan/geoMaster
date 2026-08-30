@@ -1,7 +1,7 @@
 import type { PaddingOptions } from "mapbox-gl";
 
 const MOBILE_FRAME_PADDING = {
-  top: 104,
+  top: 76,
   right: 24,
   bottom: 142,
   left: 24,
@@ -51,4 +51,3 @@ export function getQuizFramePadding({
     left: base.left,
   };
 }
-

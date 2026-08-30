@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CountryEducationCard } from "@/components/game/CountryEducationCard";
 import type { Country } from "@/data/countries";
 import { useOverlayFocus } from "@/hooks/useOverlayFocus";
@@ -28,8 +28,17 @@ export function CountryPopup({
     open: false,
   });
   const mobileDetailsRef = useRef<HTMLElement | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)");
+    const sync = () => setIsMobile(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
   const mobileDetailsOpen =
     mobileDetailsState.key === popupKey && mobileDetailsState.open;
+  const shouldAutoHide = isMobile || autoHide;
   const closeMobileDetails = useCallback(() => {
     setMobileDetailsState({ key: popupKey, open: false });
   }, [popupKey]);
@@ -45,7 +54,7 @@ export function CountryPopup({
   }
 
   const pointerClass =
-    autoHide && !mobileDetailsOpen
+    shouldAutoHide && !mobileDetailsOpen
       ? "pointer-events-none"
       : "pointer-events-auto";
   const flag = getCountryFlagDisplay(country);
@@ -59,7 +68,7 @@ export function CountryPopup({
         key={popupKey}
         initial={{ opacity: 0, y: 14, scale: 0.96 }}
         animate={
-          autoHide
+          shouldAutoHide
             ? {
                 opacity: [0, 1, 1, 0],
                 y: [14, 0, 0, 10],
@@ -68,80 +77,33 @@ export function CountryPopup({
             : { opacity: 1, y: 0, scale: 1 }
         }
         transition={
-          autoHide
+          shouldAutoHide
             ? {
-                duration: 4.2,
+                duration: isMobile ? 1.8 : 4.2,
                 ease: [0.22, 1, 0.36, 1],
-                times: [0, 0.08, 0.86, 1],
+                times: isMobile ? [0, 0.12, 0.78, 1] : [0, 0.08, 0.86, 1],
               }
             : { type: "spring", stiffness: 260, damping: 28 }
         }
         onAnimationComplete={() => {
-          if (autoHide) {
+          if (shouldAutoHide) {
             onClose();
           }
         }}
-        className={`${pointerClass} absolute inset-x-2 top-[calc(4.65rem+env(safe-area-inset-top))] z-30 mx-auto max-h-24 w-[min(25rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-emerald-100/20 bg-zinc-950/70 text-white shadow-xl shadow-emerald-950/28 backdrop-blur-2xl sm:inset-x-auto sm:right-5 sm:top-28 sm:mx-0 sm:max-h-[calc(100vh-8rem)] sm:w-[24rem] sm:overflow-y-auto sm:rounded-3xl`}
-        role={autoHide ? "status" : "region"}
+        className={`${pointerClass} absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-3 z-30 mx-0 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-emerald-100/24 bg-zinc-950/72 text-white shadow-xl shadow-emerald-950/28 backdrop-blur-2xl sm:inset-x-auto sm:right-5 sm:top-28 sm:bottom-auto sm:max-h-[calc(100vh-8rem)] sm:w-[24rem] sm:max-w-none sm:overflow-y-auto sm:rounded-3xl`}
+        role={shouldAutoHide ? "status" : "region"}
         aria-live="polite"
         aria-label={
           autoHide ? undefined : `${country.name} correct answer feedback`
         }
       >
         <div className="sm:hidden">
-          <div className="flex min-h-20 items-center gap-3 px-3 py-2.5">
-            <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/15 bg-white/8 text-xl shadow-inner">
-              {flag.src ? (
-                <img
-                  src={flag.src}
-                  alt={`${country.name} flag`}
-                  className="col-start-1 row-start-1 z-10 h-full w-full object-cover"
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : null}
-              <span className="col-start-1 row-start-1" aria-hidden="true">
-                {flag.fallback}
-              </span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[0.58rem] font-semibold uppercase tracking-[0.22em] text-emerald-200/78">
-                Correct
-              </p>
-              <h2 className="truncate text-base font-semibold leading-5 text-white">
-                {country.name}
-              </h2>
-              <p className="truncate text-xs text-white/62">{capitalLabel}</p>
-            </div>
-            {!autoHide ? (
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMobileDetailsState((state) => ({
-                      key: popupKey,
-                      open: state.key === popupKey ? !state.open : true,
-                    }))
-                  }
-                  className="pointer-events-auto min-h-11 rounded-full border border-white/12 bg-white/8 px-4 text-xs font-semibold text-white/72 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
-                  aria-expanded={mobileDetailsOpen}
-                  aria-controls={`${popupKey}-mobile-details`}
-                >
-                  Details
-                </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="pointer-events-auto grid size-11 place-items-center rounded-full border border-white/12 bg-white/8 text-lg leading-none text-white/70 transition hover:bg-white/14 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200/70"
-                  aria-label="Close country info card"
-                >
-                  ×
-                </button>
-              </div>
-            ) : null}
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <span className="text-lg font-semibold leading-none text-emerald-200" aria-hidden="true">
+              ✓
+            </span>
+            <p className="truncate text-sm font-semibold text-white">{country.name}</p>
           </div>
-          <div className="h-1 bg-gradient-to-r from-emerald-400 via-lime-200 to-sky-300" />
         </div>
 
         <div className="hidden sm:block">
