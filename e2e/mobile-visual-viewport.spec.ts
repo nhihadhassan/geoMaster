@@ -123,6 +123,7 @@ test("constrains Caribbean detail between the prompt and answer dock", async ({
   const panel = page.getByRole("region", { name: "Caribbean detail map" });
   const close = page.getByRole("button", { name: "Minimize Caribbean detail map" });
   const open = page.getByRole("button", { name: "Open Caribbean detail map" });
+  await expect(open.or(panel)).toBeVisible();
   if (await open.isVisible()) {
     await page.evaluate(() => {
       document
