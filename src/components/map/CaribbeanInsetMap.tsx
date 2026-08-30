@@ -50,6 +50,7 @@ type CaribbeanInsetMapProps = {
   clickEnabled?: boolean;
   mobilePerformanceMode?: boolean;
   documentVisible?: boolean;
+  keyboardActive?: boolean;
   correctPopupVisible?: boolean;
   mobileExpanded?: boolean;
   onMobileExpandedChange?: (expanded: boolean) => void;
@@ -145,6 +146,7 @@ export function CaribbeanInsetMap({
   clickEnabled = false,
   mobilePerformanceMode = false,
   documentVisible = true,
+  keyboardActive = false,
   correctPopupVisible = false,
   mobileExpanded = false,
   onMobileExpandedChange,
@@ -249,6 +251,39 @@ export function CaribbeanInsetMap({
       setMapLoaded(false);
     };
   }, [mapboxToken, onLabelSourceLoaded, shouldRenderInsetMap]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = mapNodeRef.current;
+
+    if (!mapLoaded || !map || !container) {
+      return;
+    }
+
+    let frame: number | null = null;
+    const resize = () => {
+      frame = null;
+      map.resize();
+    };
+    const scheduleResize = () => {
+      if (frame === null) {
+        frame = window.requestAnimationFrame(resize);
+      }
+    };
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(scheduleResize)
+        : null;
+    observer?.observe(container);
+    scheduleResize();
+
+    return () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      observer?.disconnect();
+    };
+  }, [keyboardActive, mapLoaded, mobileExpanded]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -831,7 +866,11 @@ export function CaribbeanInsetMap({
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute inset-x-3 bottom-[calc(8.85rem+env(safe-area-inset-bottom))] z-20 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/56 p-2 text-white shadow-xl shadow-black/28 backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-36 sm:w-[min(19rem,calc(100vw-2.5rem))] sm:rounded-3xl sm:p-3"
+      className={`absolute inset-x-3 bottom-[calc(8.85rem+env(safe-area-inset-bottom))] z-20 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/56 p-2 text-white shadow-xl shadow-black/28 backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-36 sm:w-[min(19rem,calc(100vw-2.5rem))] sm:rounded-3xl sm:p-3 ${
+        keyboardActive
+          ? "top-[calc(9rem+env(safe-area-inset-top))] bottom-[calc(10rem+env(safe-area-inset-bottom))] z-30"
+          : ""
+      }`}
       role="region"
       aria-label="Caribbean detail map"
     >
@@ -862,7 +901,11 @@ export function CaribbeanInsetMap({
           ) : null}
         </div>
       </div>
-      <div className="relative h-36 max-h-[22dvh] min-h-32 overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 sm:h-52 sm:max-h-none sm:rounded-2xl">
+      <div
+        className={`relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 sm:h-52 sm:max-h-none sm:rounded-2xl ${
+          keyboardActive ? "h-12 min-h-0 max-h-none" : "h-36 max-h-[22dvh] min-h-32"
+        }`}
+      >
         <div ref={mapNodeRef} className="absolute inset-0" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(34,211,238,0.10),transparent_10rem)]" />
       </div>

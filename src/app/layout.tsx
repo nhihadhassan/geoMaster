@@ -18,6 +18,7 @@ export const viewport: Viewport = {
   themeColor: "#05080c",
   // The map is full-bleed and the UI already handles safe areas itself.
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export const metadata: Metadata = {
