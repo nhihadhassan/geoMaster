@@ -228,7 +228,9 @@ const getRequestedHints = (country: Country, mode: GameMode) => {
     country.hints?.neighborHint ?? country.hints?.locationHint ?? locationHint;
 
   if (mode === "type-to-fill") {
-    return [locationHint, `Starts with ${firstLetter}`, `Capital: ${country.capital}`];
+    // Type mode should give the player a small, predictable ladder:
+    // the answer's initial, then its capital, then a map-oriented clue.
+    return [`Starts with ${firstLetter}`, `Capital: ${country.capital}`, strongerLocationHint];
   }
 
   if (mode === "identify-shaded") {
