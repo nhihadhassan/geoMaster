@@ -322,6 +322,35 @@ test("deliberate hints count once and make the answered target assisted", () => 
   assertEqual(result.outcome, "assisted", "a hinted answer is assisted");
 });
 
+test("type-mode hints reveal the initial, capital, then location", () => {
+  resetToRegion("south-america");
+  store().selectMode("type-to-fill");
+  store().startQuiz();
+
+  const target = store().quizCountries.find(
+    (country) => !store().guessedCountryIds.includes(country.iso_a3),
+  );
+
+  assert(target !== undefined, "type mode should have a remaining target");
+
+  const first = store().requestHint();
+  const second = store().requestHint();
+  const third = store().requestHint();
+
+  assertEqual(
+    first?.text,
+    `Starts with ${target?.name.charAt(0).toUpperCase()}`,
+    "the first type hint should reveal the country initial",
+  );
+  assertEqual(
+    second?.text,
+    `Capital: ${target?.capital}`,
+    "the second type hint should reveal the capital",
+  );
+  assert(third !== null, "type mode should offer a third location hint");
+  assertEqual(store().hintsUsed, 3, "each deliberate reveal should count once");
+});
+
 test("retry immediately restarts the same quiz configuration", () => {
   resetToRegion("south-america");
   store().selectMode("type-to-fill");
