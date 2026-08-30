@@ -889,7 +889,7 @@ export function CaribbeanInsetMap({
               Hints
             </span>
           ) : null}
-          {mobilePerformanceMode ? (
+          {mobilePerformanceMode || keyboardActive ? (
             <button
               type="button"
               onClick={() => onMobileExpandedChange?.(false)}
