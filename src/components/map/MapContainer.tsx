@@ -18,14 +18,11 @@ import type { FeatureCollection, Geometry } from "geojson";
 import { AntarcticaEducationCard } from "@/components/game/AntarcticaEducationCard";
 import { GameHud } from "@/components/game/GameHud";
 import { LandingPage } from "@/components/game/LandingPage";
-import { LearningModeCard } from "@/components/game/LearningModeCard";
 import { PauseOverlay } from "@/components/game/PauseOverlay";
 import { PerfectRunCelebration } from "@/components/game/PerfectRunCelebration";
 import { PremiumControls } from "@/components/game/PremiumControls";
-import { ResultsDashboard } from "@/components/game/ResultsDashboard";
 import { ResumePrompt } from "@/components/game/ResumePrompt";
 import { TargetHintCard } from "@/components/game/TargetHintCard";
-import { TypeToFillInput } from "@/components/game/TypeToFillInput";
 import { features } from "@/config/features";
 import { caribbeanCountryIds } from "@/data/caribbean";
 
@@ -33,11 +30,45 @@ const CaribbeanInsetMap = dynamic(
   () =>
     import("@/components/map/CaribbeanInsetMap").then(
       (mapModule) => mapModule.CaribbeanInsetMap,
+  ),
+  { ssr: false },
+);
+const ExploreSearch = dynamic(
+  () =>
+    import("@/components/map/ExploreSearch").then(
+      (mapModule) => mapModule.ExploreSearch,
+    ),
+  { ssr: false },
+);
+const LearningModeCard = dynamic(
+  () =>
+    import("@/components/game/LearningModeCard").then(
+      (gameModule) => gameModule.LearningModeCard,
+    ),
+  { ssr: false },
+);
+const ResultsDashboard = dynamic(
+  () =>
+    import("@/components/game/ResultsDashboard").then(
+      (gameModule) => gameModule.ResultsDashboard,
+    ),
+  { ssr: false },
+);
+const TypeToFillInput = dynamic(
+  () =>
+    import("@/components/game/TypeToFillInput").then(
+      (gameModule) => gameModule.TypeToFillInput,
+    ),
+  { ssr: false },
+);
+const MapDebugPanel = dynamic(
+  () =>
+    import("@/components/map/MapDebugPanel").then(
+      (mapModule) => mapModule.MapDebugPanel,
     ),
   { ssr: false },
 );
 import { CountryPopup } from "@/components/map/CountryPopup";
-import { ExploreSearch } from "@/components/map/ExploreSearch";
 import { IdlePromptToast } from "@/components/map/IdlePromptToast";
 import { MapControls } from "@/components/map/MapControls";
 import {
@@ -53,7 +84,6 @@ import {
 } from "@/components/map/mapMotion";
 import { useMapMotion } from "@/components/map/useMapMotion";
 import { useIdleGlobeRotation } from "@/components/map/useIdleGlobeRotation";
-import { MapDebugPanel } from "@/components/map/MapDebugPanel";
 import { MapErrorBoundary } from "@/components/map/MapErrorBoundary";
 import { MapUnavailable } from "@/components/map/MapUnavailable";
 import {
@@ -65,6 +95,7 @@ import {
   DEBUG_LEADER_LAYER_ID,
   DEBUG_LEADER_SOURCE_ID,
   FILL_LAYER_ID,
+  GEOMASTER_LAYER_IDS,
   GUIDE_CIRCLE_LAYER_ID,
   GUIDE_CIRCLE_SOURCE_ID,
   GUIDE_LINE_LAYER_ID,
@@ -187,10 +218,8 @@ export function MapContainer() {
   // constructor threw). Transient tile/style errors keep using the toast.
   const [mapFatalError, setMapFatalError] = useState<string | null>(null);
   const [mapRetryKey, setMapRetryKey] = useState(0);
-  // Mapbox is the heaviest thing on the page and the landing screen renders its
-  // own cobe globe on top of it, so hold initialization until the browser is
-  // idle (or the user leaves the landing, whichever comes first). The warm-up
-  // means the map is normally ready by the time the landing is dismissed.
+  // The landing screen owns its cobe globe, so Mapbox and country geometry stay
+  // deferred until the player deliberately enters the atlas.
   const [mapInitAllowed, setMapInitAllowed] = useState(!features.lazyMapInit);
   const [insetLabelSourceLoaded, setInsetLabelSourceLoaded] = useState(false);
   const [debugLabelIds, setDebugLabelIds] = useState<string[]>([]);
@@ -230,7 +259,11 @@ export function MapContainer() {
       window.localStorage.getItem("geomaster-debug") === "1"
     );
   });
-  const { data: topologyData, error: topologyError } = useWorldTopology();
+  const {
+    data: topologyData,
+    isLoading: topologyLoading,
+    error: topologyError,
+  } = useWorldTopology({ enabled: mapInitAllowed, retryKey: mapRetryKey });
   const selectedRegion = useGameStore((state) => state.selectedRegion);
   const selectedSpecialRegion = useGameStore(
     (state) => state.selectedSpecialRegion,
@@ -298,32 +331,13 @@ export function MapContainer() {
   const daily = useDailyChallenge();
 
   useEffect(() => {
-    if (mapInitAllowed) {
+    if (mapInitAllowed || landingOpen) {
       return;
     }
 
-    if (!landingOpen) {
-      const timeoutId = window.setTimeout(() => setMapInitAllowed(true), 0);
-
-      return () => window.clearTimeout(timeoutId);
-    }
-
-    const allow = () => setMapInitAllowed(true);
-    const idleWindow = window as typeof window & {
-      requestIdleCallback?: (
-        callback: () => void,
-        options?: { timeout: number },
-      ) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-
-    if (idleWindow.requestIdleCallback) {
-      const handle = idleWindow.requestIdleCallback(allow, { timeout: 1500 });
-
-      return () => idleWindow.cancelIdleCallback?.(handle);
-    }
-
-    const timeoutId = window.setTimeout(allow, 900);
+    // The cobe landing globe is self-contained. Keep both Mapbox and the
+    // country geometry off the network until the player enters the atlas.
+    const timeoutId = window.setTimeout(() => setMapInitAllowed(true), 0);
 
     return () => window.clearTimeout(timeoutId);
   }, [landingOpen, mapInitAllowed]);
@@ -393,6 +407,9 @@ export function MapContainer() {
     gameStatus === "completed" ||
     gameStatus === "failed" ||
     gameStatus === "gave-up";
+  const atlasReady = mapLoaded && Boolean(topologyData);
+  const atlasLoading =
+    (topologyLoading || !atlasReady) && !mapFatalError && !topologyError;
   const idlePrompts = useMemo(() => {
     const countryPrompts = IDLE_PROMPT_COUNTRY_IDS.flatMap((iso) => {
       const country = countries.find((item) => item.iso_a3 === iso);
@@ -902,13 +919,15 @@ export function MapContainer() {
         return;
       }
 
+      const needsLayerOrdering = GEOMASTER_LAYER_IDS.some(
+        (layerId) => !map.getLayer(layerId),
+      );
+
       const existingSource = map.getSource(SOURCE_ID) as
         | GeoJSONSource
         | undefined;
 
-      if (existingSource) {
-        existingSource.setData(countriesData);
-      } else {
+      if (!existingSource) {
         map.addSource(SOURCE_ID, {
           type: "geojson",
           data: countriesData,
@@ -1602,24 +1621,26 @@ export function MapContainer() {
         });
       }
 
-      [
-        PHYSICAL_LABEL_LAYER_ID,
-        SUBDIVISION_LABEL_LAYER_ID,
-        CITY_CIRCLE_LAYER_ID,
-        CITY_LABEL_LAYER_ID,
-        LANDMARK_CIRCLE_LAYER_ID,
-        LANDMARK_LABEL_LAYER_ID,
-        LEADER_LAYER_ID,
-        ...LABEL_LAYER_IDS,
-        LEARNING_LEADER_LAYER_ID,
-        ...LEARNING_LABEL_LAYER_IDS,
-        DEBUG_LEADER_LAYER_ID,
-        DEBUG_LABEL_LAYER_ID,
-      ].forEach((layerId) => {
-        if (map.getLayer(layerId)) {
-          map.moveLayer(layerId);
-        }
-      });
+      if (needsLayerOrdering) {
+        [
+          PHYSICAL_LABEL_LAYER_ID,
+          SUBDIVISION_LABEL_LAYER_ID,
+          CITY_CIRCLE_LAYER_ID,
+          CITY_LABEL_LAYER_ID,
+          LANDMARK_CIRCLE_LAYER_ID,
+          LANDMARK_LABEL_LAYER_ID,
+          LEADER_LAYER_ID,
+          ...LABEL_LAYER_IDS,
+          LEARNING_LEADER_LAYER_ID,
+          ...LEARNING_LABEL_LAYER_IDS,
+          DEBUG_LEADER_LAYER_ID,
+          DEBUG_LABEL_LAYER_ID,
+        ].forEach((layerId) => {
+          if (map.getLayer(layerId)) {
+            map.moveLayer(layerId);
+          }
+        });
+      }
 
       guessedCountryIds.forEach((iso) => {
         setCountryFeatureState(map, iso, { guessed: true, fillProgress: 1 });
@@ -1934,32 +1955,24 @@ export function MapContainer() {
 
     const map = mapRef.current;
 
-    const addLayersWhenReady = () => {
-      if (!map.isStyleLoaded()) {
-        return;
-      }
+    if (!map.isStyleLoaded()) {
+      return;
+    }
 
-      try {
-        addCountryLayers(map, topologyData);
-      } catch (error) {
-        setMapDebug({
-          lastLabelLayerError:
-            error instanceof Error
-              ? error.message
-              : "Mapbox rejected a country overlay layer.",
-          ...getMapDebugSnapshot(map),
-        });
-      }
-    };
-
-    addLayersWhenReady();
-    map.on("styledata", addLayersWhenReady);
-    map.on("idle", addLayersWhenReady);
-
-    return () => {
-      map.off("styledata", addLayersWhenReady);
-      map.off("idle", addLayersWhenReady);
-    };
+    try {
+      // mapLoaded is set by Mapbox's one-time load event. Re-run only when
+      // GeoMaster's own layer data changes; subscribing to styledata/idle here
+      // feeds each setData call back into another full layer update.
+      addCountryLayers(map, topologyData);
+    } catch (error) {
+      setMapDebug({
+        lastLabelLayerError:
+          error instanceof Error
+            ? error.message
+            : "Mapbox rejected a country overlay layer.",
+        ...getMapDebugSnapshot(map),
+      });
+    }
   }, [addCountryLayers, mapLoaded, setMapDebug, topologyData]);
 
   useEffect(() => {
@@ -2634,7 +2647,7 @@ export function MapContainer() {
 
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: mapLoaded ? 0 : 1 }}
+        animate={{ opacity: atlasLoading ? 1 : 0 }}
         transition={{ type: "spring", stiffness: 120, damping: 26 }}
         className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-[#05080c]/82 backdrop-blur-sm"
       >
@@ -2643,7 +2656,7 @@ export function MapContainer() {
         </p>
       </motion.div>
 
-      {features.mapControls && !landingOpen && mapLoaded && !mapFatalError ? (
+      {features.mapControls && !landingOpen && atlasReady && !mapFatalError ? (
         <MapControls
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
@@ -2796,10 +2809,12 @@ export function MapContainer() {
               onCountryMatched={handleCountryMatched}
             />
           ) : null}
-          <ResultsDashboard
-            onChangeRegion={() => openRegionPanel()}
-            onContinueLearning={() => setRegionPanelOpen(false)}
-          />
+          {isFinished ? (
+            <ResultsDashboard
+              onChangeRegion={() => openRegionPanel()}
+              onContinueLearning={() => setRegionPanelOpen(false)}
+            />
+          ) : null}
         </>
       ) : null}
       <AnimatePresence>
@@ -2860,22 +2875,23 @@ export function MapContainer() {
         />
       ) : null}
 
-      {mapFatalError ? (
+      {mapFatalError || topologyError ? (
         <MapUnavailable
-          detail={mapFatalError}
+          detail={mapFatalError ?? topologyError?.message}
           onRetry={() => {
             setMapFatalError(null);
+            setMapError(null);
             setMapLoaded(false);
             setMapRetryKey((key) => key + 1);
           }}
         />
       ) : null}
 
-      {(mapError || topologyError) && (
+      {mapError ? (
         <div className="absolute left-5 top-24 z-40 max-w-sm rounded-2xl border border-red-300/20 bg-red-950/40 p-4 text-sm text-red-50 shadow-xl backdrop-blur-xl">
-          {mapError ?? topologyError?.message}
+          {mapError}
         </div>
-      )}
+      ) : null}
     </main>
   );
 }

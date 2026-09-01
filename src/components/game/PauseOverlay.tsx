@@ -20,6 +20,9 @@ export function PauseOverlay() {
       transition={{ duration: 0.18 }}
     >
       <motion.section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pause-dialog-title"
         initial={{ opacity: 0, y: 18, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -29,7 +32,10 @@ export function PauseOverlay() {
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.3em] text-sky-100/64">
           Paused
         </p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+        <h2
+          id="pause-dialog-title"
+          className="mt-3 text-3xl font-semibold tracking-tight"
+        >
           Take your time.
         </h2>
         <p className="mt-2 text-sm leading-5 text-white/58">

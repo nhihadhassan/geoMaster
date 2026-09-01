@@ -1,90 +1,135 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
-import worldCountries from "@/data/world-countries.geo.json";
+import { feature } from "topojson-client";
+import type {
+  GeometryCollection,
+  Topology,
+} from "topojson-specification";
 
 export type CountryProperties = {
   iso_a3: string;
   name: string;
 };
 
-type RawCountryProperties = Record<string, unknown>;
 type CountryFeature = Feature<Geometry, CountryProperties>;
 type CountryFeatureCollection = FeatureCollection<Geometry, CountryProperties>;
-
-const readString = (properties: RawCountryProperties, keys: string[]) => {
-  for (const key of keys) {
-    const value = properties[key];
-
-    if (typeof value === "string" && value && value !== "-99") {
-      return value;
-    }
-  }
-
-  return "";
+type CountryTopology = Topology<{
+  countries: GeometryCollection<CountryProperties>;
+}>;
+type TopologyState = {
+  data: CountryFeatureCollection | null;
+  isLoading: boolean;
+  error: Error | null;
+};
+type UseWorldTopologyOptions = {
+  enabled: boolean;
+  retryKey: number;
 };
 
-const normalizeFeature = (
-  feature: Feature<Geometry, RawCountryProperties>,
-): CountryFeature | null => {
-  const iso = readString(feature.properties ?? {}, [
-    "iso_a3",
-    "ISO_A3",
-    "ADM0_A3",
-    "adm0_a3",
-    "WB_A3",
-    "SOV_A3",
-  ]);
-  const name = readString(feature.properties ?? {}, [
-    "name",
-    "NAME",
-    "ADMIN",
-    "admin",
-  ]);
+export const WORLD_TOPOLOGY_PATH = "/data/world-countries.topo.json";
 
-  if (!iso || !name) {
-    return null;
+const IDLE_STATE: TopologyState = {
+  data: null,
+  isLoading: false,
+  error: null,
+};
+
+const isCountryFeature = (item: Feature<Geometry>): item is CountryFeature =>
+  typeof item.properties?.iso_a3 === "string" &&
+  typeof item.properties?.name === "string";
+
+const parseTopology = (value: unknown): CountryFeatureCollection => {
+  const topology = value as CountryTopology;
+  const countriesObject = topology?.objects?.countries;
+
+  if (topology?.type !== "Topology" || !countriesObject) {
+    throw new Error("The world country geometry response is invalid.");
+  }
+
+  const collection = feature(topology, countriesObject);
+
+  if (collection.type !== "FeatureCollection") {
+    throw new Error("The world country geometry has no feature collection.");
+  }
+
+  const features = collection.features.filter(isCountryFeature);
+
+  if (features.length !== collection.features.length || features.length === 0) {
+    throw new Error("The world country geometry is missing country metadata.");
   }
 
   return {
-    ...feature,
-    id: iso,
-    properties: {
-      iso_a3: iso,
-      name,
-    },
+    type: "FeatureCollection",
+    features,
   };
 };
 
-export function useWorldTopology() {
-  return useMemo(() => {
-    try {
-      const collection = worldCountries as unknown as FeatureCollection<
-        Geometry,
-        RawCountryProperties
-      >;
-      const features = collection.features
-        .map(normalizeFeature)
-        .filter((feature): feature is CountryFeature => Boolean(feature));
+export function useWorldTopology({
+  enabled,
+  retryKey,
+}: UseWorldTopologyOptions) {
+  const [state, setState] = useState<TopologyState>(IDLE_STATE);
 
-      return {
-        data: {
-          type: "FeatureCollection",
-          features,
-        } satisfies CountryFeatureCollection,
-        isLoading: false,
-        error: null,
-      };
-    } catch (error) {
-      return {
-        data: null,
-        isLoading: false,
-        error:
-          error instanceof Error
-            ? error
-            : new Error("Unable to load world country geometry."),
-      };
+  useEffect(() => {
+    if (!enabled) {
+      return;
     }
-  }, []);
+
+    const controller = new AbortController();
+    let settled = false;
+    const loadingTimeoutId = window.setTimeout(() => {
+      if (!settled) {
+        setState({ data: null, isLoading: true, error: null });
+      }
+    }, 0);
+
+    void fetch(WORLD_TOPOLOGY_PATH, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(
+            `Could not load world country geometry (${response.status}).`,
+          );
+        }
+
+        return response.json() as Promise<unknown>;
+      })
+      .then((value) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        settled = true;
+        window.clearTimeout(loadingTimeoutId);
+        setState({ data: parseTopology(value), isLoading: false, error: null });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        settled = true;
+        window.clearTimeout(loadingTimeoutId);
+        setState({
+          data: null,
+          isLoading: false,
+          error:
+            error instanceof Error
+              ? error
+              : new Error("Unable to load world country geometry."),
+        });
+      });
+
+    return () => {
+      settled = true;
+      window.clearTimeout(loadingTimeoutId);
+      controller.abort();
+    };
+  }, [enabled, retryKey]);
+
+  return state;
 }

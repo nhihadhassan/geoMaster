@@ -65,7 +65,10 @@ test("pausing stops the clock and resuming restarts it", async ({ page }) => {
   await page.waitForTimeout(2_200);
   await expect(timer).toHaveText(paused ?? "");
 
-  await visible(page.getByRole("button", { name: "Resume" })).click();
+  await page
+    .getByRole("dialog", { name: "Take your time." })
+    .getByRole("button", { name: "Resume" })
+    .click();
   await page.waitForTimeout(2_200);
   await expect(timer).not.toHaveText(paused ?? "");
 });
