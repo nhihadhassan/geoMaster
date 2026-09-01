@@ -197,6 +197,7 @@ export function TargetHintCard({
           stiffness: 320,
           damping: 30,
         }}
+        aria-label="Target prompt"
         className="absolute left-5 top-28 z-20 hidden w-[min(20rem,calc(100vw-2.5rem))] rounded-3xl border border-cyan-200/16 bg-zinc-950/58 p-4 text-white shadow-xl shadow-cyan-950/24 backdrop-blur-xl sm:block"
       >
         <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-cyan-100/60">

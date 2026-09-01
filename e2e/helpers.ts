@@ -1,5 +1,93 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
+const isExtensionUrl = (url: string) =>
+  url.startsWith("chrome-extension://") ||
+  url.startsWith("moz-extension://") ||
+  url.startsWith("safari-web-extension://");
+
+/**
+ * Captures application-owned browser failures without treating extension
+ * injections or third-party map-tile availability as first-party regressions.
+ */
+export const monitorPageHealth = (page: Page) => {
+  const issues: string[] = [];
+
+  page.on("console", (message) => {
+    if (message.type() !== "error" && message.type() !== "warning") {
+      return;
+    }
+
+    const sourceUrl = message.location().url;
+    const text = message.text();
+
+    // Chromium emits these from the local GPU process during WebGL readback;
+    // they are environmental diagnostics rather than application warnings.
+    if (text.includes("GL Driver Message") && text.includes("ReadPixels")) {
+      return;
+    }
+
+    // A blocked/unavailable third-party Mapbox tile also produces this generic
+    // console line. First-party failures are still captured by requestfailed.
+    if (text === "Failed to load resource: net::ERR_NAME_NOT_RESOLVED") {
+      return;
+    }
+
+    if (!isExtensionUrl(sourceUrl)) {
+      issues.push(`console ${message.type()}: ${text}`);
+    }
+  });
+  page.on("pageerror", (error) => {
+    issues.push(`page error: ${error.stack ?? error.message}`);
+  });
+  page.on("requestfailed", (request) => {
+    const currentUrl = page.url();
+
+    if (!currentUrl.startsWith("http")) {
+      return;
+    }
+
+    const requestedUrl = new URL(request.url());
+    const currentOrigin = new URL(currentUrl).origin;
+    const failure = request.failure()?.errorText ?? "unknown failure";
+
+    if (
+      requestedUrl.origin === currentOrigin &&
+      failure !== "net::ERR_ABORTED"
+    ) {
+      issues.push(
+        `first-party request failed: ${requestedUrl.pathname} (${failure})`,
+      );
+    }
+  });
+
+  return async () => {
+    const duplicateIds = await page.locator("[id]").evaluateAll((elements) => {
+      const counts = new Map<string, number>();
+
+      elements.forEach((element) => {
+        counts.set(element.id, (counts.get(element.id) ?? 0) + 1);
+      });
+
+      return [...counts.entries()]
+        .filter(([, count]) => count > 1)
+        .map(([id]) => id);
+    });
+
+    expect(duplicateIds, "duplicate DOM ids").toEqual([]);
+    expect(issues, "browser health issues").toEqual([]);
+  };
+};
+
+/** Opens a clean document once, with health capture active before hydration. */
+export const openMonitoredFresh = async (page: Page) => {
+  await page.addInitScript(() => window.localStorage.clear());
+  const verifyHealth = monitorPageHealth(page);
+  await page.goto("/");
+  await page.getByRole("heading", { name: "GeoMaster" }).waitFor();
+
+  return verifyHealth;
+};
+
 /**
  * The HUD renders a mobile and a desktop header at once and hides one by
  * breakpoint, so nearly every control exists twice in the DOM. Specs must

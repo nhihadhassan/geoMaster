@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3100;
+const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3107);
 
 /**
  * Smoke coverage for the journeys that matter, run against a production build.
@@ -14,11 +14,11 @@ const PORT = 3100;
 export default defineConfig({
   testDir: "./e2e",
   // These smoke journeys all drive one app server and a real Mapbox style, so
-  // heavy parallelism produced timeouts that looked like product failures
-  // rather than the contention they were. Two workers is plenty for five
-  // journeys and keeps runs deterministic.
+  // parallel Mapbox/WebGL canvases produced GPU-session closures and timeouts
+  // that looked like product failures rather than the contention they were.
+  // One worker keeps page-health and visual-viewport results deterministic.
   fullyParallel: false,
-  workers: 2,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "line" : [["list"]],
@@ -35,7 +35,9 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npx next start --port ${PORT}`,
     url: `http://127.0.0.1:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // Never silently test another local Next app that happens to own this
+    // port. A bind failure is actionable; false-positive coverage is not.
+    reuseExistingServer: false,
     timeout: 180_000,
   },
 });

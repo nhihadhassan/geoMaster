@@ -1,6 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
+import {
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_URL,
+  SOCIAL_IMAGE_ALT,
+  SOCIAL_IMAGE_PATH,
+} from "@/config/site";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./globals.css";
 
@@ -22,7 +29,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "GeoMaster",
+  metadataBase: new URL(SITE_URL),
+  title: SITE_NAME,
   // Installable as a home-screen app. Deliberately no service worker: the map
   // needs the network, so an offline shell would promise more than it delivers.
   manifest: "/manifest.webmanifest",
@@ -31,8 +39,31 @@ export const metadata: Metadata = {
     title: "GeoMaster",
     statusBarStyle: "black-translucent",
   },
-  description:
-    "A premium, map-centric geography learning app for mastering world countries.",
+  description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    siteName: SITE_NAME,
+    type: "website",
+    images: [
+      {
+        url: SOCIAL_IMAGE_PATH,
+        width: 1200,
+        height: 630,
+        alt: SOCIAL_IMAGE_ALT,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [SOCIAL_IMAGE_PATH],
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },
@@ -62,7 +93,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
       suppressHydrationWarning
     >
-      <body className="min-h-full overflow-hidden antialiased" suppressHydrationWarning>
+      <body
+        className="min-h-full overflow-hidden antialiased"
+        suppressHydrationWarning
+      >
         <Script
           id="remove-extension-hydration-attributes"
           strategy="beforeInteractive"

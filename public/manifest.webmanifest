@@ -1,7 +1,7 @@
 {
   "name": "GeoMaster",
   "short_name": "GeoMaster",
-  "description": "Learn every country on a real world map - quiz yourself, explore, and practise what you miss.",
+  "description": "Master world countries with interactive maps, geography quizzes, and focused practice.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",
