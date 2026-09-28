@@ -220,6 +220,10 @@ export function TypeToFillInput({
       return;
     }
 
+    if (selectedMode === "type-to-fill" && !currentInput.trim()) {
+      return;
+    }
+
     const match = findCountryMatch(currentInput, quizCountries);
     const globalMatch = findCountryMatch(currentInput, allCountries);
 
