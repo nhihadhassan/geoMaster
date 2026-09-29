@@ -210,6 +210,7 @@ export function MapContainer() {
   const mapRef = useRef<Map | null>(null);
   const previousGuessedIdsRef = useRef<string[]>([]);
   const previousTargetIdRef = useRef<string | null>(null);
+  const previousClickTargetIdRef = useRef<string | null>(null);
   const feedbackGlowTimeoutRef = useRef<number | null>(null);
   const missFeedbackTimeoutRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -2178,6 +2179,55 @@ export function MapContainer() {
     selectedSpecialRegion,
     setMapDebug,
   ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (!mapLoaded || !map) {
+      return;
+    }
+
+    if (
+      selectedMode !== "click-country" ||
+      gameStatus !== "running" ||
+      !currentTargetCountry
+    ) {
+      previousClickTargetIdRef.current = null;
+      return;
+    }
+
+    const previousTargetId = previousClickTargetIdRef.current;
+    previousClickTargetIdRef.current = currentTargetCountry.iso_a3;
+
+    // Keep the initial region overview and the learner's chosen zoom. After
+    // the first question, pan only when the next country has left the view.
+    if (
+      !previousTargetId ||
+      previousTargetId === currentTargetCountry.iso_a3
+    ) {
+      return;
+    }
+
+    const visibleBounds = map.getBounds();
+
+    if (
+      visibleBounds?.contains([
+        currentTargetCountry.center.lng,
+        currentTargetCountry.center.lat,
+      ])
+    ) {
+      return;
+    }
+
+    map.easeTo({
+      center: [
+        currentTargetCountry.center.lng,
+        currentTargetCountry.center.lat,
+      ],
+      duration: 650,
+      essential: true,
+    });
+  }, [currentTargetCountry, gameStatus, mapLoaded, selectedMode]);
 
   useEffect(() => {
     const map = mapRef.current;
