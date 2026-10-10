@@ -85,6 +85,9 @@ export function ResultsDashboard({
   const selectedCountryId = reviewState.key === reviewKey ? reviewState.selectedCountryId : null;
   const resultsPanelRef = useRef<HTMLElement>(null);
   const reviewContentRef = useRef<HTMLDivElement>(null);
+  const [mapVisible, setMapVisible] = useState(false);
+  const mapGestureRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const suppressMapHandleClickRef = useRef(false);
   const countryById = useMemo(
     () => new Map(quizCountries.map((country) => [country.iso_a3, country])),
     [quizCountries],
@@ -175,6 +178,12 @@ export function ResultsDashboard({
     onReviewCountrySelect?.(null);
     startCustomQuiz(practiceCountryIds, { label: `Practice · ${quizLabel}` });
   };
+  const showMap = () => {
+    onReviewCountrySelect?.(null);
+    setReviewState({ ...reviewState, key: reviewKey, open: false, selectedCountryId: null });
+    resultsPanelRef.current?.scrollTo({ top: 0 });
+    setMapVisible(true);
+  };
 
   return (
     <motion.section
@@ -187,6 +196,56 @@ export function ResultsDashboard({
       aria-label={reviewOpen ? "Review quiz answers" : "Quiz results"}
       className={`absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 rounded-3xl border border-white/14 bg-[#111a20]/95 text-white shadow-xl shadow-black/34 backdrop-blur-2xl lg:bottom-5 lg:left-5 lg:right-auto lg:w-[min(29rem,calc(100vw-2.5rem))] ${reviewOpen ? "flex max-h-[70dvh] flex-col overflow-hidden lg:max-h-[min(76vh,48rem)]" : "max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto"}`}
     >
+      <button
+        type="button"
+        aria-label={mapVisible ? "Show results" : "Show map"}
+        aria-expanded={!mapVisible}
+        aria-controls="quiz-results-content"
+        onPointerDown={(event) => {
+          suppressMapHandleClickRef.current = false;
+          if (event.pointerType === "mouse" || !event.isPrimary) return;
+          mapGestureRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerUp={(event) => {
+          const gesture = mapGestureRef.current;
+          mapGestureRef.current = null;
+          if (!gesture || gesture.pointerId !== event.pointerId) return;
+          const distanceY = event.clientY - gesture.y;
+          const distanceX = Math.abs(event.clientX - gesture.x);
+          if (Math.abs(distanceY) < 48 || Math.abs(distanceY) < distanceX * 1.5) return;
+          // A swipe also generates a click; consume it so the sheet stays put.
+          suppressMapHandleClickRef.current = true;
+          if (!mapVisible && distanceY > 0) showMap();
+          else if (mapVisible && distanceY < 0) setMapVisible(false);
+        }}
+        onPointerCancel={() => {
+          mapGestureRef.current = null;
+        }}
+        onClick={(event) => {
+          if (suppressMapHandleClickRef.current && event.detail > 0) {
+            suppressMapHandleClickRef.current = false;
+            return;
+          }
+          if (mapVisible) setMapVisible(false);
+          else showMap();
+        }}
+        className="flex min-h-14 w-full touch-none select-none flex-col items-center gap-2 rounded-t-3xl px-5 pb-3 pt-2 text-white/80 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-200/70 lg:hidden"
+      >
+        <span aria-hidden="true" className="h-1 w-9 rounded-full bg-white/35" />
+        <span className="flex w-full items-center justify-between gap-3 text-xs font-medium">
+          <span className="min-w-0 truncate">{mapVisible ? `${score}/${total} · ${quizLabel}` : "Swipe down to see the map"}</span>
+          <span className="shrink-0">{mapVisible ? "Show results ↑" : "Show map ↓"}</span>
+        </span>
+      </button>
+      {mapVisible ? (
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/10 px-4 py-2 text-[0.7rem] text-white/80 lg:hidden" aria-label="Map result colours">
+          <span><i aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-full bg-emerald-300" />{correctCount} correct</span>
+          {assistedCount > 0 ? <span><i aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-full bg-amber-300" />{assistedCount} with hints</span> : null}
+          <span><i aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-full bg-rose-200" />{missedCount} missed</span>
+        </div>
+      ) : null}
+      <div id="quiz-results-content" className={mapVisible ? "hidden lg:contents" : "contents"}>
       {!reviewOpen ? (
         <>
           <div className="px-5 pb-2 pt-5 sm:px-6 sm:pt-6">
@@ -274,6 +333,7 @@ export function ResultsDashboard({
           </div>
         </>
       )}
+      </div>
     </motion.section>
   );
 }
