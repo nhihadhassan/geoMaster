@@ -137,6 +137,7 @@ import {
 } from "@/components/map/mapLayers";
 import {
   countries,
+  getCountriesForRegion,
   getRegionConfig,
   quizCountryIds,
   type Country,
@@ -180,6 +181,20 @@ import type { ExploreSearchResult } from "@/utils/exploreSearch";
 import { isWebglAvailable } from "@/utils/webglSupport";
 
 const IS_DEVELOPMENT = process.env.NODE_ENV !== "production";
+const EUROPE_RESULTS_BOUNDS: [[number, number], [number, number]] = [
+  [-26, 34],
+  [50, 73],
+];
+const getCountryReviewPadding = (width: number, height: number) => {
+  const isDesktop = width >= 1024;
+  const panelHeight = isDesktop ? 0.76 : 0.7;
+  return {
+    top: isDesktop ? 64 : 76,
+    right: 24,
+    bottom: Math.min(height - 120, Math.round(height * panelHeight + 20)),
+    left: width >= 1024 ? 488 : 24,
+  };
+};
 const IDLE_ROTATION_INITIAL_DELAY_MS = 8_000;
 const IDLE_ROTATION_RESUME_DELAY_MS = 60_000;
 const IDLE_PROMPT_INITIAL_DELAY_MS = 16_000;
@@ -208,6 +223,7 @@ const GENERIC_IDLE_PROMPTS = [
 export function MapContainer() {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
+  const reviewedCountryIdRef = useRef<string | null>(null);
   const previousGuessedIdsRef = useRef<string[]>([]);
   const previousTargetIdRef = useRef<string | null>(null);
   const previousClickTargetIdRef = useRef<string | null>(null);
@@ -586,8 +602,12 @@ export function MapContainer() {
   );
   const visibleLabelIds = useMemo(
     () => {
-      if (gameStatus === "failed" || gameStatus === "gave-up") {
-        return quizCountryIdList;
+      if (isFinished) {
+        // Finished results become a learning map. Show the whole selected
+        // region, including countries outside a focused practice roster.
+        return getCountriesForRegion(selectedRegion).map(
+          (country) => country.iso_a3,
+        );
       }
 
       if (isTargetQueueMode) {
@@ -597,11 +617,11 @@ export function MapContainer() {
       return guessedCountryIds;
     },
     [
-      gameStatus,
       guessedCountryIds,
+      isFinished,
       isTargetQueueMode,
-      quizCountryIdList,
       resolvedCountryIds,
+      selectedRegion,
     ],
   );
   const caribbeanInsetMounted =
@@ -629,10 +649,11 @@ export function MapContainer() {
 
   const labelCollections = useMemo(
     () =>
-      buildLabelCollections(quizCountries, visibleLabelIds, "main", {
+      buildLabelCollections(countries, visibleLabelIds, "main", {
         hideMainInsetLabels: caribbeanInsetMounted,
+        results: isFinished,
       }),
-    [caribbeanInsetMounted, quizCountries, visibleLabelIds],
+    [caribbeanInsetMounted, isFinished, visibleLabelIds],
   );
   const learningLabelCollections = useMemo(
     () =>
@@ -2106,6 +2127,9 @@ export function MapContainer() {
     }
 
     const region = getRegionConfig(selectedRegion);
+    const frameBounds = isFinished && selectedRegion === "europe"
+      ? EUROPE_RESULTS_BOUNDS
+      : region.bounds;
     const isAntarctica = selectedSpecialRegion === "antarctica";
     const shouldFrameQuizRegion =
       (selectedMode === "type-to-fill" ||
@@ -2123,6 +2147,7 @@ export function MapContainer() {
         visualViewportRef.current.usableHeight ||
         (typeof window !== "undefined" ? window.innerHeight : 768),
       running: gameStatus === "running" || gameStatus === "paused",
+      results: isFinished,
     });
 
     try {
@@ -2141,10 +2166,10 @@ export function MapContainer() {
         essential: true,
       });
     } else if (shouldFrameQuizRegion) {
-      map.fitBounds(region.bounds, {
+      map.fitBounds(frameBounds, {
         padding: regionPadding,
-        pitch: region.pitch,
-        bearing: region.bearing,
+        pitch: isFinished ? 0 : region.pitch,
+        bearing: isFinished ? 0 : region.bearing,
         duration: 1300,
         essential: true,
         retainPadding: false,
@@ -2172,6 +2197,7 @@ export function MapContainer() {
     setMapDebug(getMapDebugSnapshot(map));
   }, [
     gameStatus,
+    isFinished,
     mapLoaded,
     regionPanelOpen,
     selectedMode,
@@ -2579,6 +2605,9 @@ export function MapContainer() {
     // during a run, otherwise the default globe view.
     if (gameStatus !== "idle" && !selectedSpecialRegion) {
       const region = getRegionConfig(selectedRegion);
+      const frameBounds = isFinished && selectedRegion === "europe"
+        ? EUROPE_RESULTS_BOUNDS
+        : region.bounds;
       const frameWidth =
         visualViewportRef.current.usableWidth ||
         (typeof window !== "undefined" ? window.innerWidth : 1024);
@@ -2586,14 +2615,15 @@ export function MapContainer() {
         visualViewportRef.current.usableHeight ||
         (typeof window !== "undefined" ? window.innerHeight : 768);
 
-      map.fitBounds(region.bounds, {
+      map.fitBounds(frameBounds, {
         padding: getQuizFramePadding({
           width: frameWidth,
           height: frameHeight,
           running: true,
+          results: isFinished,
         }),
-        pitch: region.pitch,
-        bearing: region.bearing,
+        pitch: isFinished ? 0 : region.pitch,
+        bearing: isFinished ? 0 : region.bearing,
         duration: 900,
         essential: true,
         retainPadding: false,
@@ -2610,7 +2640,61 @@ export function MapContainer() {
       duration: 900,
       essential: true,
     });
-  }, [gameStatus, registerMapInteraction, selectedRegion, selectedSpecialRegion]);
+  }, [gameStatus, isFinished, registerMapInteraction, selectedRegion, selectedSpecialRegion]);
+
+  const focusReviewedCountry = useCallback((country: Country | null) => {
+    const map = mapRef.current;
+    const previousId = reviewedCountryIdRef.current;
+
+    if (map && previousId && previousId !== country?.iso_a3) {
+      setCountryFeatureState(map, previousId, { target: false });
+    }
+    reviewedCountryIdRef.current = country?.iso_a3 ?? null;
+
+    if (!map) {
+      return;
+    }
+
+    if (!country) {
+      if (isFinished && previousId) {
+        const region = getRegionConfig(selectedRegion);
+        const width = visualViewportRef.current.usableWidth || window.innerWidth;
+        const height = visualViewportRef.current.usableHeight || window.innerHeight;
+        const frameBounds = selectedRegion === "europe"
+          ? EUROPE_RESULTS_BOUNDS
+          : region.bounds;
+        map.fitBounds(frameBounds, {
+          padding: getQuizFramePadding({ width, height, running: true, results: true }),
+          pitch: 0,
+          bearing: 0,
+          duration: 850,
+          essential: true,
+          retainPadding: false,
+        });
+      }
+      return;
+    }
+
+    setCountryFeatureState(map, country.iso_a3, {
+      target: true,
+      targetPulse: 1,
+    });
+    const frameWidth = visualViewportRef.current.usableWidth || window.innerWidth;
+    const frameHeight = visualViewportRef.current.usableHeight || window.innerHeight;
+    map.flyTo({
+      center: [country.center.lng, country.center.lat],
+      zoom: Math.max(
+        getRegionConfig(selectedRegion).zoom,
+        Math.min(country.zoom, frameWidth < 768 ? 4.25 : country.zoom),
+      ),
+      padding: getCountryReviewPadding(frameWidth, frameHeight),
+      pitch: 0,
+      bearing: 0,
+      retainPadding: false,
+      duration: 850,
+      essential: true,
+    });
+  }, [isFinished, selectedRegion]);
 
   const reopenLanding = useCallback(() => {
     if (gameStatus === "running") {
@@ -2863,6 +2947,7 @@ export function MapContainer() {
             <ResultsDashboard
               onChangeRegion={() => openRegionPanel()}
               onContinueLearning={() => setRegionPanelOpen(false)}
+              onReviewCountrySelect={focusReviewedCountry}
             />
           ) : null}
         </>

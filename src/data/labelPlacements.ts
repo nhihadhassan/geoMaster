@@ -25,6 +25,7 @@ type Placement = {
 export type LabelPlacement = {
   main?: Placement;
   inset?: Placement;
+  results?: Placement;
 };
 
 export type LabelProperties = {
@@ -573,6 +574,47 @@ export const labelPlacements: Record<string, LabelPlacement> = {
   },
 };
 
+// The end-of-quiz Europe view uses a dedicated callout layout. The dense
+// central states keep their authoritative anchors while their labels sit in
+// nearby open water, where Mapbox can show every selected-region name.
+const resultsLabelPlacements: Record<string, Placement> = {
+  GBR: { labelCoord: [-13, 61], leaderAnchorCoord: [-2, 54], textAnchor: "right", labelSize: "small" },
+  ESP: { labelCoord: [-16, 45], leaderAnchorCoord: [-3.5, 40], textAnchor: "right", labelSize: "small" },
+  FRA: { labelCoord: [-9, 52], leaderAnchorCoord: [2, 46], textAnchor: "right", labelSize: "small" },
+  AND: { labelCoord: [-14, 39], leaderAnchorCoord: [1.5, 42.5], textAnchor: "right", labelSize: "small" },
+  BEL: { labelCoord: [-2, 56], leaderAnchorCoord: [4, 50.83], textAnchor: "right", labelSize: "small" },
+  CYP: { labelCoord: [38, 36], leaderAnchorCoord: [33, 35], textAnchor: "left", labelSize: "small" },
+  DNK: { labelCoord: [7, 62], leaderAnchorCoord: [10, 56], textAnchor: "right", labelSize: "small" },
+  NLD: { labelCoord: [-1, 60], leaderAnchorCoord: [5.75, 52.5], textAnchor: "right", labelSize: "small" },
+  LUX: { labelCoord: [-1, 47], leaderAnchorCoord: [6.17, 49.75], textAnchor: "right", labelSize: "small" },
+  CHE: { labelCoord: [-4, 44], leaderAnchorCoord: [8, 47], textAnchor: "right", labelSize: "small" },
+  LIE: { labelCoord: [14, 45], leaderAnchorCoord: [9.53, 47.27], textAnchor: "left", labelSize: "small" },
+  AUT: { labelCoord: [18, 52], leaderAnchorCoord: [13.33, 47.33], textAnchor: "left", labelSize: "small" },
+  CZE: { labelCoord: [7, 52], leaderAnchorCoord: [15.5, 49.75], textAnchor: "right", labelSize: "small" },
+  SVK: { labelCoord: [26, 55], leaderAnchorCoord: [19.5, 48.67], textAnchor: "left", labelSize: "small" },
+  SVN: { labelCoord: [6, 47], leaderAnchorCoord: [14.82, 46.12], textAnchor: "right", labelSize: "small" },
+  HRV: { labelCoord: [4, 45], leaderAnchorCoord: [15.5, 45.17], textAnchor: "right", labelSize: "small" },
+  BIH: { labelCoord: [10, 44], leaderAnchorCoord: [18, 44], textAnchor: "right", labelSize: "small" },
+  ITA: { labelCoord: [0, 40], leaderAnchorCoord: [12.83, 42.83], textAnchor: "right", labelSize: "small" },
+  MCO: { labelCoord: [16, 48], leaderAnchorCoord: [7.4, 43.73], textAnchor: "left", labelSize: "small" },
+  SMR: { labelCoord: [17, 46], leaderAnchorCoord: [12.42, 43.77], textAnchor: "left", labelSize: "small" },
+  VAT: { labelCoord: [18, 39], leaderAnchorCoord: [12.45, 41.9], textAnchor: "left", labelSize: "small" },
+  HUN: { labelCoord: [26, 51], leaderAnchorCoord: [20, 47], textAnchor: "left", labelSize: "small" },
+  POL: { labelCoord: [17, 57], leaderAnchorCoord: [20, 52], textAnchor: "left", labelSize: "small" },
+  SRB: { labelCoord: [27, 42], leaderAnchorCoord: [21, 44], textAnchor: "left", labelSize: "small" },
+  KOS: { labelCoord: [16, 40], leaderAnchorCoord: [20.9, 42.6], textAnchor: "right", labelSize: "small" },
+  MNE: { labelCoord: [14, 42], leaderAnchorCoord: [19.3, 42.5], textAnchor: "right", labelSize: "small" },
+  MKD: { labelCoord: [24, 38], leaderAnchorCoord: [22, 41.83], textAnchor: "left", labelSize: "small" },
+  ALB: { labelCoord: [10, 38], leaderAnchorCoord: [20, 41], textAnchor: "right", labelSize: "small" },
+  GRC: { labelCoord: [27, 36], leaderAnchorCoord: [22, 39], textAnchor: "left", labelSize: "small" },
+  PRT: { labelCoord: [-16, 35], leaderAnchorCoord: [-8, 39.5], textAnchor: "right", labelSize: "small" },
+  ROU: { labelCoord: [36, 52], leaderAnchorCoord: [25, 46], textAnchor: "left", labelSize: "small" },
+  MDA: { labelCoord: [40, 46], leaderAnchorCoord: [29, 47], textAnchor: "left", labelSize: "small" },
+  LVA: { labelCoord: [34, 63], leaderAnchorCoord: [24.6, 56.9], textAnchor: "left", labelSize: "small" },
+  LTU: { labelCoord: [34, 58], leaderAnchorCoord: [24, 56], textAnchor: "left", labelSize: "small" },
+  EST: { labelCoord: [34, 68], leaderAnchorCoord: [26, 59], textAnchor: "left", labelSize: "small" },
+};
+
 const emptyLabelCollection = {
   type: "FeatureCollection",
   features: [],
@@ -762,7 +804,7 @@ export const buildLabelCollections = (
   countries: Country[],
   countryIds: string[],
   surface: LabelSurface,
-  options: { hideMainInsetLabels?: boolean } = {},
+  options: { hideMainInsetLabels?: boolean; results?: boolean } = {},
 ) => {
   const countryIdSet = new Set(countryIds);
   const labelFeatures: Feature<Point, LabelProperties>[] = [];
@@ -772,7 +814,9 @@ export const buildLabelCollections = (
     .filter((country) => countryIdSet.has(country.iso_a3))
     .forEach((country) => {
       const placement =
-        labelPlacements[country.iso_a3]?.[surface] ??
+        (options.results && resultsLabelPlacements[country.iso_a3]) ||
+        (options.results && labelPlacements[country.iso_a3]?.results) ||
+        labelPlacements[country.iso_a3]?.[surface] ||
         labelPlacements[country.iso_a3]?.main;
 
       if (

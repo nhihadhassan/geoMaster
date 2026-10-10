@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CountryEducationCard } from "@/components/game/CountryEducationCard";
 import { ShareResultCard } from "@/components/game/ShareResultCard";
 import { features } from "@/config/features";
@@ -17,9 +17,8 @@ type ReviewGroup = {
   countries: Country[];
 };
 
-// The chip's colour already says how this run went. The dot says how the
-// country has gone over time, so a chronic miss reads differently from a
-// one-off slip - and this is the read a future mastery map will build on.
+type ReviewFilter = "missed" | "found";
+
 const masteryDotClasses: Record<MasteryLevel, string> = {
   mastered: "bg-emerald-300",
   learning: "bg-cyan-300/80",
@@ -34,22 +33,16 @@ const masteryLabels: Record<MasteryLevel, string> = {
   unseen: "first time seen",
 };
 
-const toneClasses: Record<ReviewGroup["tone"], string> = {
-  emerald: "border-emerald-200/24 bg-emerald-300/12 text-emerald-50",
-  amber: "border-amber-200/24 bg-amber-300/12 text-amber-50",
-  rose: "border-rose-200/24 bg-rose-300/12 text-rose-50",
-};
-
 type ResultsDashboardProps = {
-  /** Reopens quiz setup. Omitted when there is nowhere to send the user. */
   onChangeRegion?: () => void;
-  /** Dismisses the results and returns to explore mode on the same map. */
   onContinueLearning?: () => void;
+  onReviewCountrySelect?: (country: Country | null) => void;
 };
 
 export function ResultsDashboard({
   onChangeRegion,
   onContinueLearning,
+  onReviewCountrySelect,
 }: ResultsDashboardProps = {}) {
   const prefersReducedMotion = useReducedMotion();
   const gameStatus = useGameStore((state) => state.gameStatus);
@@ -61,28 +54,14 @@ export function ResultsDashboard({
   const score = useGameStore((state) => state.score);
   const total = useGameStore((state) => state.total);
   const retryQuiz = useGameStore((state) => state.retryQuiz);
-  const hintsUsed = useGameStore((state) => state.hintsUsed);
   const startCustomQuiz = useGameStore((state) => state.startCustomQuiz);
   const backToRegionSelect = useGameStore((state) => state.backToRegionSelect);
   const lastFeedbackEvent = useGameStore((state) => state.lastFeedbackEvent);
-  const reviewKey = `${gameStatus}-${selectedRegion}-${selectedMode}`;
-  const [drawerState, setDrawerState] = useState<{
-    key: string;
-    expanded: boolean;
-    selectedCountryId: string | null;
-  }>({
-    key: reviewKey,
-    expanded: false,
-    selectedCountryId: null,
-  });
-  const expanded = drawerState.key === reviewKey ? drawerState.expanded : false;
-  const selectedCountryId =
-    drawerState.key === reviewKey ? drawerState.selectedCountryId : null;
-  const region = getRegionConfig(selectedRegion);
   const customQuizSet = useGameStore((state) => state.customQuizSet);
   const countryProgress = useProgressStore((state) => state.countries);
   const progressHydrated = useProgressStore((state) => state.hydrated);
   const showMastery = features.progressTracking && progressHydrated;
+  const region = getRegionConfig(selectedRegion);
   const quizLabel = customQuizSet?.label ?? region.label;
   const statusLabel =
     gameStatus === "completed"
@@ -90,357 +69,211 @@ export function ResultsDashboard({
       : gameStatus === "gave-up"
         ? "Quiz ended"
         : "Time expired";
-  const modeBResults = Object.values(countryResults);
   const isTargetQueueMode =
     selectedMode === "identify-shaded" ||
     selectedMode === "click-country" ||
     selectedMode === "capital-challenge";
+  const reviewKey = `${gameStatus}-${selectedRegion}-${selectedMode}-${quizLabel}`;
+  const [reviewState, setReviewState] = useState<{
+    key: string;
+    open: boolean;
+    filter: ReviewFilter;
+    selectedCountryId: string | null;
+  }>({ key: reviewKey, open: false, filter: "missed", selectedCountryId: null });
+  const reviewOpen = reviewState.key === reviewKey && reviewState.open;
+  const reviewFilter = reviewState.key === reviewKey ? reviewState.filter : "missed";
+  const selectedCountryId = reviewState.key === reviewKey ? reviewState.selectedCountryId : null;
+  const resultsPanelRef = useRef<HTMLElement>(null);
+  const reviewContentRef = useRef<HTMLDivElement>(null);
   const countryById = useMemo(
     () => new Map(quizCountries.map((country) => [country.iso_a3, country])),
     [quizCountries],
   );
-  const perfectCount = modeBResults.filter(
-    (result) => result.status === "correct",
-  ).length;
-  const assistedCount = modeBResults.filter(
-    (result) => result.status === "assisted",
-  ).length;
-  const resolvedModeBIds = new Set(Object.keys(countryResults));
-  const missedCount =
-    modeBResults.filter((result) => result.status === "missed").length +
-    (isTargetQueueMode && (gameStatus === "failed" || gameStatus === "gave-up")
-      ? quizCountries.filter((country) => !resolvedModeBIds.has(country.iso_a3))
-          .length
-      : 0);
+  const modeResults = Object.values(countryResults);
+  const perfectCount = modeResults.filter((result) => result.status === "correct").length;
+  const assistedCount = modeResults.filter((result) => result.status === "assisted").length;
+
   const reviewGroups = useMemo<ReviewGroup[]>(() => {
     if (isTargetQueueMode) {
-      const perfect = quizCountries.filter(
-        (country) => countryResults[country.iso_a3]?.status === "correct",
-      );
-      const assisted = quizCountries.filter(
-        (country) => countryResults[country.iso_a3]?.status === "assisted",
-      );
+      const perfect = quizCountries.filter((country) => countryResults[country.iso_a3]?.status === "correct");
+      const assisted = quizCountries.filter((country) => countryResults[country.iso_a3]?.status === "assisted");
       const missed = quizCountries.filter((country) => {
         const result = countryResults[country.iso_a3];
-
-        return (
-          result?.status === "missed" ||
-          ((gameStatus === "failed" || gameStatus === "gave-up") && !result)
-        );
+        return result?.status === "missed" || ((gameStatus === "failed" || gameStatus === "gave-up") && !result);
       });
-
       return [
         { label: "Perfect", tone: "emerald", countries: perfect },
         { label: "With hints", tone: "amber", countries: assisted },
         { label: "Missed", tone: "rose", countries: missed },
       ];
     }
-
     const guessed = new Set(guessedCountryIds);
-    const correct = quizCountries.filter((country) =>
-      guessed.has(country.iso_a3),
-    );
-    const missed =
-      gameStatus === "failed" || gameStatus === "gave-up"
-        ? quizCountries.filter((country) => !guessed.has(country.iso_a3))
-        : [];
-
+    const correct = quizCountries.filter((country) => guessed.has(country.iso_a3));
+    const missed = gameStatus === "failed" || gameStatus === "gave-up"
+      ? quizCountries.filter((country) => !guessed.has(country.iso_a3))
+      : [];
     return [
-      { label: "Correct", tone: "emerald", countries: correct },
+      { label: "Found", tone: "emerald", countries: correct },
       { label: "Missed", tone: "rose", countries: missed },
     ];
-  }, [
-    countryResults,
-    gameStatus,
-    guessedCountryIds,
-    isTargetQueueMode,
-    quizCountries,
-  ]);
+  }, [countryResults, gameStatus, guessedCountryIds, isTargetQueueMode, quizCountries]);
+  const missedCount = reviewGroups.find((group) => group.tone === "rose")?.countries.length ?? 0;
   const reviewCountries = useMemo(
-    () => reviewGroups.flatMap((group) => group.countries),
-    [reviewGroups],
+    () => reviewGroups.filter((group) => reviewFilter === "missed" ? group.tone === "rose" : group.tone !== "rose").flatMap((group) => group.countries),
+    [reviewFilter, reviewGroups],
   );
-  const selectedCountry =
-    (selectedCountryId ? countryById.get(selectedCountryId) : null) ??
-    reviewCountries[0] ??
-    null;
-  // Everything this run did not nail: outright misses plus answers that needed
-  // a hint. That is the set worth drilling next.
+  const selectedCountry = selectedCountryId ? countryById.get(selectedCountryId) ?? null : null;
+
+  useEffect(() => {
+    resultsPanelRef.current?.scrollTo({ top: 0 });
+    reviewContentRef.current?.scrollTo({ top: 0 });
+  }, [reviewFilter, reviewOpen, selectedCountryId]);
+
+  // Include hinted answers as useful practice, and include every unresolved country
+  // in a timed or manually ended target queue.
   const practiceCountryIds = useMemo(() => {
     if (isTargetQueueMode) {
-      return quizCountries
-        .filter((country) => {
-          const result = countryResults[country.iso_a3];
-
-          return (
-            result?.status === "missed" ||
-            result?.status === "assisted" ||
-            ((gameStatus === "failed" || gameStatus === "gave-up") && !result)
-          );
-        })
-        .map((country) => country.iso_a3);
+      return quizCountries.filter((country) => {
+        const result = countryResults[country.iso_a3];
+        return result?.status === "missed" || result?.status === "assisted" ||
+          ((gameStatus === "failed" || gameStatus === "gave-up") && !result);
+      }).map((country) => country.iso_a3);
     }
-
     const guessed = new Set(guessedCountryIds);
+    return quizCountries.filter((country) => !guessed.has(country.iso_a3)).map((country) => country.iso_a3);
+  }, [countryResults, gameStatus, guessedCountryIds, isTargetQueueMode, quizCountries]);
+  const canPractice = features.practiceMistakes && practiceCountryIds.length > 0;
+  const completionPulse = Boolean(lastFeedbackEvent?.completed) && gameStatus === "completed";
+  const foundCount = Math.max(0, total - missedCount);
+  const correctCount = isTargetQueueMode ? perfectCount : score;
+  const initialFilter: ReviewFilter = missedCount > 0 ? "missed" : "found";
 
-    return quizCountries
-      .filter((country) => !guessed.has(country.iso_a3))
-      .map((country) => country.iso_a3);
-  }, [
-    countryResults,
-    gameStatus,
-    guessedCountryIds,
-    isTargetQueueMode,
-    quizCountries,
-  ]);
-  const canPracticeMistakes =
-    features.practiceMistakes && practiceCountryIds.length > 0;
+  if (gameStatus !== "completed" && gameStatus !== "failed" && gameStatus !== "gave-up") return null;
 
-  const completionPulse =
-    Boolean(lastFeedbackEvent?.completed) && gameStatus === "completed";
-
-  if (
-    gameStatus !== "completed" &&
-    gameStatus !== "failed" &&
-    gameStatus !== "gave-up"
-  ) {
-    return null;
-  }
+  const openReview = () => setReviewState({
+    key: reviewKey,
+    open: true,
+    filter: initialFilter,
+    selectedCountryId: null,
+  });
+  const chooseFilter = (filter: ReviewFilter) => setReviewState({
+    key: reviewKey,
+    open: true,
+    filter,
+    selectedCountryId: null,
+  });
+  const finishResults = (action?: () => void) => {
+    onReviewCountrySelect?.(null);
+    backToRegionSelect();
+    action?.();
+  };
+  const retryCurrentQuiz = () => {
+    onReviewCountrySelect?.(null);
+    retryQuiz();
+  };
+  const startPractice = () => {
+    onReviewCountrySelect?.(null);
+    startCustomQuiz(practiceCountryIds, { label: `Practice · ${quizLabel}` });
+  };
 
   return (
     <motion.section
-      initial={{ opacity: 0, y: 26, scale: 0.98 }}
-      animate={
-        completionPulse && !prefersReducedMotion
-          ? {
-              opacity: 1,
-              y: 0,
-              scale: [1, 1.01, 1],
-              boxShadow: [
-                "0 18px 48px rgba(0,0,0,0.34)",
-                "0 22px 72px rgba(16,185,129,0.28)",
-                "0 18px 48px rgba(0,0,0,0.34)",
-              ],
-            }
-          : { opacity: 1, y: 0, scale: 1 }
-      }
-      transition={
-        completionPulse && !prefersReducedMotion
-          ? { duration: 0.72, ease: [0.22, 1, 0.36, 1] }
-          : { type: "spring", stiffness: 240, damping: 28 }
-      }
-      className={`absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 overflow-hidden rounded-3xl border border-white/14 bg-zinc-950/72 text-white shadow-xl shadow-black/34 backdrop-blur-2xl sm:left-1/2 sm:bottom-5 sm:w-[min(48rem,calc(100vw-2rem))] sm:-translate-x-1/2 ${
-        expanded
-          ? "max-h-[82dvh] overflow-y-auto p-4 sm:max-h-[min(72vh,40rem)] sm:p-5"
-          : "p-3"
-      }`}
+      ref={resultsPanelRef}
+      initial={{ opacity: 0, y: 18, scale: 0.99 }}
+      animate={completionPulse && !prefersReducedMotion
+        ? { opacity: 1, y: 0, scale: [1, 1.01, 1], boxShadow: ["0 18px 48px rgba(0,0,0,0.34)", "0 22px 72px rgba(16,185,129,0.22)", "0 18px 48px rgba(0,0,0,0.34)"] }
+        : { opacity: 1, y: 0, scale: 1 }}
+      transition={completionPulse && !prefersReducedMotion ? { duration: 0.7 } : { type: "spring", stiffness: 240, damping: 28 }}
+      aria-label={reviewOpen ? "Review quiz answers" : "Quiz results"}
+      className={`absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 rounded-3xl border border-white/14 bg-[#111a20]/95 text-white shadow-xl shadow-black/34 backdrop-blur-2xl lg:bottom-5 lg:left-5 lg:right-auto lg:w-[min(29rem,calc(100vw-2.5rem))] ${reviewOpen ? "flex max-h-[70dvh] flex-col overflow-hidden lg:max-h-[min(76vh,48rem)]" : "max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto"}`}
     >
-      <div
-        className={`flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between ${
-          expanded
-            ? "sticky top-0 z-10 -mx-4 -mt-4 border-b border-white/10 bg-zinc-950/86 px-4 py-3 backdrop-blur-2xl sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4"
-            : ""
-        }`}
-      >
-        <div className="min-w-0 flex-1 sm:min-w-[13rem]">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-100/60">
-            {statusLabel}
-          </p>
-          <h2
-            className={
-              expanded
-                ? "mt-2 text-2xl font-semibold"
-                : "mt-1 truncate text-lg font-semibold"
-            }
-          >
-            {quizLabel}
-          </h2>
-          <p
-            className={
-              expanded
-                ? "mt-2 text-sm text-white/64"
-                : "mt-1 text-sm text-white/64"
-            }
-          >
-            You found {score} of {total} countries.
-          </p>
-          <p className="mt-1 text-xs font-medium text-white/50">
-            {hintsUsed === 0
-              ? "No hints used"
-              : hintsUsed === 1
-                ? "1 hint used"
-                : `${hintsUsed} hints used`}
-          </p>
-          {isTargetQueueMode ? (
-            <p className="mt-1 text-xs font-medium text-white/50">
-              Perfect {perfectCount} · With hints {assistedCount} · Missed{" "}
-              {missedCount}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() =>
-              setDrawerState((state) => ({
-                key: reviewKey,
-                expanded: state.key === reviewKey ? !state.expanded : true,
-                selectedCountryId:
-                  state.key === reviewKey ? state.selectedCountryId : null,
-              }))
-            }
-            className="min-h-11 rounded-full border border-white/12 bg-white/7 px-4 py-2 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
-          >
-            {expanded ? (
-              "Minimize"
-            ) : (
-              <>
-                <span className="sm:hidden">Review</span>
-                <span className="hidden sm:inline">Expand Review</span>
-              </>
-            )}
-          </button>
-          {onChangeRegion ? (
-            <button
-              type="button"
-              onClick={() => {
-                backToRegionSelect();
-                onChangeRegion();
-              }}
-              className="min-h-11 rounded-full border border-white/12 bg-white/7 px-4 py-2 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white"
-            >
-              Change Region
-            </button>
-          ) : null}
-          {onContinueLearning ? (
-            <button
-              type="button"
-              onClick={() => {
-                backToRegionSelect();
-                onContinueLearning();
-              }}
-              className="min-h-11 rounded-full border border-cyan-100/22 bg-cyan-300/12 px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20"
-            >
-              Explore
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={retryQuiz}
-            className={`min-h-11 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-              canPracticeMistakes
-                ? "border-white/12 bg-white/7 text-white/66 hover:bg-white/12 hover:text-white"
-                : "border-emerald-100/34 bg-emerald-300/22 text-emerald-50 shadow-sm shadow-emerald-950/20 hover:bg-emerald-300/30"
-            }`}
-          >
-            Try Again
-          </button>
-          {canPracticeMistakes ? (
-            <button
-              type="button"
-              onClick={() =>
-                startCustomQuiz(practiceCountryIds, {
-                  label: `Practice · ${quizLabel}`,
-                })
-              }
-              className="min-h-11 rounded-full border border-emerald-100/34 bg-emerald-300/22 px-4 py-2 text-sm font-semibold text-emerald-50 shadow-sm shadow-emerald-950/20 transition hover:bg-emerald-300/30"
-            >
-              Practice {practiceCountryIds.length}
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      {expanded ? (
+      {!reviewOpen ? (
         <>
-        <div className="mt-4 flex justify-end">
-          {features.shareResultCard ? (
-            <ShareResultCard
-              quizLabel={quizLabel}
-              modeLabel={modeLabels[selectedMode]}
-              score={score}
-              total={total}
-              statusLabel={statusLabel}
-            />
-          ) : null}
-        </div>
-        {showMastery ? (
-          <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.68rem] font-medium text-white/45">
-            <span className="uppercase tracking-[0.18em] text-white/38">
-              Over time
-            </span>
-            {(["mastered", "learning", "shaky"] as const).map((level) => (
-              <span key={level} className="inline-flex items-center gap-1.5">
-                <span
-                  className={`size-1.5 rounded-full ${masteryDotClasses[level]}`}
-                  aria-hidden="true"
-                />
-                {masteryLabels[level]}
-              </span>
-            ))}
-          </p>
-        ) : null}
-        <div className="mt-3 grid gap-4 pb-1 lg:grid-cols-[1fr_20rem]">
-          <div className="space-y-4">
-            {reviewGroups.map((group) =>
-              group.countries.length > 0 ? (
-                <section key={group.label}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-white/60">
-                      {group.label}
-                    </h3>
-                    <span className="text-xs font-semibold text-white/58">
-                      {group.countries.length}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {group.countries.map((country) => (
-                      <button
-                        key={country.iso_a3}
-                        type="button"
-                        onClick={() =>
-                          setDrawerState((state) => ({
-                            key: reviewKey,
-                            expanded:
-                              state.key === reviewKey ? state.expanded : true,
-                            selectedCountryId: country.iso_a3,
-                          }))
-                        }
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:bg-white/16 ${
-                          selectedCountry?.iso_a3 === country.iso_a3
-                            ? "border-white/70 bg-white/18 text-white"
-                            : toneClasses[group.tone]
-                        }`}
-                      >
-                        {showMastery ? (
-                          <span
-                            className={`size-1.5 shrink-0 rounded-full ${
-                              masteryDotClasses[
-                                getMasteryLevel(countryProgress[country.iso_a3])
-                              ]
-                            }`}
-                            title={`${country.name}: ${
-                              masteryLabels[
-                                getMasteryLevel(countryProgress[country.iso_a3])
-                              ]
-                            }`}
-                          />
-                        ) : null}
-                        <span>{country.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ) : null,
-            )}
+          <div className="px-5 pb-2 pt-5 sm:px-6 sm:pt-6">
+            <p className="mb-1 text-[0.62rem] font-semibold uppercase tracking-[0.17em] text-white/50">{statusLabel}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.19em] text-white/65">
+                {quizLabel} · {modeLabels[selectedMode]}
+              </p>
+              <span className="text-sm font-semibold tabular-nums text-white/70">{total ? Math.round((score / total) * 100) : 0}%</span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <h2 aria-label={`${score} of ${total}`} className="text-[2.65rem] font-semibold leading-none tracking-[-0.06em]">
+                {score}<span aria-hidden="true" className="ml-1 text-2xl font-medium tracking-[-0.04em] text-white/65">/{total}</span>
+              </h2>
+            </div>
+            <p className="mt-2 text-sm text-white/82">
+              {missedCount > 0 ? `${missedCount} ${missedCount === 1 ? "country" : "countries"} left to learn.` : "Every country found."}
+            </p>
+            <div className="mt-4 flex h-1.5 overflow-hidden rounded-full bg-rose-200/80" role="img" aria-label={`${score} of ${total} countries found`}>
+              <span className="bg-emerald-300 transition-[width]" style={{ width: `${total ? Math.min(100, (correctCount / total) * 100) : 0}%` }} />
+              {assistedCount > 0 ? <span className="bg-amber-300 transition-[width]" style={{ width: `${total ? Math.min(100, (assistedCount / total) * 100) : 0}%` }} /> : null}
+            </div>
+            <div className="mt-2 flex justify-between text-[0.7rem] font-medium text-white/70">
+              <span><i className="mr-1.5 inline-block size-1.5 rounded-full bg-emerald-300" />{correctCount} found{assistedCount > 0 ? <span className="ml-2 text-amber-200"><i className="mr-1.5 inline-block size-1.5 rounded-full bg-amber-300" />{assistedCount} with hints</span> : null}</span>
+              <span><i className="mr-1.5 inline-block size-1.5 rounded-full bg-rose-200" />{missedCount} missed</span>
+            </div>
+            <button type="button" onClick={openReview} className="mt-4 flex min-h-16 w-full items-center gap-3 border-y border-white/12 py-3 text-left transition hover:bg-white/[0.035] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-200/70">
+              <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-rose-200/10 text-rose-100">≡</span>
+              <span className="min-w-0 flex-1"><strong className="block text-sm font-semibold">See the countries you {missedCount ? "missed" : "found"}</strong><small className="mt-1 block text-xs text-white/65">Review their names and capitals</small></span>
+              <span aria-hidden="true" className="text-2xl leading-none text-white/65">›</span>
+            </button>
           </div>
-
-          {selectedCountry ? (
-            <CountryEducationCard country={selectedCountry} variant="review" />
-          ) : null}
-        </div>
+          <div className="px-5 pb-3 pt-4 sm:px-6">
+            {canPractice ? (
+              <>
+                <button type="button" onClick={startPractice} className="flex min-h-12 w-full items-center justify-center gap-3 rounded-xl border border-emerald-100/50 bg-emerald-200 px-4 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100">
+                  Practice {practiceCountryIds.length} {assistedCount ? "countries to revisit" : "missed countries"}<span aria-hidden="true" className="text-lg font-normal">→</span>
+                </button>
+                <p className="mt-2 text-center text-[0.7rem] leading-5 text-white/65">A shorter quiz focused on what needs another look.</p>
+              </>
+            ) : (
+              <button type="button" onClick={retryCurrentQuiz} className="min-h-12 w-full rounded-xl border border-emerald-100/50 bg-emerald-200 px-4 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-100">Retry {quizLabel}</button>
+            )}
+            <div className={`mt-3 grid gap-2 ${canPractice && onChangeRegion ? "grid-cols-2" : "grid-cols-1"}`}>
+              {canPractice ? <button type="button" onClick={retryCurrentQuiz} className="min-h-11 rounded-xl border border-white/16 bg-white/[0.035] px-3 text-sm font-medium text-white/85 transition hover:bg-white/10">Retry {quizLabel}</button> : null}
+              {onChangeRegion ? <button type="button" onClick={() => finishResults(onChangeRegion)} className="min-h-11 rounded-xl border border-white/16 bg-white/[0.035] px-3 text-sm font-medium text-white/85 transition hover:bg-white/10">Choose another quiz</button> : null}
+            </div>
+            {onContinueLearning ? <button type="button" onClick={() => finishResults(onContinueLearning)} className="min-h-11 w-full text-xs font-medium text-white/65 transition hover:text-white">Explore the map <span aria-hidden="true">↗</span></button> : null}
+          </div>
         </>
-      ) : null}
+      ) : (
+        <>
+          <div className="z-10 shrink-0 border-b border-white/12 bg-[#111a20]/96 px-5 pb-4 pt-4 backdrop-blur-2xl sm:px-6">
+            <button type="button" onClick={() => { onReviewCountrySelect?.(null); setReviewState({ ...reviewState, key: reviewKey, open: false }); }} className="mb-3 min-h-11 text-xs font-medium text-cyan-100/85 hover:text-white">← Results</button>
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-white/65">{quizLabel} · Review answers</p>
+            <h2 className="mt-1 text-xl font-semibold">{reviewFilter === "missed" ? `${missedCount} countries to learn` : `${foundCount} countries found`}</h2>
+            <p className="mt-1 text-xs text-white/65">Choose a country to see its capital and map location.</p>
+            <div className="mt-3 flex gap-2" role="group" aria-label="Filter reviewed countries">
+              {(["missed", "found"] as const).map((filter) => {
+                const count = filter === "missed" ? missedCount : foundCount;
+                return <button key={filter} type="button" aria-pressed={reviewFilter === filter} onClick={() => { onReviewCountrySelect?.(null); chooseFilter(filter); }} className={`min-h-11 rounded-lg border px-3 text-xs font-medium capitalize transition ${reviewFilter === filter ? filter === "missed" ? "border-rose-200/30 bg-rose-200/10 text-rose-100" : "border-emerald-200/30 bg-emerald-200/10 text-emerald-100" : "border-white/12 text-white/65 hover:bg-white/8"}`}>{filter} <span className="ml-1 tabular-nums">{count}</span></button>;
+              })}
+            </div>
+          </div>
+          <div ref={reviewContentRef} className="min-h-0 flex-1 overflow-y-auto px-5 lg:px-6">
+            {selectedCountry ? <>
+              <button type="button" onClick={() => { onReviewCountrySelect?.(null); setReviewState({ ...reviewState, key: reviewKey, selectedCountryId: null }); }} className="my-3 min-h-11 text-xs font-medium text-cyan-100/85 hover:text-white">← Back to {reviewFilter}</button>
+              <CountryEducationCard country={selectedCountry} variant="review" />
+            </> : reviewGroups.filter((group) => reviewFilter === "missed" ? group.tone === "rose" : group.tone !== "rose").map((group) => group.countries.length ? (
+              <section key={group.label}>
+                {isTargetQueueMode ? <h3 className="sticky top-0 bg-[#111a20]/96 py-2 text-[0.63rem] font-semibold uppercase tracking-[0.18em] text-white/60">{group.label} · {group.countries.length}</h3> : null}
+                {group.countries.map((country) => <button key={country.iso_a3} type="button" onClick={() => { setReviewState({ ...reviewState, key: reviewKey, selectedCountryId: country.iso_a3 }); onReviewCountrySelect?.(country); }} className="flex min-h-14 w-full items-center gap-3 border-b border-white/[0.08] py-2.5 text-left text-white/90 transition hover:text-cyan-100">
+                  <span className="w-8 text-center text-lg" aria-hidden="true">{country.flagEmoji ?? "◉"}</span>
+                  <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{country.name}</span><span className="mt-0.5 block text-xs text-white/60">{country.capital}</span></span>
+                  {showMastery ? <span title={masteryLabels[getMasteryLevel(countryProgress[country.iso_a3])]} className={`size-1.5 rounded-full ${masteryDotClasses[getMasteryLevel(countryProgress[country.iso_a3])]}`} /> : null}
+                  <span aria-hidden="true" className="text-xl text-white/55">›</span>
+                </button>)}
+              </section>
+            ) : null)}
+            {!selectedCountry && reviewCountries.length === 0 ? <p className="py-8 text-center text-sm text-white/65">No countries in this group.</p> : null}
+            {features.shareResultCard ? <div className="flex justify-end py-3"><ShareResultCard quizLabel={quizLabel} modeLabel={modeLabels[selectedMode]} score={score} total={total} statusLabel={statusLabel} /></div> : null}
+          </div>
+          <div className="shrink-0 border-t border-white/12 px-5 py-3 sm:px-6">
+            {canPractice ? <button type="button" onClick={startPractice} className="min-h-11 w-full rounded-xl border border-emerald-100/50 bg-emerald-200 px-4 text-sm font-semibold text-emerald-950">Practice {practiceCountryIds.length} countries</button> : <button type="button" onClick={retryCurrentQuiz} className="min-h-11 w-full rounded-xl border border-emerald-100/50 bg-emerald-200 px-4 text-sm font-semibold text-emerald-950">Retry {quizLabel}</button>}
+          </div>
+        </>
+      )}
     </motion.section>
   );
 }

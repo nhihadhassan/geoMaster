@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   emeraldCtaClass,
   emeraldCtaGlowClass,
@@ -25,10 +25,10 @@ import { formatTime } from "@/utils/formatTime";
 import { unlockGeoAudio } from "@/utils/soundEffects";
 
 const modeDescriptions: Record<GameMode, string> = {
-  "type-to-fill": "Name countries to fill the map.",
-  "identify-shaded": "Name the highlighted country.",
-  "click-country": "Tap the prompted country.",
-  "capital-challenge": "Answer from the capital.",
+  "type-to-fill": "Type each country’s name to fill the map.",
+  "identify-shaded": "Name each country highlighted on the map.",
+  "click-country": "Find and tap each country on the map.",
+  "capital-challenge": "Use each capital to name its country.",
 };
 
 function MinimizeButton({ onClick }: { onClick: () => void }) {
@@ -111,6 +111,7 @@ export function PremiumControls({
   const timerMode = useGameStore((state) => state.timerMode);
   const setTimerMode = useGameStore((state) => state.setTimerMode);
   const panelRootRef = useRef<HTMLDivElement | null>(null);
+  const [regionChoicesOpen, setRegionChoicesOpen] = useState(false);
   const isQuizLocked = gameStatus === "running" || gameStatus === "paused";
   const selectedLabel = selectedSpecialRegion
     ? "Antarctica"
@@ -190,6 +191,7 @@ export function PremiumControls({
               } else {
                 selectRegion(region.id as QuizRegion);
               }
+              setRegionChoicesOpen(false);
             }}
             disabled={isQuizLocked || !region.enabled}
             className={`min-h-11 rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition sm:flex sm:items-baseline sm:gap-2 ${
@@ -208,6 +210,30 @@ export function PremiumControls({
         );
       })}
     </div>
+  );
+
+  const currentRegionOption = regionSelectorConfigs.find(
+    (option) => option.id === (selectedSpecialRegion ?? selectedRegion),
+  );
+  const regionPicker = (
+    <>
+      <button
+        type="button"
+        aria-expanded={regionChoicesOpen}
+        aria-controls="quiz-region-options"
+        onClick={() => setRegionChoicesOpen((open) => !open)}
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-white/14 bg-white/[0.045] px-3 text-left transition hover:bg-white/[0.08]"
+      >
+        <span>
+          <span className="block text-sm font-semibold text-white/90">{selectedLabel}</span>
+          <span className="mt-0.5 block text-xs text-white/60">
+            {currentRegionOption?.count ? `${currentRegionOption.count} countries` : currentRegionOption?.note ?? ""}
+          </span>
+        </span>
+        <span aria-hidden="true" className={`text-lg text-white/65 transition ${regionChoicesOpen ? "rotate-180" : ""}`}>⌄</span>
+      </button>
+      {regionChoicesOpen ? <div id="quiz-region-options" className="mt-2">{regionOptions}</div> : null}
+    </>
   );
 
   const modeOptions = (
@@ -434,6 +460,14 @@ export function PremiumControls({
       return null;
     }
 
+    if (
+      gameStatus === "completed" ||
+      gameStatus === "failed" ||
+      gameStatus === "gave-up"
+    ) {
+      return null;
+    }
+
     return (
       <div ref={panelRootRef}>
         <span
@@ -445,26 +479,19 @@ export function PremiumControls({
         >
           {compactChip}
         </span>
-        <motion.button
-          type="button"
-          initial={{ opacity: 0, x: -14, scale: 0.96 }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 260, damping: 28 }}
-          onClick={() => {
-            if (!isQuizLocked) {
-              onPanelOpenChange(true);
-            }
-          }}
-          disabled={isQuizLocked}
-          className="absolute bottom-28 left-5 z-20 hidden min-h-11 rounded-full border border-white/12 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/64 hover:text-white disabled:cursor-default disabled:opacity-72 sm:block"
-          aria-label={
-            isQuizLocked
-              ? `Region locked during quiz: ${selectedLabel}`
-              : "Open region and mode menu"
-          }
-        >
-          Regions · {selectedLabel}
-        </motion.button>
+        {!isQuizLocked ? (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, x: -14, scale: 0.96 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 28 }}
+            onClick={() => onPanelOpenChange(true)}
+            className="absolute bottom-28 left-5 z-20 hidden min-h-11 rounded-full border border-white/12 bg-zinc-950/52 px-4 py-2 text-sm font-semibold text-white/70 shadow-lg shadow-black/25 backdrop-blur-xl transition hover:bg-zinc-950/64 hover:text-white sm:block"
+            aria-label="Open region and mode menu"
+          >
+            Regions · {selectedLabel}
+          </motion.button>
+        ) : null}
       </div>
     );
   }
@@ -475,7 +502,7 @@ export function PremiumControls({
         initial={{ opacity: 0, y: 28, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 28 }}
-        className="absolute inset-x-2 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 max-h-[68dvh] overflow-hidden rounded-3xl border border-white/12 bg-zinc-950/72 text-white shadow-2xl shadow-black/36 backdrop-blur-2xl sm:hidden"
+        className="absolute inset-x-2 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-30 flex max-h-[68dvh] flex-col overflow-hidden rounded-3xl border border-white/12 bg-zinc-950/72 text-white shadow-2xl shadow-black/36 backdrop-blur-2xl sm:hidden"
         role="dialog"
         aria-modal="true"
         aria-label="Region and mode menu"
@@ -484,52 +511,49 @@ export function PremiumControls({
           <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/22" />
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
-                Setup
-              </p>
-              <p className="truncate text-sm font-semibold text-white/76">
-                {selectedLabel} · {modeLabels[selectedMode]}
-              </p>
+              <p className="text-base font-semibold text-white/92">What would you like to learn?</p>
+              <p className="mt-1 text-xs text-white/60">Choose a region and how you want to play.</p>
             </div>
-            {renderStartButton("header")}
             <MinimizeButton onClick={closePanel} />
           </div>
         </div>
-        <div className="max-h-[calc(68dvh-5.5rem)] space-y-4 overflow-y-auto px-3 py-3">
-          <SetupSection title="Region">{regionOptions}</SetupSection>
-          <SetupSection title="Mode">{modeOptions}</SetupSection>
-          {timerOptions}
-          <div className="border-t border-white/10 pt-3">{togglesSection}</div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 py-3">
+          <SetupSection title="Region">{regionPicker}</SetupSection>
+          <SetupSection title="How to play">{modeOptions}</SetupSection>
+          <details className="border-t border-white/10 pt-2">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-white/58">Timer & preferences<span aria-hidden="true">⌄</span></summary>
+            <div className="space-y-4 pb-2 pt-2">{timerOptions}{togglesSection}</div>
+          </details>
         </div>
+        {canStartQuiz ? <div className="shrink-0 border-t border-white/10 bg-zinc-950/88 px-3 py-3">{renderStartButton("panel")}</div> : null}
       </motion.aside>
 
       <motion.aside
         initial={{ opacity: 0, x: -18, scale: 0.98 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 28 }}
-        className="absolute bottom-28 left-5 z-20 hidden max-h-[calc(100vh-12rem)] w-[min(20rem,calc(100vw-2.5rem))] overflow-y-auto rounded-3xl border border-white/12 bg-zinc-950/56 p-3 text-white shadow-xl shadow-black/30 backdrop-blur-xl sm:block"
+        className="absolute bottom-5 left-5 z-20 hidden max-h-[calc(100vh-7rem)] w-[min(25rem,calc(100vw-2.5rem))] overflow-y-auto rounded-3xl border border-white/12 bg-zinc-950/72 p-4 text-white shadow-xl shadow-black/30 backdrop-blur-xl sm:block"
       >
         <div>
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-white/58">
-              Region
-            </h3>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-white/92">What would you like to learn?</h2>
+              <p className="mt-1 text-xs text-white/60">Choose a region and how you want to play.</p>
+            </div>
             <MinimizeButton onClick={closePanel} />
           </div>
-          {canStartQuiz ? (
-            <div className="mt-3">{renderStartButton("panel")}</div>
-          ) : null}
-          <div className="mt-2">{regionOptions}</div>
+          <div className="mt-4"><SetupSection title="Region">{regionPicker}</SetupSection></div>
         </div>
         <div className="mt-3 border-t border-white/10 pt-3">
-          <SetupSection title="Mode">{modeOptions}</SetupSection>
+          <SetupSection title="How to play">{modeOptions}</SetupSection>
         </div>
-        <div className="mt-3 border-t border-white/10 pt-3">
-          {timerOptions}
+        <div className="mt-3 border-t border-white/10 pt-2">
+          <details>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-white/58">Timer & preferences<span aria-hidden="true">⌄</span></summary>
+            <div className="space-y-4 pb-2 pt-2">{timerOptions}{togglesSection}</div>
+          </details>
         </div>
-        <div className="mt-3 border-t border-white/10 pt-3">
-          {togglesSection}
-        </div>
+        {canStartQuiz ? <div className="mt-3 border-t border-white/10 pt-3">{renderStartButton("panel")}</div> : null}
       </motion.aside>
     </div>
   );

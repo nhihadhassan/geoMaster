@@ -24,12 +24,17 @@ export function getQuizFramePadding({
   width,
   height,
   running,
+  results = false,
 }: {
   width: number;
   height: number;
   running: boolean;
+  results?: boolean;
 }): PaddingOptions {
   const mobile = width < 768;
+  if (results && width >= 1024) {
+    return { top: 112, right: 64, bottom: 160, left: 488 };
+  }
   const base = mobile
     ? MOBILE_FRAME_PADDING
     : running
