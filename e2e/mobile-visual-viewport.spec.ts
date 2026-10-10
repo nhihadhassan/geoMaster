@@ -108,8 +108,9 @@ test("constrains Caribbean detail between the prompt and answer dock", async ({
 }) => {
   await openFresh(page);
   await openQuizSetup(page);
-  await visible(page.getByRole("button", { name: "North America 23 countries" })).click();
-  await visible(page.getByRole("button", { name: /Identify Name/ })).click();
+  await visible(page.locator('button[aria-controls="quiz-region-options"]')).click();
+  await visible(page.getByRole("button", { name: /North America 23 countries/ })).click();
+  await visible(page.getByRole("button", { name: /Identify a country/ })).click();
   await visible(page.getByRole("button", { name: "Start Quiz" })).click();
 
   const shell = page.getByTestId("quiz-shell");

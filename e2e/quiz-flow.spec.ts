@@ -22,7 +22,7 @@ test("landing leads into quiz setup and a running quiz", async ({ page }) => {
 
   // Setup reads as one linear flow rather than tabs.
   await expect(visible(page.getByRole("heading", { name: "Region" }))).toBeVisible();
-  await expect(visible(page.getByRole("heading", { name: "Mode" }))).toBeVisible();
+  await expect(visible(page.getByRole("heading", { name: "How to play" }))).toBeVisible();
 
   await startConfiguredQuiz(page);
 
@@ -39,14 +39,13 @@ test("a finished quiz offers the next action and can be retried", async ({
   await startConfiguredQuiz(page);
   await endQuizViaPause(page);
 
+  const retryButton = visible(page.getByRole("button", { name: /^Retry / }));
+  await expect(retryButton).toBeVisible();
   await expect(
-    visible(page.getByRole("button", { name: "Try Again" })),
-  ).toBeVisible();
-  await expect(
-    visible(page.getByRole("button", { name: /^Practice \d+$/ })),
+    visible(page.getByRole("button", { name: /^Practice \d+ missed countries$/ })),
   ).toBeVisible();
 
-  await visible(page.getByRole("button", { name: "Try Again" })).click();
+  await retryButton.click();
   await expect(page.getByText("Quiz ended", { exact: false })).toHaveCount(0);
 });
 

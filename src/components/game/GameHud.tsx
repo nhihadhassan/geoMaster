@@ -211,6 +211,19 @@ export function GameHud({
     };
   }, [gameStatus, tick]);
 
+  if (isFinished || isSetup) {
+    return (
+      <>
+        <div className="absolute left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 sm:hidden">
+          <GeoMasterBrand onOpenLanding={onOpenLanding} compact />
+        </div>
+        <div className="absolute left-4 top-4 z-20 hidden sm:block">
+          <GeoMasterBrand onOpenLanding={onOpenLanding} />
+        </div>
+      </>
+    );
+  }
+
   const primaryAction =
     gameStatus === "running"
       ? { label: "Pause", action: pauseQuiz, tone: "amber" as const }
