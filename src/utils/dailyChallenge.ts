@@ -1,3 +1,5 @@
+import { browserStorage } from "@/utils/browserStorage";
+
 // A fixed set of countries per calendar day, identical for everyone, so a
 // result is comparable between players. Local-only: the streak lives in
 // localStorage and there is no leaderboard, account, or network call.
@@ -65,7 +67,7 @@ export const readDailyRecord = (): DailyRecord => {
   }
 
   try {
-    const raw = window.localStorage.getItem(DAILY_KEY);
+    const raw = browserStorage.getItem(DAILY_KEY);
 
     if (!raw) {
       return emptyRecord();
@@ -106,7 +108,7 @@ export const recordDailyCompletion = (
 
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(DAILY_KEY, JSON.stringify(next));
+      browserStorage.setItem(DAILY_KEY, JSON.stringify(next));
     } catch {
       // A streak is a nicety, never a blocker.
     }

@@ -154,10 +154,33 @@ export function CaribbeanInsetMap({
   onLabelSourceLoaded,
 }: CaribbeanInsetMapProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const pulseFrameRef = useRef<number | null>(null);
   const targetPulseFrameRef = useRef<number | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  useEffect(() => {
+    const panel = panelRef.current;
+    const main = panel?.closest("main");
+    if (!keyboardActive || !panel || !main || main.clientWidth >= 640) return;
+    const prompt = main.querySelector<HTMLElement>('aside[aria-label="Target prompt"]');
+    const answer = main.querySelector<HTMLElement>(".atlas-answer-dock");
+    if (!prompt || !answer) return;
+    const measure = () => {
+      const bounds = main.getBoundingClientRect();
+      // Include room for the prompt's entrance animation and wrapped hints.
+      panel.style.top = `${Math.max(164, prompt.getBoundingClientRect().bottom - bounds.top + 16)}px`;
+      panel.style.bottom = `${Math.max(120, bounds.bottom - answer.getBoundingClientRect().top + 10)}px`;
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    [main, prompt, answer].forEach((element) => observer.observe(element));
+    return () => {
+      observer.disconnect();
+      panel.style.removeProperty("top");
+      panel.style.removeProperty("bottom");
+    };
+  }, [keyboardActive, mobileExpanded, targetCountryId, correctPopupVisible, mobilePerformanceMode, mapLoaded]);
   const targetIsCaribbean =
     Boolean(targetCountryId) && caribbeanCountryIds.has(targetCountryId ?? "");
   const hasCaribbeanAttention =
@@ -874,7 +897,7 @@ export function CaribbeanInsetMap({
         exit={{ opacity: 0, y: 8, scale: 0.96 }}
         transition={{ type: "spring", stiffness: 260, damping: 28 }}
         onClick={() => onMobileExpandedChange?.(true)}
-        className={`absolute bottom-[calc(6.15rem+env(safe-area-inset-bottom))] right-3 z-20 min-h-11 rounded-full border px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-black/25 backdrop-blur-xl transition hover:text-white sm:hidden ${
+        className={`absolute bottom-[calc(8.5rem+env(safe-area-inset-bottom))] right-3 z-20 min-h-11 rounded-full border px-3 py-2 text-xs font-semibold text-white shadow-lg shadow-black/25 backdrop-blur-xl transition hover:text-white sm:hidden ${
           hasCaribbeanAttention
             ? "border-cyan-100/28 bg-cyan-300/18 text-cyan-50"
             : "border-white/12 bg-zinc-950/58 text-white/72"
@@ -888,13 +911,14 @@ export function CaribbeanInsetMap({
 
   return (
     <motion.aside
+      ref={panelRef}
       initial={{ opacity: 0, x: 18, scale: 0.98 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
       exit={{ opacity: 0, x: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
       className={`absolute inset-x-3 bottom-[calc(8.85rem+env(safe-area-inset-bottom))] z-20 overflow-hidden rounded-2xl border border-white/12 bg-zinc-950/56 p-2 text-white shadow-xl shadow-black/28 backdrop-blur-xl sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-36 sm:w-[min(19rem,calc(100vw-2.5rem))] sm:rounded-3xl sm:p-3 ${
         keyboardActive
-          ? "top-[calc(9.25rem+env(safe-area-inset-top))] bottom-[calc(10rem+env(safe-area-inset-bottom))] z-30"
+          ? "top-[calc(10.75rem+env(safe-area-inset-top))] bottom-[calc(10rem+env(safe-area-inset-bottom))] z-30"
           : ""
       }`}
       role="region"

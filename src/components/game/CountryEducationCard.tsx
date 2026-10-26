@@ -15,7 +15,7 @@ import { getCountryFlagDisplay } from "@/utils/countryFlags";
 
 type CountryEducationCardProps = {
   country: Country;
-  variant?: "popup" | "review";
+  variant?: "popup" | "review" | "profile";
 };
 
 type IconName = "capital" | "language" | "gdp" | "population";
@@ -166,6 +166,38 @@ export function CountryEducationCard({
       )}
     </section>
   ) : null;
+
+  if (variant === "profile") {
+    return (
+      <article className="atlas-country-profile">
+        <header className="atlas-country-heading">
+          <span className="atlas-profile-flag">
+            {flag.src ? <img src={flag.src} alt={`${country.name} flag`} onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}
+            <span aria-hidden="true">{flag.fallback}</span>
+          </span>
+          <div className="min-w-0"><h3>{country.name}</h3><p>{regionLabel}</p></div>
+        </header>
+        <p className="atlas-profile-capital"><span>Capital</span>{country.capital}</p>
+        <dl className="atlas-profile-facts">
+          {countryRows.filter((row) => row.icon !== "capital").sort((a, b) => (a.icon === "language" ? 1 : 0) - (b.icon === "language" ? 1 : 0)).map((row) => (
+            <div key={row.label} className={row.icon === "language" ? "atlas-profile-languages" : ""}><dt>{row.label}</dt><dd>{row.value}</dd></div>
+          ))}
+        </dl>
+        <p className="atlas-profile-intro">{education.featuredFunFact}</p>
+        {story || education.featuredImage || quickFacts.length ? <details className="atlas-country-story">
+          <summary>{story ? "Read the country story" : `More about ${country.name}`}</summary>
+          {education.featuredImage ? <figure>
+            <img src={education.featuredImage.src} alt={education.featuredImage.alt} loading="lazy" onError={(event) => { event.currentTarget.closest("figure")?.setAttribute("hidden", ""); }} />
+            {education.featuredImage.credit ? <figcaption>{education.featuredImage.credit}</figcaption> : null}
+          </figure> : null}
+          {story?.title ? <h4>{story.title}</h4> : null}
+          {storyParagraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+          {quickFacts.length ? <ul>{quickFacts.map((fact) => <li key={fact}>{fact}</li>)}</ul> : null}
+        </details> : null}
+        {education.sourceYear ? <p className="atlas-profile-source">Statistics reference year: {education.sourceYear}</p> : null}
+      </article>
+    );
+  }
 
   return (
     <article

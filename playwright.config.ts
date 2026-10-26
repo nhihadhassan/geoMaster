@@ -27,6 +27,9 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "on-first-retry",
+    // Software WebGL avoids intermittent macOS GPU-process stalls while
+    // retaining the actual Mapbox canvas and its interaction handlers.
+    launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },

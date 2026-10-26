@@ -49,10 +49,11 @@ test("quiz setup fits its regions without a tab bar", async ({ page }) => {
 
   // The tab bar is gone; the sections are headings in one column.
   await expect(visible(page.getByRole("heading", { name: "Region" }))).toBeVisible();
-  await expect(visible(page.getByRole("heading", { name: "Mode" }))).toBeVisible();
+  await expect(visible(page.getByRole("heading", { name: "How to play" }))).toBeVisible();
   await expect(startButton(page)).toBeVisible();
 
-  // All eight region choices are reachable in the sheet.
+  // All eight region choices are reachable in the expanded picker.
+  await visible(page.locator('button[aria-controls="quiz-region-options"]')).click();
   await expect(
     visible(page.getByRole("button", { name: /Whole World/ })),
   ).toBeVisible();

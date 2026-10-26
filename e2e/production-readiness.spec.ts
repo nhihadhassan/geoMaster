@@ -17,7 +17,7 @@ test("region and Type flow reaches results and retries without browser issues", 
   await visible(
     page.getByRole("button", { name: /South America \d+ countries/ }),
   ).click();
-  await visible(page.getByRole("button", { name: "Name countries" })).click();
+  await visible(page.getByRole("radio", { name: "Name countries" })).click();
   await startConfiguredQuiz(page);
   await expect(visible(page.getByRole("textbox"))).toBeVisible();
   await endQuizViaPause(page);
@@ -31,7 +31,7 @@ test("Identify mode starts with a named target and answer input", async ({
 }) => {
   const verifyHealth = await openMonitoredFresh(page);
   await openQuizSetup(page);
-  await visible(page.getByRole("button", { name: "Identify a country" })).click();
+  await visible(page.getByRole("radio", { name: "Identify a country" })).click();
   await startConfiguredQuiz(page);
   await expect(
     visible(page.getByRole("complementary", { name: "Target prompt" })),
@@ -45,7 +45,7 @@ test("Map Click mode starts with an accessible target prompt", async ({
 }) => {
   const verifyHealth = await openMonitoredFresh(page);
   await openQuizSetup(page);
-  await visible(page.getByRole("button", { name: "Find on the map" })).click();
+  await visible(page.getByRole("radio", { name: "Find on the map" })).click();
   await startConfiguredQuiz(page);
   const targetPrompt = visible(
     page.getByRole("complementary", { name: "Target prompt" }),

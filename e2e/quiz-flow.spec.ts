@@ -27,7 +27,7 @@ test("landing leads into quiz setup and a running quiz", async ({ page }) => {
   await startConfiguredQuiz(page);
 
   await expect(visible(page.getByRole("button", { name: "Pause" }))).toBeVisible();
-  // Give Up no longer competes for HUD space; ending is Pause -> End Quiz.
+  // Give Up no longer competes for HUD space; ending is Pause -> Finish & review.
   await expect(page.getByRole("button", { name: /Give Up/ })).toHaveCount(0);
 });
 
@@ -66,7 +66,7 @@ test("pausing stops the clock and resuming restarts it", async ({ page }) => {
 
   await page
     .getByRole("dialog", { name: "Take your time." })
-    .getByRole("button", { name: "Resume" })
+    .getByRole("button", { name: "Resume quiz" })
     .click();
   await page.waitForTimeout(2_200);
   await expect(timer).not.toHaveText(paused ?? "");

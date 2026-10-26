@@ -165,7 +165,7 @@ export function ShareResultCard(props: ShareResultCardProps) {
       disabled={status === "working"}
       className="min-h-11 rounded-full border border-white/12 bg-white/7 px-4 py-2 text-sm font-semibold text-white/66 transition hover:bg-white/12 hover:text-white disabled:opacity-60"
     >
-      {status === "done" ? "Saved" : status === "error" ? "Try again" : "Share"}
+      {status === "done" ? "Saved" : status === "error" ? "Try again" : "Share result"}
     </button>
   );
 }

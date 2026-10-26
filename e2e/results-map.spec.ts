@@ -28,7 +28,7 @@ async function finishWithOneCorrectAnswer(page: Page) {
   await openQuizSetup(page);
   await visible(page.locator('button[aria-controls="quiz-region-options"]')).click();
   await visible(page.locator("#quiz-region-options").getByRole("button", { name: /South America \d+ countries/ })).click();
-  await visible(page.getByRole("button", { name: "Name countries" })).click();
+  await visible(page.getByRole("radio", { name: "Name countries" })).click();
   await startConfiguredQuiz(page);
   await visible(page.getByRole("textbox")).fill("Brazil");
   await endQuizViaPause(page);
@@ -93,7 +93,7 @@ test("a completed mobile quiz can reveal the all-correct map", async ({ page }, 
   test.skip(testInfo.project.name !== "mobile", "Mobile completion journey");
   await openFresh(page);
   await openQuizSetup(page);
-  await visible(page.getByRole("button", { name: "Name countries" })).click();
+  await visible(page.getByRole("radio", { name: "Name countries" })).click();
   await startConfiguredQuiz(page);
   for (const country of getCountriesForRegion("south-america")) {
     await visible(page.getByRole("textbox")).fill(country.name);

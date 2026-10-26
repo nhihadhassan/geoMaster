@@ -96,13 +96,13 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
       animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 16, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className="absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-h-[70dvh] overflow-y-auto rounded-3xl border border-white/14 bg-zinc-950/74 p-4 text-white shadow-xl shadow-black/34 backdrop-blur-2xl md:inset-x-auto md:bottom-auto md:right-5 md:top-28 md:w-[22rem] md:max-h-[min(66vh,34rem)]"
+      className="atlas-learning-sheet absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-h-[70dvh] overflow-y-auto rounded-3xl border border-white/14 bg-zinc-950/74 p-4 text-white shadow-xl shadow-black/34 backdrop-blur-2xl md:inset-x-auto md:bottom-auto md:right-5 md:top-28 md:w-[22rem] md:max-h-[min(66vh,34rem)]"
       role="dialog"
       aria-modal="true"
       aria-label={`${name} ${label.toLowerCase()} profile`}
     >
-      <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/86 px-4 py-3 backdrop-blur-2xl md:static md:-mx-0 md:-mt-0 md:border-b-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
-        <div>
+      <div className="atlas-learning-heading sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-between gap-3 border-b border-white/10 bg-zinc-950/86 px-4 py-3 backdrop-blur-2xl md:static md:-mx-0 md:-mt-0 md:border-b-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
+        <div className={isCountry ? "sr-only" : ""}>
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.26em] text-sky-100/68">
             Learning Mode
           </p>
@@ -118,9 +118,9 @@ export function LearningModeCard({ feature, onClose }: LearningModeCardProps) {
         </button>
       </div>
       {isCountry ? (
-        <CountryEducationCard country={feature.country} variant="review" />
+        <CountryEducationCard country={feature.country} variant="profile" />
       ) : (
-        <article className="rounded-3xl border border-white/12 bg-white/8 p-4 text-white">
+        <article className="text-white">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="inline-flex rounded-full border border-sky-100/18 bg-sky-300/10 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-sky-100/72">

@@ -129,10 +129,10 @@ export const startConfiguredQuiz = async (page: Page) => {
   await expect(visible(page.getByRole("button", { name: "Pause" }))).toBeVisible();
 };
 
-/** Ends a running quiz the way the UI now requires: Pause, then End Quiz. */
+/** Ends a running quiz the way the UI now requires: Pause, then Finish & review. */
 export const endQuizViaPause = async (page: Page) => {
   await visible(page.getByRole("button", { name: "Pause" })).click();
-  await visible(page.getByRole("button", { name: "End Quiz" })).click();
+  await visible(page.getByRole("button", { name: "Finish & review" })).click();
   await expect(visible(page.getByText("Quiz ended"))).toBeVisible();
 };
 

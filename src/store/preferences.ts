@@ -1,3 +1,5 @@
+import { browserStorage } from "@/utils/browserStorage";
+
 // Small localStorage-backed preference helpers for the game store.
 // Extracted from gameStore.ts unchanged; every reader is SSR-safe and every
 // writer tolerates storage being unavailable.
@@ -10,7 +12,7 @@ export const readInitialAutoHideCorrectCard = () => {
     return true;
   }
 
-  return window.localStorage.getItem(AUTO_HIDE_CORRECT_CARD_KEY) !== "false";
+  return browserStorage.getItem(AUTO_HIDE_CORRECT_CARD_KEY) !== "false";
 };
 
 export const persistAutoHideCorrectCard = (enabled: boolean) => {
@@ -18,7 +20,7 @@ export const persistAutoHideCorrectCard = (enabled: boolean) => {
     return;
   }
 
-  window.localStorage.setItem(AUTO_HIDE_CORRECT_CARD_KEY, String(enabled));
+  browserStorage.setItem(AUTO_HIDE_CORRECT_CARD_KEY, String(enabled));
 };
 
 export const readInitialSoundEffectsEnabled = () => {
@@ -26,7 +28,7 @@ export const readInitialSoundEffectsEnabled = () => {
     return false;
   }
 
-  return window.localStorage.getItem(SOUND_EFFECTS_ENABLED_KEY) === "true";
+  return browserStorage.getItem(SOUND_EFFECTS_ENABLED_KEY) === "true";
 };
 
 export const persistSoundEffectsEnabled = (enabled: boolean) => {
@@ -34,7 +36,7 @@ export const persistSoundEffectsEnabled = (enabled: boolean) => {
     return;
   }
 
-  window.localStorage.setItem(SOUND_EFFECTS_ENABLED_KEY, String(enabled));
+  browserStorage.setItem(SOUND_EFFECTS_ENABLED_KEY, String(enabled));
 };
 
 // Timer multiplier lets players give themselves more time before starting.
@@ -54,7 +56,7 @@ export const readInitialTimerMultiplier = () => {
   }
 
   return normalizeTimerMultiplier(
-    Number(window.localStorage.getItem(TIMER_MULTIPLIER_KEY)),
+    Number(browserStorage.getItem(TIMER_MULTIPLIER_KEY)),
   );
 };
 
@@ -63,7 +65,7 @@ export const persistTimerMultiplier = (multiplier: number) => {
     return;
   }
 
-  window.localStorage.setItem(TIMER_MULTIPLIER_KEY, String(multiplier));
+  browserStorage.setItem(TIMER_MULTIPLIER_KEY, String(multiplier));
 };
 
 // Untimed practice: the clock is hidden and never runs out, so a player can
@@ -77,7 +79,7 @@ export const readInitialTimerMode = (): TimerMode => {
     return "timed";
   }
 
-  return window.localStorage.getItem(TIMER_MODE_KEY) === "untimed"
+  return browserStorage.getItem(TIMER_MODE_KEY) === "untimed"
     ? "untimed"
     : "timed";
 };
@@ -87,7 +89,7 @@ export const persistTimerMode = (mode: TimerMode) => {
     return;
   }
 
-  window.localStorage.setItem(TIMER_MODE_KEY, mode);
+  browserStorage.setItem(TIMER_MODE_KEY, mode);
 };
 
 // Last-used quiz setup, so a returning player can start again in one tap
@@ -105,7 +107,7 @@ export const readLastSetup = (): LastSetup | null => {
   }
 
   try {
-    const raw = window.localStorage.getItem(LAST_SETUP_KEY);
+    const raw = browserStorage.getItem(LAST_SETUP_KEY);
 
     if (!raw) {
       return null;
@@ -125,7 +127,7 @@ export const persistLastSetup = (setup: LastSetup) => {
   }
 
   try {
-    window.localStorage.setItem(LAST_SETUP_KEY, JSON.stringify(setup));
+    browserStorage.setItem(LAST_SETUP_KEY, JSON.stringify(setup));
   } catch {
     // Non-essential convenience; a failed write just means no quick start.
   }

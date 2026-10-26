@@ -194,7 +194,7 @@ export function ResultsDashboard({
         : { opacity: 1, y: 0, scale: 1 }}
       transition={completionPulse && !prefersReducedMotion ? { duration: 0.7 } : { type: "spring", stiffness: 240, damping: 28 }}
       aria-label={reviewOpen ? "Review quiz answers" : "Quiz results"}
-      className={`absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 rounded-3xl border border-white/14 bg-[#111a20]/95 text-white shadow-xl shadow-black/34 backdrop-blur-2xl lg:bottom-5 lg:left-5 lg:right-auto lg:w-[min(29rem,calc(100vw-2.5rem))] ${reviewOpen ? "flex max-h-[70dvh] flex-col overflow-hidden lg:max-h-[min(76vh,48rem)]" : "max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto"}`}
+      className={`atlas-results absolute inset-x-2 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 rounded-3xl border border-white/14 bg-[#11262d]/98 text-white shadow-xl shadow-black/34 backdrop-blur-2xl lg:bottom-5 lg:left-5 lg:right-auto lg:w-[min(29rem,calc(100vw-2.5rem))] ${reviewOpen ? "flex max-h-[70dvh] flex-col overflow-hidden lg:max-h-[min(76vh,48rem)]" : "max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto"}`}
     >
       <button
         type="button"
@@ -293,7 +293,10 @@ export function ResultsDashboard({
               {canPractice ? <button type="button" onClick={retryCurrentQuiz} className="min-h-11 rounded-xl border border-white/16 bg-white/[0.035] px-3 text-sm font-medium text-white/85 transition hover:bg-white/10">Retry {quizLabel}</button> : null}
               {onChangeRegion ? <button type="button" onClick={() => finishResults(onChangeRegion)} className="min-h-11 rounded-xl border border-white/16 bg-white/[0.035] px-3 text-sm font-medium text-white/85 transition hover:bg-white/10">Choose another quiz</button> : null}
             </div>
-            {onContinueLearning ? <button type="button" onClick={() => finishResults(onContinueLearning)} className="min-h-11 w-full text-xs font-medium text-white/65 transition hover:text-white">Explore the map <span aria-hidden="true">↗</span></button> : null}
+            <div className="atlas-result-footer">
+              {onContinueLearning ? <button type="button" onClick={() => finishResults(onContinueLearning)} className="min-h-11 text-xs font-medium text-white/80 transition hover:text-white">Explore the map <span aria-hidden="true">↗</span></button> : null}
+              {features.shareResultCard ? <ShareResultCard quizLabel={quizLabel} modeLabel={modeLabels[selectedMode]} score={score} total={total} statusLabel={statusLabel} /> : null}
+            </div>
           </div>
         </>
       ) : (
@@ -313,7 +316,7 @@ export function ResultsDashboard({
           <div ref={reviewContentRef} className="min-h-0 flex-1 overflow-y-auto px-5 lg:px-6">
             {selectedCountry ? <>
               <button type="button" onClick={() => { onReviewCountrySelect?.(null); setReviewState({ ...reviewState, key: reviewKey, selectedCountryId: null }); }} className="my-3 min-h-11 text-xs font-medium text-cyan-100/85 hover:text-white">← Back to {reviewFilter}</button>
-              <CountryEducationCard country={selectedCountry} variant="review" />
+              <CountryEducationCard country={selectedCountry} variant="profile" />
             </> : reviewGroups.filter((group) => reviewFilter === "missed" ? group.tone === "rose" : group.tone !== "rose").map((group) => group.countries.length ? (
               <section key={group.label}>
                 {isTargetQueueMode ? <h3 className="sticky top-0 bg-[#111a20]/96 py-2 text-[0.63rem] font-semibold uppercase tracking-[0.18em] text-white/60">{group.label} · {group.countries.length}</h3> : null}
