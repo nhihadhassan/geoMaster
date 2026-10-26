@@ -186,3 +186,5 @@ input {
 /* A failed save must not cover a prompt or a sheet's actions. */
 .atlas-temporary-notice { top: auto; bottom: calc(8.5rem + env(safe-area-inset-bottom)); }
 main:has(.atlas-setup, .atlas-pause-backdrop, .atlas-learning-sheet, .atlas-results) > .atlas-temporary-notice { display: none; }
+
+.atlas-results h2[aria-label] { font-size: 3.625rem; }
