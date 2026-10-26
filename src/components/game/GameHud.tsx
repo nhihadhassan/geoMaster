@@ -35,7 +35,7 @@ function GeoMasterBrand({
     <button
       type="button"
       onClick={onOpenLanding}
-      className={`flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/7 text-left transition hover:bg-white/12 ${
+      className={`flex shrink-0 items-center gap-2 rounded-xl border border-white/20 bg-[#132a30] text-left transition hover:bg-[#1d3c43] ${
         compact ? "min-h-11 px-2.5" : "min-h-11 px-3"
       }`}
       aria-label="Open GeoMaster intro"
