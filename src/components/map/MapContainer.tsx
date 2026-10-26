@@ -70,6 +70,8 @@ const MapDebugPanel = dynamic(
 );
 import { CountryPopup } from "@/components/map/CountryPopup";
 import { IdlePromptToast } from "@/components/map/IdlePromptToast";
+import { browserStorage } from "@/utils/browserStorage";
+import { TemporaryProgressNotice } from "@/components/game/TemporaryProgressNotice";
 import { MapControls } from "@/components/map/MapControls";
 import {
   breathe,
@@ -273,7 +275,7 @@ export function MapContainer() {
 
     return (
       params.has("debug") ||
-      window.localStorage.getItem("geomaster-debug") === "1"
+      browserStorage.getItem("geomaster-debug") === "1"
     );
   });
   const {
@@ -2776,6 +2778,7 @@ export function MapContainer() {
         landingOpen ? "[&_.mapboxgl-control-container]:hidden" : ""
       }`}
     >
+      <TemporaryProgressNotice />
       <div ref={mapNodeRef} className="absolute inset-0 h-full w-full" />
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_18%,rgba(34,211,238,0.08),transparent_32rem),linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.18))]" />
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { browserStorage } from "@/utils/browserStorage";
+
 // Local-first mastery tracking. Deliberately separate from gameStore: the quiz
 // engine stays unaware of it, and turning features.progressTracking off means
 // nothing here is ever read or written.
@@ -43,7 +45,7 @@ export const readStoredProgress = (): StoredProgress => {
   }
 
   try {
-    const raw = window.localStorage.getItem(PROGRESS_KEY);
+    const raw = browserStorage.getItem(PROGRESS_KEY);
 
     if (!raw) {
       return emptyStore();
@@ -67,7 +69,7 @@ const writeStoredProgress = (stored: StoredProgress) => {
   }
 
   try {
-    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(stored));
+    browserStorage.setItem(PROGRESS_KEY, JSON.stringify(stored));
   } catch {
     // Storage can be unavailable (private mode, quota). Progress is a bonus,
     // never a prerequisite for playing.

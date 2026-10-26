@@ -150,7 +150,7 @@ export function TypeToFillInput({
           <button
             type="button"
             onClick={lateHint.request}
-            className="pointer-events-auto absolute -top-10 left-3 min-h-8 rounded-full border border-amber-200/24 bg-amber-300/12 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+            className="pointer-events-auto absolute -top-10 left-3 min-h-11 rounded-full border border-amber-200/24 bg-amber-300/12 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
           >
             Hint?
           </button>
@@ -291,11 +291,12 @@ export function TypeToFillInput({
       initial={{ opacity: 0, y: 28, scale: 0.98 }}
       animate={feedbackControls}
       transition={{ type: "spring", stiffness: 280, damping: 30 }}
-      className="absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl transition-colors sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
+      className="atlas-answer-dock absolute inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl rounded-2xl border border-white/12 bg-zinc-950/62 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl transition-colors sm:inset-x-4 sm:bottom-6 sm:rounded-3xl sm:p-2"
     >
-      <label className="sr-only" htmlFor="country-guess">
-        Type a country name
+      <label className="atlas-answer-label" htmlFor="country-guess">
+        Country name
       </label>
+      <div className="atlas-answer-row">
       <input
         id="country-guess"
         value={currentInput}
@@ -309,7 +310,7 @@ export function TypeToFillInput({
         type="text"
         name="geomaster-country-answer"
         inputMode="text"
-        enterKeyHint="done"
+        enterKeyHint={selectedMode === "type-to-fill" ? "done" : "go"}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="words"
@@ -324,12 +325,12 @@ export function TypeToFillInput({
                 : gameStatus === "gave-up"
                   ? "Quiz ended"
                   : selectedMode === "identify-shaded"
-                    ? "Identify the glowing country, then press Enter"
+                    ? "Country name"
                     : selectedMode === "capital-challenge"
-                      ? "Name the country from the capital, then press Enter"
+                      ? "Country name"
                       : "Type a country..."
         }
-        className="h-12 w-full rounded-xl border border-white/10 bg-white/9 px-4 text-center text-base font-medium text-white outline-none ring-0 transition placeholder:text-white/52 focus:border-emerald-300/40 focus:bg-white/14 focus:shadow-[0_0_34px_rgba(52,211,153,0.16)] disabled:cursor-not-allowed disabled:opacity-70 sm:h-16 sm:rounded-2xl sm:px-6 sm:text-2xl"
+        className="atlas-answer-input h-12 w-full rounded-xl border border-white/10 bg-white/9 px-4 text-center text-base font-medium text-white outline-none ring-0 transition placeholder:text-white/52 focus:border-emerald-300/40 focus:bg-white/14 focus:shadow-[0_0_34px_rgba(52,211,153,0.16)] disabled:cursor-not-allowed disabled:opacity-70 sm:h-16 sm:rounded-2xl sm:px-6 sm:text-2xl"
       />
       {(selectedMode === "identify-shaded" ||
         selectedMode === "capital-challenge") &&
@@ -337,11 +338,12 @@ export function TypeToFillInput({
         <button
           type="button"
           onClick={handleSubmit}
-          className="absolute right-3 top-1/2 hidden min-h-11 -translate-y-1/2 rounded-full border border-cyan-100/20 bg-cyan-100/12 px-4 py-2 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-100/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200/70 sm:block"
+          className="atlas-check-answer atlas-primary"
         >
-          Submit
+          Check answer
         </button>
       ) : null}
+      </div>
       {feedbackMessage || localHint || smartHint ? (
         <p className={`pointer-events-none absolute -top-10 left-1/2 max-w-[calc(100vw-1.5rem)] -translate-x-1/2 rounded-2xl border px-3 py-1 text-center text-xs font-semibold leading-4 backdrop-blur-xl sm:-top-9 sm:max-w-[min(36rem,calc(100vw-2rem))] sm:rounded-full ${feedbackMessage ? "border-rose-200/24 bg-zinc-950/76 text-rose-50" : "border-amber-200/20 bg-zinc-950/68 text-amber-100"}`} aria-live="polite">
           {feedbackMessage ?? smartHint ?? localHint}
@@ -351,7 +353,7 @@ export function TypeToFillInput({
         <button
           type="button"
           onClick={lateHint.request}
-          className="absolute -top-10 left-3 min-h-8 rounded-full border border-amber-200/24 bg-amber-300/12 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
+          className="absolute -top-10 left-3 min-h-11 rounded-full border border-amber-200/24 bg-amber-300/12 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200/70"
         >
           Hint?
         </button>

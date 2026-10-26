@@ -1,3 +1,5 @@
+import { browserStorage } from "@/utils/browserStorage";
+
 // localStorage persistence for an in-progress quiz, so a reload can offer to
 // resume it. Extracted from gameStore.ts unchanged.
 import { getCountriesForRegion, type QuizRegion } from "@/data/countries";
@@ -35,7 +37,7 @@ export const writeQuizProgress = (snapshot: QuizProgressSnapshot) => {
   }
 
   try {
-    window.localStorage.setItem(QUIZ_PROGRESS_KEY, JSON.stringify(snapshot));
+    browserStorage.setItem(QUIZ_PROGRESS_KEY, JSON.stringify(snapshot));
   } catch {
     // Storage can be unavailable (private mode, quota). The quiz keeps
     // running; it just won't survive a reload.
@@ -48,7 +50,7 @@ export const clearQuizProgress = () => {
   }
 
   try {
-    window.localStorage.removeItem(QUIZ_PROGRESS_KEY);
+    browserStorage.removeItem(QUIZ_PROGRESS_KEY);
   } catch {
     // Same storage caveat as writeQuizProgress.
   }
@@ -59,7 +61,7 @@ export const readQuizProgress = (): QuizProgressSnapshot | null => {
     return null;
   }
 
-  const raw = window.localStorage.getItem(QUIZ_PROGRESS_KEY);
+  const raw = browserStorage.getItem(QUIZ_PROGRESS_KEY);
 
   if (!raw) {
     return null;

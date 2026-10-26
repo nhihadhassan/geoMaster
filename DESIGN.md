@@ -246,3 +246,19 @@ Learning labels must appear progressively by zoom and density. The Caribbean ins
 - **Don't** use glassmorphism as default content styling. Glass exists because there is a map behind it.
 - **Don't** add background audio or ambient soundscapes. Only short feedback sounds are allowed.
 - **Don't** make desktop worse to solve mobile. Preserve the desktop atlas HUD quality.
+
+## Approved mobile direction · October 26, 2026
+
+Keep the existing spinning-globe Home and automatic acceptance in Name countries.
+Quiz setup uses the selected Focused Setup (B) direction: one opaque dark sheet,
+more available height, visible radio selection, a visible timed/untimed choice,
+and a pinned Start action. Its larger footprint is intentional while choosing a
+quiz; the desktop setup remains a compact panel.
+
+Quiz, Pause, profiles, and results use Refined Atlas (A). Use stable dark backing
+for map overlays, 44–48px touch areas, and rounded rectangular primary controls.
+Identify and Capital have a visible Check answer action on phones. Pause traps
+focus and makes the background inert, with explicit Resume, Finish & review,
+Restart, and Discard actions. Profiles use one sheet with flat fact rows and
+expandable story/media content. Results keep Practice prominent and expose Share
+on the score summary. Map/results gestures and the pale atlas map are preserved.

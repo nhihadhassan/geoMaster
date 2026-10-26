@@ -36,7 +36,7 @@ function GeoMasterBrand({
       type="button"
       onClick={onOpenLanding}
       className={`flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/7 text-left transition hover:bg-white/12 ${
-        compact ? "min-h-10 px-2.5" : "min-h-11 px-3"
+        compact ? "min-h-11 px-2.5" : "min-h-11 px-3"
       }`}
       aria-label="Open GeoMaster intro"
       title="Open GeoMaster intro"
@@ -243,7 +243,7 @@ export function GameHud({
     primaryAction.tone === "emerald"
       ? "border-emerald-100/30 bg-emerald-300/20 text-emerald-50 hover:bg-emerald-300/28"
       : primaryAction.tone === "amber"
-        ? "border-amber-200/50 bg-amber-300/30 text-amber-50 hover:bg-amber-300/40"
+        ? "border-amber-100/70 bg-[#f1d48f] text-[#352d18] hover:bg-amber-100"
         : "border-sky-100/24 bg-sky-300/14 text-sky-50 hover:bg-sky-300/22";
 
   return (
@@ -260,7 +260,7 @@ export function GameHud({
           <button
             type="button"
             onClick={onOpenRegionPanel}
-            className="min-h-10 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
+            className="min-h-11 shrink-0 rounded-full border border-white/12 bg-white/8 px-3 text-xs font-semibold text-white/70 transition hover:bg-white/14 hover:text-white"
           >
             {/* The search field takes the middle of this header, so the label
                 shortens only when it is actually competing for room. */}
@@ -273,7 +273,7 @@ export function GameHud({
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
           data-testid="mobile-quiz-hud"
-          className="pointer-events-none absolute inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex items-center justify-between text-white sm:hidden"
+          className="atlas-mobile-hud pointer-events-none absolute inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-20 flex items-center justify-between text-white sm:hidden"
         >
           <span className="rounded-full border border-white/12 bg-zinc-950/58 px-3 py-2 text-sm font-semibold tabular-nums text-white/86 shadow-lg shadow-black/24 backdrop-blur-xl">
             {progressCount}/{total}
