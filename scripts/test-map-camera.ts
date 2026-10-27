@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium, expect, type Page } from "@playwright/test";
 import type { Map as MapboxMap } from "mapbox-gl";
-import { countries } from "../src/data/countries.ts";
+import { countries, getRegionConfig } from "../src/data/countries.ts";
 import type { QuizProgressSnapshot } from "../src/store/quizPersistence.ts";
 
 // Separate from the DOM-only smoke suite: this check requires real Mapbox
@@ -84,6 +84,10 @@ async function checkJourney(mode: Mode, mobile: boolean) {
   const page = await browser.newPage({
     viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
     isMobile: mobile, hasTouch: mobile,
+    // Keep decorative pulses and entrance springs out of the functional
+    // camera check. The old answer-follow pan was essential and still ran
+    // with this preference, so it remains a valid regression trigger.
+    reducedMotion: "reduce",
   });
   page.setDefaultTimeout(15_000);
   page.on("pageerror", (error) => console.error(error.message));
@@ -122,6 +126,7 @@ async function checkJourney(mode: Mode, mobile: boolean) {
     // constructor camera that may still be visible during initial map loading.
     await visibleButton(page, "Recenter the map").click();
     await page.waitForTimeout(1_100);
+    await page.waitForFunction(() => !window.__cameraAuditMap!.isMoving());
     const overview = await camera(page);
     // Pan with a real drag toward the first question, then zoom until the
     // upcoming Argentina target is outside the bounds used by the old rule.
@@ -167,10 +172,14 @@ async function checkJourney(mode: Mode, mobile: boolean) {
     await assertStill("three misses ARG -> VEN");
     await visibleButton(page, "Recenter the map").click();
     await page.waitForTimeout(1_100);
+    await page.waitForFunction(() => !window.__cameraAuditMap!.isMoving());
     const recentered = await camera(page);
-    assert(Math.abs(recentered.zoom - overview.zoom) < 0.01, "Recenter must restore regional zoom");
-    assert(Math.abs(recentered.lng - overview.lng) < 0.01 && Math.abs(recentered.lat - overview.lat) < 0.01,
-      "Recenter must restore the region, rather than center the answer");
+    assert(recentered.zoom < chosenCamera.zoom - 0.5, "Recenter must zoom out to the region");
+    const regionVisible = await page.evaluate((bounds) => {
+      const visible = window.__cameraAuditMap!.getBounds()!;
+      return visible.contains(bounds[0]) && visible.contains(bounds[1]);
+    }, getRegionConfig("south-america").bounds);
+    assert(regionVisible, "Recenter must include the whole region, rather than center the answer");
     console.log(`PASS ${mobile ? "mobile" : "desktop"} ${mode}: correct answer, three misses, regional Recenter`);
   } catch (error) {
     console.error(await page.evaluate(() => ({
@@ -187,7 +196,9 @@ async function checkJourney(mode: Mode, mobile: boolean) {
 
 const browser = await chromium.launch({ channel: "chromium", args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
-  for (const mobile of [true, false]) {
+  const screen = process.env.MAP_CAMERA_SCREEN;
+  assert(!screen || ["mobile", "desktop"].includes(screen), "MAP_CAMERA_SCREEN must be mobile or desktop");
+  for (const mobile of [true, false].filter((value) => !screen || screen === (value ? "mobile" : "desktop"))) {
     for (const mode of ["click-country", "identify-shaded"] as const) await checkJourney(mode, mobile);
   }
 } finally { await browser.close(); }

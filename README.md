@@ -89,6 +89,7 @@ Set `MAP_CAMERA_URL` to test another local server or deployment. It checks corre
 and three-miss transitions while zoomed in, plus regional Recenter, in both map-tapping
 and highlighted-country modes on mobile and desktop. Unlike the DOM-only smoke suite,
 it waits for the real map and fails if map resources are unavailable.
+It uses reduced motion to keep decorative animation out of the functional check.
 
 ## Project structure
 
