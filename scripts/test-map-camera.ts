@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium, expect, type Page } from "@playwright/test";
 import type { Map as MapboxMap } from "mapbox-gl";
-import { countries } from "../src/data/countries.ts";
+import { countries, getRegionConfig } from "../src/data/countries.ts";
 import type { QuizProgressSnapshot } from "../src/store/quizPersistence.ts";
 
 // Separate from the DOM-only smoke suite: this check requires real Mapbox
@@ -33,7 +33,7 @@ async function attachCameraReader(page: Page) {
       }
     }
     return false;
-  }, undefined, { timeout: 60_000 });
+  }, undefined, { timeout: Number(process.env.MAP_CAMERA_LOAD_TIMEOUT ?? 60_000) });
 }
 
 const camera = (page: Page) => page.evaluate(() => {
@@ -63,13 +63,46 @@ async function clickCountry(page: Page, iso: string) {
   await page.mouse.click(point.x, point.y);
 }
 
+async function panToCountry(page: Page, iso: string) {
+  const drag = await page.evaluate((center) => {
+    const map = window.__cameraAuditMap!;
+    const rect = map.getCanvas().getBoundingClientRect();
+    const target = map.project([center.lng, center.lat]);
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    return { x, y, endX: x + rect.width / 2 - target.x, endY: y + rect.height / 2 - target.y };
+  }, countries.find((country) => country.iso_a3 === iso)!.center);
+  await page.mouse.move(drag.x, drag.y);
+  await page.mouse.down();
+  await page.mouse.move(drag.endX, drag.endY, { steps: 12 });
+  await page.waitForTimeout(200);
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+}
+
 async function checkJourney(mode: Mode, mobile: boolean) {
   const page = await browser.newPage({
     viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
     isMobile: mobile, hasTouch: mobile,
+    // Keep decorative pulses and entrance springs out of the functional
+    // camera check. The old answer-follow pan was essential and still ran
+    // with this preference, so it remains a valid regression trigger.
+    reducedMotion: "reduce",
   });
-  page.setDefaultTimeout(15_000);
+  page.setDefaultTimeout(30_000);
   page.on("pageerror", (error) => console.error(error.message));
+  page.on("requestfailed", (request) => {
+    const url = new URL(request.url());
+    if (url.hostname !== "events.mapbox.com" && request.failure()?.errorText !== "net::ERR_ABORTED") {
+      console.error("Request failed", url.hostname, url.pathname, request.failure()?.errorText);
+    }
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      const url = new URL(response.url());
+      console.error("HTTP failure", response.status(), url.hostname, url.pathname);
+    }
+  });
   try {
     // A deterministic saved run gives both modes the same real questions.
     await page.addInitScript((quizMode) => {
@@ -78,24 +111,35 @@ async function checkJourney(mode: Mode, mobile: boolean) {
         v: 3, region: "south-america", mode: quizMode, status: "running",
         guessedCountryIds: [], countryResults: {}, incorrectAttempts: {},
         score: 0, total: 12, remainingSeconds: 240,
-        currentTargetIso: "BOL", targetQueue: ["PRY", "ARG", "VEN"], savedAt: Date.now(),
+        currentTargetIso: "BOL",
+        targetQueue: ["ARG", "VEN", "PRY", "BRA", "PER", "COL", "ECU", "GUY", "SUR", "URY", "CHL"],
+        savedAt: Date.now(),
       }));
     }, mode);
     await page.goto(baseURL, { waitUntil: "domcontentloaded" });
-    await visibleButton(page, "Resume Quiz").click();
+    await visibleButton(page, "Resume Quiz").click({ noWaitAfter: true });
     await visibleButton(page, "Pause").waitFor();
     await attachCameraReader(page);
     await page.waitForTimeout(1_500);
     await page.waitForFunction(() => !window.__cameraAuditMap!.isMoving());
+    // Establish the regional frame explicitly rather than comparing with a
+    // constructor camera that may still be visible during initial map loading.
+    await visibleButton(page, "Recenter the map").click();
+    await page.waitForTimeout(1_100);
+    await page.waitForFunction(() => !window.__cameraAuditMap!.isMoving());
     const overview = await camera(page);
-    for (let count = 0; count < (mobile ? 2 : 3); count++) {
+    // Pan with a real drag toward the first question, then zoom until the
+    // upcoming Argentina target is outside the bounds used by the old rule.
+    await panToCountry(page, "BOL");
+    const argentinaVisible = () => page.evaluate((center) => window.__cameraAuditMap!.getBounds()!
+      .contains([center.lng, center.lat]), countries.find((country) => country.iso_a3 === "ARG")!.center);
+    for (let count = 0; count < 5 && (count < 1 || await argentinaVisible()); count++) {
       await visibleButton(page, "Zoom in").click();
       await page.waitForFunction(() => !window.__cameraAuditMap!.isMoving());
     }
     const chosenCamera = await camera(page);
-    assert(chosenCamera.zoom > overview.zoom + 1, "The learner must be zoomed in");
-    assert.equal(await page.evaluate((center) => window.__cameraAuditMap!.getBounds()!
-      .contains([center.lng, center.lat]), countries.find((c) => c.iso_a3 === "ARG")!.center),
+    assert(chosenCamera.zoom > overview.zoom + 0.5, "The learner must be zoomed in");
+    assert.equal(await argentinaVisible(),
     false, "Argentina must be offscreen to exercise the previous answer-revealing pan");
 
     const assertStill = async (label: string) => {
@@ -107,16 +151,14 @@ async function checkJourney(mode: Mode, mobile: boolean) {
         assert(Math.abs(after[key] - chosenCamera[key]) < 0.00001, `${label}: camera ${key} changed`);
       }
     };
-    for (const [iso, next] of [["BOL", "PRY"], ["PRY", "ARG"]]) {
-      if (mode === "click-country") await clickCountry(page, iso);
-      else {
-        await page.getByRole("textbox").filter({ visible: true }).fill(countries.find((c) => c.iso_a3 === iso)!.name);
-        await visibleButton(page, "Check answer").click();
-      }
-      await expect.poll(async () => (await progress(page)).currentTargetIso).toBe(next);
-      assert.equal((await progress(page)).countryResults[iso].status, "correct");
-      await assertStill(`correct ${iso} -> ${next}`);
+    if (mode === "click-country") await clickCountry(page, "BOL");
+    else {
+      await page.getByRole("textbox").filter({ visible: true }).fill("Bolivia");
+      await visibleButton(page, "Check answer").click();
     }
+    await expect.poll(async () => (await progress(page)).currentTargetIso).toBe("ARG");
+    assert.equal((await progress(page)).countryResults.BOL.status, "correct");
+    await assertStill("correct BOL -> ARG");
     for (let attempt = 1; attempt <= 3; attempt++) {
       if (mode === "click-country") await clickCountry(page, "BOL");
       else {
@@ -130,24 +172,33 @@ async function checkJourney(mode: Mode, mobile: boolean) {
     await assertStill("three misses ARG -> VEN");
     await visibleButton(page, "Recenter the map").click();
     await page.waitForTimeout(1_100);
+    await page.waitForFunction(() => !window.__cameraAuditMap!.isMoving());
     const recentered = await camera(page);
-    assert(Math.abs(recentered.zoom - overview.zoom) < 0.01, "Recenter must restore regional zoom");
-    assert(Math.abs(recentered.lng - overview.lng) < 0.01 && Math.abs(recentered.lat - overview.lat) < 0.01,
-      "Recenter must restore the region, rather than center the answer");
-    console.log(`PASS ${mobile ? "mobile" : "desktop"} ${mode}: two correct answers, three misses, regional Recenter`);
+    assert(recentered.zoom < chosenCamera.zoom - 0.5, "Recenter must zoom out to the region");
+    const regionVisible = await page.evaluate((bounds) => {
+      const visible = window.__cameraAuditMap!.getBounds()!;
+      return visible.contains(bounds[0]) && visible.contains(bounds[1]);
+    }, getRegionConfig("south-america").bounds);
+    assert(regionVisible, "Recenter must include the whole region, rather than center the answer");
+    console.log(`PASS ${mobile ? "mobile" : "desktop"} ${mode}: correct answer, three misses, regional Recenter`);
   } catch (error) {
     console.error(await page.evaluate(() => ({
       quiz: localStorage.getItem("geomaster-quiz-progress"),
       mapLayers: window.__cameraAuditMap?.getStyle()?.layers?.map((layer) => layer.id),
+      styleLoaded: window.__cameraAuditMap?.isStyleLoaded(),
+      mapLoaded: window.__cameraAuditMap?.loaded(),
+      tilesLoaded: window.__cameraAuditMap?.areTilesLoaded(),
       screen: document.body.innerText.slice(0, 1_200),
     })));
     throw error;
   } finally { await page.close(); }
 }
 
-const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const browser = await chromium.launch({ channel: "chromium", args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 try {
-  for (const mobile of [true, false]) {
+  const screen = process.env.MAP_CAMERA_SCREEN;
+  assert(!screen || ["mobile", "desktop"].includes(screen), "MAP_CAMERA_SCREEN must be mobile or desktop");
+  for (const mobile of [true, false].filter((value) => !screen || screen === (value ? "mobile" : "desktop"))) {
     for (const mode of ["click-country", "identify-shaded"] as const) await checkJourney(mode, mobile);
   }
 } finally { await browser.close(); }

@@ -1978,24 +1978,30 @@ export function MapContainer() {
 
     const map = mapRef.current;
 
-    if (!map.isStyleLoaded()) {
-      return;
+    const attachCountryLayers = () => {
+      try {
+        addCountryLayers(map, topologyData);
+      } catch (error) {
+        setMapDebug({
+          lastLabelLayerError:
+            error instanceof Error
+              ? error.message
+              : "Mapbox rejected a country overlay layer.",
+          ...getMapDebugSnapshot(map),
+        });
+      }
+    };
+
+    if (map.isStyleLoaded()) {
+      attachCountryLayers();
+    } else {
+      // Terrain/style updates can begin after the initial load event. Retry
+      // once when they settle; a persistent idle/styledata listener would
+      // feed our own setData calls back into repeated full layer updates.
+      map.once("idle", attachCountryLayers);
     }
 
-    try {
-      // mapLoaded is set by Mapbox's one-time load event. Re-run only when
-      // GeoMaster's own layer data changes; subscribing to styledata/idle here
-      // feeds each setData call back into another full layer update.
-      addCountryLayers(map, topologyData);
-    } catch (error) {
-      setMapDebug({
-        lastLabelLayerError:
-          error instanceof Error
-            ? error.message
-            : "Mapbox rejected a country overlay layer.",
-        ...getMapDebugSnapshot(map),
-      });
-    }
+    return () => { map.off("idle", attachCountryLayers); };
   }, [addCountryLayers, mapLoaded, setMapDebug, topologyData]);
 
   useEffect(() => {
