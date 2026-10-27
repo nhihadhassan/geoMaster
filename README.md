@@ -1,7 +1,7 @@
 # GeoMaster
 
 A premium, map-first **geography learning game** built with Next.js and Mapbox GL. Type a
-country, get it fuzzy-matched, watch the map fly to it, and learn something about it — wrapped
+country, get it fuzzy-matched, see it fill on the map, and learn something about it — wrapped
 in an "atlas HUD" interface with quiz feedback, hints, and end-of-round stats.
 
 **Live demo:** https://geo-master-livid.vercel.app
@@ -10,7 +10,8 @@ in an "atlas HUD" interface with quiz feedback, hints, and end-of-round stats.
 
 ## Features
 
-- 🗺️ **Interactive Mapbox map** — full-screen, flies to each country as you guess it
+- 🗺️ **Interactive Mapbox map** — full-screen, preserves your view between quiz questions;
+  Recenter returns to the whole region
 - ⌨️ **Type-to-fill matching** — forgiving country matching (handles typos and alternate names)
 - 🎓 **Explore mode** — country, city, landmark, subdivision, and physical-feature cards,
   with search and zoom/recenter controls
@@ -80,7 +81,14 @@ npm run test:search          # explore search
 npm run test:daily           # daily challenge
 npm run test:motion          # map motion curves
 npm run test:e2e             # Playwright smoke journeys (desktop + mobile)
+npm run test:camera          # real-map camera regression against a running server
 ```
+
+The camera check requires Mapbox access and a running app at `http://127.0.0.1:3107`.
+Set `MAP_CAMERA_URL` to test another local server or deployment. It checks correct-answer
+and three-miss transitions while zoomed in, plus regional Recenter, in both map-tapping
+and highlighted-country modes on mobile and desktop. Unlike the DOM-only smoke suite,
+it waits for the real map and fails if map resources are unavailable.
 
 ## Project structure
 
