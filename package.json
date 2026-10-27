@@ -20,7 +20,8 @@
     "test:daily": "tsx scripts/test-daily-challenge.ts",
     "test:motion": "tsx scripts/test-map-motion.ts",
     "test:viewport": "tsx scripts/test-visual-viewport.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:camera": "tsx scripts/test-map-camera.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
