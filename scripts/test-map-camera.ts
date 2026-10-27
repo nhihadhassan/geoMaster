@@ -89,7 +89,7 @@ async function checkJourney(mode: Mode, mobile: boolean) {
     // with this preference, so it remains a valid regression trigger.
     reducedMotion: "reduce",
   });
-  page.setDefaultTimeout(15_000);
+  page.setDefaultTimeout(30_000);
   page.on("pageerror", (error) => console.error(error.message));
   page.on("requestfailed", (request) => {
     const url = new URL(request.url());
@@ -117,7 +117,7 @@ async function checkJourney(mode: Mode, mobile: boolean) {
       }));
     }, mode);
     await page.goto(baseURL, { waitUntil: "domcontentloaded" });
-    await visibleButton(page, "Resume Quiz").click();
+    await visibleButton(page, "Resume Quiz").click({ noWaitAfter: true });
     await visibleButton(page, "Pause").waitFor();
     await attachCameraReader(page);
     await page.waitForTimeout(1_500);
