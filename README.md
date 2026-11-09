@@ -90,6 +90,9 @@ and three-miss transitions while zoomed in, plus regional Recenter, in both map-
 and highlighted-country modes on mobile and desktop. Unlike the DOM-only smoke suite,
 it waits for the real map and fails if map resources are unavailable.
 It uses reduced motion to keep decorative animation out of the functional check.
+For a Mac with Chrome and hardware graphics, both browser suites support
+`PLAYWRIGHT_CHANNEL=chrome PLAYWRIGHT_HARDWARE_WEBGL=1`. Their default remains
+bundled Chromium with software WebGL; changing the browser does not skip assertions.
 
 ## Project structure
 
