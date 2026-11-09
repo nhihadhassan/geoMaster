@@ -96,6 +96,10 @@ bundled Chromium with software WebGL; changing the browser does not skip asserti
 
 ## Project structure
 
+Feature work is currently gated on the physical iPhone Safari and VoiceOver
+[acceptance pass](docs/acceptance/iphone-safari-voiceover.md). Record actual
+device results and resolve blockers before starting another feature.
+
 ```
 src/
 ├── app/                # App Router entry (renders the full-screen map game)
