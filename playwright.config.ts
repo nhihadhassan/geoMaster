@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3107);
+const browserChannel = process.env.PLAYWRIGHT_CHANNEL;
+const hardwareWebGL = process.env.PLAYWRIGHT_HARDWARE_WEBGL === "1";
 
 /**
  * Smoke coverage for the journeys that matter, run against a production build.
@@ -29,7 +31,10 @@ export default defineConfig({
     trace: "on-first-retry",
     // Software WebGL avoids intermittent macOS GPU-process stalls while
     // retaining the actual Mapbox canvas and its interaction handlers.
-    launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] },
+    launchOptions: {
+      ...(browserChannel ? { channel: browserChannel } : {}),
+      args: hardwareWebGL ? [] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+    },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },

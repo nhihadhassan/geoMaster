@@ -194,7 +194,11 @@ async function checkJourney(mode: Mode, mobile: boolean) {
   } finally { await page.close(); }
 }
 
-const browser = await chromium.launch({ channel: "chromium", args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+const browser = await chromium.launch({
+  channel: process.env.PLAYWRIGHT_CHANNEL ?? "chromium",
+  args: process.env.PLAYWRIGHT_HARDWARE_WEBGL === "1"
+    ? [] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+});
 try {
   const screen = process.env.MAP_CAMERA_SCREEN;
   assert(!screen || ["mobile", "desktop"].includes(screen), "MAP_CAMERA_SCREEN must be mobile or desktop");
